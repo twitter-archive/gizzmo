@@ -1,6 +1,6 @@
 = gizzmo
 
-Description goes here.
+Gizzmo is a 
 
 == Note on Patches/Pull Requests
  
