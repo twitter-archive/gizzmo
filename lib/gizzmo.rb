@@ -154,19 +154,9 @@ else
   rescue ThriftClient::Simple::ThriftException => e
     STDERR.puts e.message
     exit 1
+  rescue Errno::EPIPE 
+    # This is just us trying to puts into a closed stdout.  For example, if you pipe into
+    # head -1, then this script will keep running after head closes.  We don't care, and
+    # seeing the backtrace is annoying!
   end
-
-  # include Gizzard::Thrift
-  # 20.times do |i|
-  #   i += 20
-  #   repl = service.create_shard(ShardInfo.new(repl_id = ShardId.new("localhost", "table_repl_#{i}"), "com.twitter.service.flock.edges.ReplicatingShard", "", "", 0))
-  #   a    = service.create_shard(ShardInfo.new(a_id    = ShardId.new("localhost", "table_a_#{i}"), "com.twitter.service.flock.edges.SqlShard", "INT UNSIGNED", "INT UNSIGNED", 0))
-  #   b    = service.create_shard(ShardInfo.new(b_id    = ShardId.new("localhost", "table_b_#{i}"), "com.twitter.service.flock.edges.SqlShard", "INT UNSIGNED", "INT UNSIGNED", 0))
-  #
-  #   service.add_link(repl_id, a_id, 2)
-  #   service.add_link(repl_id, b_id, 1)
-  #
-  #   service.set_forwarding(Forwarding.new(0, i * 1000, repl_id))
-  # end
-
 end
