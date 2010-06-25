@@ -1,17 +1,29 @@
 = gizzmo
 
-Gizzmo is a 
+Gizzmo is a command-line client for managing gizzard clusters.
 
-== Note on Patches/Pull Requests
+== Installation and setup
+
+Installation is a simple gem install.  You may find it useful to create a ~/.gizmorc file, which is simply YAML key/values.  The keys are the long-style command line option keys converted into Ruby-style variables.  A common .gizmorc will simply be:
+
+    host: localhost
+    port: 7917
+
+== Usage
+
+Run `gizzmo help` for up-to-date usage.
+
+== Running tests
+
+The tests may be somewhat difficult to run outside of Twitter.  They assume the following:
+
+1. You have a running FlockDB development environment exposing a ShardManager over thrift on localhost:7917
+2. You don't mind blowing away the data in your dev environment.
+3. Your MySQL username and password are in the environment variables DB_USERNAME and DB_PASSWORD
+
+Assuming you've put together the dependencies, ./test/test.sh should run fine.
  
-* Fork the project.
-* Make your feature addition or bug fix.
-* Add tests for it. This is important so I don't break it in a
-  future version unintentionally.
-* Commit, do not mess with rakefile, version, or history.
-  (if you want to have your own version, that is fine but bump version in a commit by itself I can ignore when I pull)
-* Send me a pull request. Bonus points for topic branches.
-
 == Copyright
 
-Copyright (c) 2010 Kyle Maxwell. See LICENSE for details.
+Copyright (c) 2010 Twitter, Inc. See LICENSE for details.
+ 
