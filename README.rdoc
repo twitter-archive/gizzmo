@@ -4,7 +4,7 @@ Gizzmo is a command-line client for managing gizzard clusters.
 
 == Installation and setup
 
-Installation is a simple gem install.  You may find it useful to create a ~/.gizmorc file, which is simply YAML key/values.  The keys are the long-style command line option keys converted into Ruby-style variables.  A common .gizmorc will simply be:
+Installation is a simple gem install.  You may find it useful to create a ~/.gizzmorc file, which is simply YAML key/values.  The keys are the long-style command line option keys converted into Ruby-style variables.  A common .gizzmorc will simply be:
 
     host: localhost
     port: 7917
