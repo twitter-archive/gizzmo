@@ -88,6 +88,32 @@ module Gizzard
     end
 
     class ShardManager < T::ThriftService
+      def initialize(host, port, dry_run = false)
+        super(host, port)
+        @dry = dry_run
+      end
+      
+      def _proxy(method_name, *args)
+        cls = self.class.ancestors.find { |cls| cls.respond_to?(:_arg_structs) and cls._arg_structs[method_name.to_sym] }
+        arg_class, rv_class = cls._arg_structs[method_name.to_sym]
+        
+        # Writing methods return void. Methods should never both read and write. If this assumption
+        # is violated in the future, dry-run will fail!!
+        is_writing_method = rv_class._fields.first.type == ThriftClient::Simple::VOID
+        if @dry && is_writing_method
+          puts "Skipped writing: #{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
+        else
+          super(method_name, *args)
+        end
+      rescue ThriftClient::Simple::ThriftException
+        if @dry
+          puts "Skipped reading: #{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
+        else
+          raise
+        end
+      end
+      
+      
       thrift_method :create_shard, void, field(:shard, struct(ShardInfo), 1), :throws => exception(ShardException)
       thrift_method :delete_shard, void, field(:id, struct(ShardId), 1)
       thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1)

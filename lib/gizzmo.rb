@@ -90,7 +90,7 @@ global = OptionParser.new do |opts|
     global_options.port = port
   end
 
-  opts.on("-d", "--dry-run", "") do |port|
+  opts.on("-D", "--dry-run", "") do |port|
     global_options.dry = true
   end
 
@@ -136,27 +136,23 @@ unless subcommands.include?(subcommand_name)
   exit 1
 end
 
-if global_options.dry
-  puts "Connecting to service on #{global_options.host}:#{global_options.port}"
-  puts "Sending #{subcommand_name} with #{argv.inspect}, #{subcommand_options.inspect}"
-else
-  service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port)
-  begin
-    Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)
-  rescue HelpNeededError => e
-    if e.class.name != e.message 
-      STDERR.puts("=" * 80)
-      STDERR.puts e.message 
-      STDERR.puts("=" * 80)
-    end
-    STDERR.puts subcommands[subcommand_name]
-    exit 1
-  rescue ThriftClient::Simple::ThriftException => e
-    STDERR.puts e.message
-    exit 1
-  rescue Errno::EPIPE 
-    # This is just us trying to puts into a closed stdout.  For example, if you pipe into
-    # head -1, then this script will keep running after head closes.  We don't care, and
-    # seeing the backtrace is annoying!
+service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, global_options.dry)
+
+begin
+  Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)
+rescue HelpNeededError => e
+  if e.class.name != e.message 
+    STDERR.puts("=" * 80)
+    STDERR.puts e.message 
+    STDERR.puts("=" * 80)
   end
+  STDERR.puts subcommands[subcommand_name]
+  exit 1
+rescue ThriftClient::Simple::ThriftException => e
+  STDERR.puts e.message
+  exit 1
+rescue Errno::EPIPE 
+  # This is just us trying to puts into a closed stdout.  For example, if you pipe into
+  # head -1, then this script will keep running after head closes.  We don't care, and
+  # seeing the backtrace is annoying!
 end
