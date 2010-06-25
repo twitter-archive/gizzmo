@@ -6,6 +6,7 @@ require "ostruct"
 require "gizzard"
 require "yaml"
 
+ORIGINAL_ARGV = ARGV.dup
 
 # Container for parsed options
 global_options     = OpenStruct.new
@@ -99,6 +100,10 @@ global = OptionParser.new do |opts|
       global_options.send("#{k}=", v)
     end
   end
+  
+  opts.on("-L", "--log=LOG_FILE", "Path to LOG_FILE") do |file|
+    global_options.log = file
+  end
 end
 
 # Print banner if no args
@@ -136,7 +141,8 @@ unless subcommands.include?(subcommand_name)
   exit 1
 end
 
-service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, global_options.dry)
+log = global_options.log || "/tmp/gizzmo.log"
+service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
 
 begin
   Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)

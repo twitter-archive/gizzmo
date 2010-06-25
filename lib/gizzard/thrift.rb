@@ -88,9 +88,14 @@ module Gizzard
     end
 
     class ShardManager < T::ThriftService
-      def initialize(host, port, dry_run = false)
+      def initialize(host, port, log_path, dry_run = false)
         super(host, port)
         @dry = dry_run
+        begin
+          @log = File.open(log_path, "a")
+        rescue
+          STDERR.puts "Error opening log file at #{log_path}.  Continuing..."
+        end
       end
       
       def _proxy(method_name, *args)
@@ -101,16 +106,22 @@ module Gizzard
         # is violated in the future, dry-run will fail!!
         is_writing_method = rv_class._fields.first.type == ThriftClient::Simple::VOID
         if @dry && is_writing_method
-          puts "Skipped writing: #{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
+          puts "Skipped writing: #{printable(method_name, args)}"
         else
+          @log.puts printable(method_name, args, true)
           super(method_name, *args)
         end
       rescue ThriftClient::Simple::ThriftException
         if @dry
-          puts "Skipped reading: #{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
+          puts "Skipped reading: #{printable(method_name, args)}"
         else
           raise
         end
+      end
+      
+      def printable(method_name, args, timestamp = false)
+        ts = timestamp ? "#{Time.now}\t" : ""
+        "#{ts}#{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
       end
       
       
