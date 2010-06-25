@@ -34,7 +34,7 @@ module Gizzard
     end
   end
 
-  class LinkCommand < Command
+  class AddlinkCommand < Command
     def run
       up_id, down_id, weight = argv
       help! if argv.length != 3
