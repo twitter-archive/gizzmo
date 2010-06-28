@@ -19,7 +19,7 @@ begin
   YAML.load_file(File.join(ENV["HOME"], ".gizzmorc")).each do |k, v|
     global_options.send("#{k}=", v)
   end
-rescue Errno::ENOENT 
+rescue Errno::ENOENT
   # Do nothing...
 rescue => e
   abort "Unknown error loading ~/.gizzmorc: #{e.message}"
@@ -63,7 +63,7 @@ subcommands = {
   'reload' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} reload"
   end,
-  'link' => OptionParser.new do |opts|
+  'addlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
   end,
   'unlink' => OptionParser.new do |opts|
@@ -100,7 +100,7 @@ global = OptionParser.new do |opts|
       global_options.send("#{k}=", v)
     end
   end
-  
+
   opts.on("-L", "--log=LOG_FILE", "Path to LOG_FILE") do |file|
     global_options.log = file
   end
@@ -147,9 +147,9 @@ service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.
 begin
   Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)
 rescue HelpNeededError => e
-  if e.class.name != e.message 
+  if e.class.name != e.message
     STDERR.puts("=" * 80)
-    STDERR.puts e.message 
+    STDERR.puts e.message
     STDERR.puts("=" * 80)
   end
   STDERR.puts subcommands[subcommand_name]
@@ -157,8 +157,10 @@ rescue HelpNeededError => e
 rescue ThriftClient::Simple::ThriftException => e
   STDERR.puts e.message
   exit 1
-rescue Errno::EPIPE 
+rescue Errno::EPIPE
   # This is just us trying to puts into a closed stdout.  For example, if you pipe into
   # head -1, then this script will keep running after head closes.  We don't care, and
   # seeing the backtrace is annoying!
+rescue Interrupt
+  exit 1
 end

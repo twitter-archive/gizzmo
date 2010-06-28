@@ -29,8 +29,8 @@ do
   g create localhost "table_repl_$i" com.twitter.service.flock.edges.ReplicatingShard
   g create localhost "table_a_$i" com.twitter.service.flock.edges.SqlShard --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
   g create localhost "table_b_$i" com.twitter.service.flock.edges.SqlShard --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g link "localhost/table_repl_$i" "localhost/table_a_$i" 2
-  g link "localhost/table_repl_$i" "localhost/table_b_$i" 1
+  g addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
+  g addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
 done
 
 for i in `g find -h localhost`; do g info $i; done | expect info.txt
