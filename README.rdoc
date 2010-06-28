@@ -17,16 +17,16 @@ Run `gizzmo help` for up-to-date usage.
 
 === Block and unblock a shard
 
-	BLOCKER=`gizzmo wrap com.twitter.gizzard.shards.BlockedShard a_shard`
-	
-	gizzmo unwrap $BLOCKER
+    BLOCKER=`gizzmo wrap com.twitter.gizzard.shards.BlockedShard a_shard`
+    
+    gizzmo unwrap $BLOCKER
 
 === Reweight a shard safely (the hard way)
 
-	REPL=`gizzmo wrap com.twitter.service.flock.edges.ReplicatingShard a_shard`
-	PARENT=`gizzmo links $REPL | cut -f 1 | grep -v $REPL | head -1`
-	gizzmo link $PARENT a_shard
-	gizzmo unwrap $REPL
+    REPL=`gizzmo wrap com.twitter.service.flock.edges.ReplicatingShard a_shard`
+    PARENT=`gizzmo links $REPL | cut -f 1 | grep -v $REPL | head -1`
+    gizzmo link $PARENT a_shard
+    gizzmo unwrap $REPL
 
 == Running tests
 
