@@ -38,8 +38,8 @@ g find -hlocalhost | expect original-find.txt
 g find -hlocalhost -tSqlShard | expect find-only-sql-shard-type.txt
 
 # Dry run this
-g -D wrap com.twitter.service.flock.edges.ReplicatingShard localhost/table_b_0 | expect dry-wrap-table_b_0.txt
 
+g -D wrap com.twitter.service.flock.edges.ReplicatingShard localhost/table_b_0 | expect dry-wrap-table_b_0.txt
 g wrap com.twitter.service.flock.edges.ReplicatingShard localhost/table_b_0 | expect wrap-table_b_0.txt
 g links localhost/table_b_0 | expect links-for-table_b_0.txt
 g links localhost/table_repl_0 | expect links-for-table_repl_0.txt

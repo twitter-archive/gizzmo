@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.1.0"
+  s.version = "0.1.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-06-24}
+  s.date = %q{2010-06-25}
   s.default_executable = %q{gizzmo}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
@@ -26,15 +26,14 @@ Gem::Specification.new do |s|
      "Rakefile",
      "VERSION",
      "bin/gizzmo",
+     "gizzmo.gemspec",
      "lib/gizzard.rb",
-     "lib/gizzard/_deprecated.rb",
      "lib/gizzard/commands.rb",
-     "lib/gizzard/consts.rb",
-     "lib/gizzard/dsl.rb",
      "lib/gizzard/thrift.rb",
      "lib/gizzmo.rb",
      "lib/vendor/thrift_client/simple.rb",
      "test/config.yaml",
+     "test/expected/dry-wrap-table_b_0.txt",
      "test/expected/empty-file.txt",
      "test/expected/find-only-sql-shard-type.txt",
      "test/expected/help-info.txt",

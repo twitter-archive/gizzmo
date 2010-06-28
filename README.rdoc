@@ -13,6 +13,21 @@ Installation is a simple gem install.  You may find it useful to create a ~/.giz
 
 Run `gizzmo help` for up-to-date usage.
 
+== Recipes
+
+=== Block and unblock a shard
+
+	BLOCKER=`gizzmo wrap com.twitter.gizzard.shards.BlockedShard a_shard`
+	
+	gizzmo unwrap $BLOCKER
+
+=== Reweight a shard safely (the hard way)
+
+	REPL=`gizzmo wrap com.twitter.service.flock.edges.ReplicatingShard a_shard`
+	PARENT=`gizzmo links $REPL | cut -f 1 | grep -v $REPL | head -1`
+	gizzmo link $PARENT a_shard
+	gizzmo unwrap $REPL
+
 == Running tests
 
 The tests may be somewhat difficult to run outside of Twitter.  They assume the following:
