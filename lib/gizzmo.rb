@@ -40,6 +40,9 @@ subcommands = {
   'wrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
   end,
+  'delete' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
+  end,
   'unwrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"
   end,

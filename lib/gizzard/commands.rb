@@ -34,6 +34,16 @@ module Gizzard
     end
   end
 
+  class DeleteCommand < Command
+    def run
+      argv.each do |arg|
+        id  = ShardId.parse(arg)
+        service.delete_shard(id)
+        puts id.to_unix
+      end
+    end
+  end
+
   class AddlinkCommand < Command
     def run
       up_id, down_id, weight = argv
