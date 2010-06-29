@@ -1,3 +1,4 @@
+require "pp"
 module Gizzard
   class Command
     include Thrift
@@ -20,6 +21,37 @@ module Gizzard
 
     def help!(message = nil)
       raise HelpNeededError, message
+    end
+  end
+  
+  class SubtreeCommand < Command
+    def run
+      @roots = []
+      argv.each do |arg|
+        @id = ShardId.parse(arg)
+        @roots << up(@id)
+      end
+      @roots.uniq.each do |root|
+        puts root.to_unix
+        down(root, 1)          
+      end
+    end
+    
+    def up(id)
+      links = service.list_upward_links(id)
+      if links.empty?
+        id
+      else
+        links.map{|link| link.up_id }.find{|up_id| up(up_id) }
+      end
+    end
+
+    def down(id, depth = 0)
+      service.list_downward_links(id).map do |link|
+        down(link.down_id, depth + 1)
+        printable = "  " * depth + link.down_id.to_unix
+        puts printable
+      end
     end
   end
 

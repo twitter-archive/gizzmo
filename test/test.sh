@@ -52,6 +52,8 @@ g links localhost/table_b_0 | expect unwrapped-table_b_0.txt
 g unlink localhost/table_repl_0 localhost/table_b_0 | expect empty-file.txt
 g links localhost/table_b_0 | expect empty-file.txt
 
+g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml subtree 2>&1 | expect subtree.txt
+
 g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml delete
 g find -hlocalhost | expect empty-file.txt
 
