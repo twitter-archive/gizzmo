@@ -128,10 +128,12 @@ module Gizzard
         service.create_shard(ShardInfo.new(wrapper_id = self.class.derive_wrapper_shard_id(shard_info, class_name), class_name, "", "", 0))
 
         existing_links = service.list_upward_links(shard_id)
-        service.add_link(wrapper_id, shard_id, 1)
-        existing_links.each do |link_info|
-          service.add_link(link_info.up_id, wrapper_id, link_info.weight)
-          service.remove_link(link_info.up_id, link_info.down_id)
+        unless existing_links.include?(LinkInfo.new(wrapper_id, shard_id, 1))
+          service.add_link(wrapper_id, shard_id, 1)
+          existing_links.each do |link_info|
+            service.add_link(link_info.up_id, wrapper_id, link_info.weight)
+            service.remove_link(link_info.up_id, link_info.down_id)
+          end
         end
         puts wrapper_id.to_unix
       end
