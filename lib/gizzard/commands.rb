@@ -126,7 +126,7 @@ module Gizzard
   class WrapCommand < Command
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
       prefix_prefix = wrapping_class_name.split(".").last.downcase.gsub("shard", "") + "_"
-      ShardId.new(shard_info.id.hostname, prefix_prefix + shard_info.id.table_prefix)
+      ShardId.new("localhost", prefix_prefix + shard_info.id.table_prefix)
     end
 
     def run
