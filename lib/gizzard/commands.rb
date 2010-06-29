@@ -113,6 +113,7 @@ module Gizzard
             puts new_link.to_unix
           end
         end
+        service.delete_shard shard_id
       end
     end
   end
