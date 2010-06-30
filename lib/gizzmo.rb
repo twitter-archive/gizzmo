@@ -74,6 +74,9 @@ subcommands = {
   end,
   'unlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
+  end,
+  'forward' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} forward TABLE_ID BASE_ID SHARD_ID"
   end
 }
 
@@ -109,6 +112,10 @@ global = OptionParser.new do |opts|
 
   opts.on("-L", "--log=LOG_FILE", "Path to LOG_FILE") do |file|
     global_options.log = file
+  end
+
+  opts.on("-b", "--batch", "Batch mode (no confirmation dialogs)") do
+    global_options.batch = true
   end
 end
 

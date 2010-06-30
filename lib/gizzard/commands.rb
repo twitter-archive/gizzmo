@@ -23,7 +23,7 @@ module Gizzard
       raise HelpNeededError, message
     end
   end
-  
+
   class SubtreeCommand < Command
     def run
       @roots = []
@@ -33,10 +33,10 @@ module Gizzard
       end
       @roots.uniq.each do |root|
         puts root.to_unix
-        down(root, 1)          
+        down(root, 1)
       end
     end
-    
+
     def up(id)
       links = service.list_upward_links(id)
       if links.empty?
@@ -57,8 +57,13 @@ module Gizzard
 
   class ReloadCommand < Command
     def run
-      puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
-      if gets.chomp == "yes"
+      if global_options.batch
+        serious = true
+      else
+        puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
+        serious = (gets.chomp == "yes")
+      end
+      if serious
         service.reload_forwardings
       else
         STDERR.puts "aborted"
@@ -128,6 +133,15 @@ module Gizzard
       service.create_shard(ShardInfo.new(shard_id = ShardId.new(host, table), class_name, source_type, destination_type, busy))
       service.get_shard(shard_id)
       puts shard_id.to_unix
+    end
+  end
+
+  class ForwardCommand < Command
+    def run
+      help! if argv.length != 3
+      table_id, base_id, shard_id_text = argv
+      shard_id = ShardId.parse(shard_id_text)
+      service.set_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
     end
   end
 
