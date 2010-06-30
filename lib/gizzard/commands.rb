@@ -145,6 +145,20 @@ module Gizzard
     end
   end
 
+  class ShowCommand < Command
+    def run
+      service.get_forwardings().sort_by do |f|
+        [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
+      end.each do |forwarding|
+        if @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id) &&
+           !@command_options.table_ids.include?(-forwarding.table_id)
+          next
+        end
+        puts "%8d %015x %s" % [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ]
+      end
+    end
+  end
+
   class LinksCommand < Command
     def run
       shard_ids = @argv

@@ -77,6 +77,13 @@ subcommands = {
   end,
   'forward' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} forward TABLE_ID BASE_ID SHARD_ID"
+  end,
+  'show' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} show [options]"
+
+    opts.on("-t", "--tables=IDS", "Show only the specified table ids (comma separated)") do |table_ids|
+      subcommand_options.table_ids = table_ids.split(",").map { |s| s.to_i }
+    end
   end
 }
 
