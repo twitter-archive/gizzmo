@@ -46,6 +46,17 @@ subcommands = {
   'delete' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
   end,
+  'addforwarding' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} addforwarding TABLE_ID BASE_ID SHARD_ID"
+  end,
+  'forwardings' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} show [options]"
+  
+    opts.on("-t", "--tables=IDS", "Show only the specified table ids (comma separated)") do |table_ids|
+      subcommand_options.table_ids ||= []
+      subcommand_options.table_ids +=  table_ids.split(",").map { |s| s.to_i }
+    end
+  end,
   'unwrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"
   end,
@@ -109,6 +120,10 @@ global = OptionParser.new do |opts|
 
   opts.on("-L", "--log=LOG_FILE", "Path to LOG_FILE") do |file|
     global_options.log = file
+  end
+  
+  opts.on("-f", "--force", "Don't display confirmation dialogs") do |force|
+    global_options.force = force
   end
 end
 

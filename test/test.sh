@@ -4,25 +4,13 @@ function g {
   # echo "> g $@" >&2
   ../bin/gizzmo -Cconfig.yaml "$@" 2>&1
 }
+
 function expect {
   diff -u - "expected/$1" && echo "    success." || echo "    failed." && exit 1
 }
 
-# set -ex
-
-if ["$FLOCK_ENV" -eq ""]; then
-  FLOCK_ENV=development
-fi
-
-for i in 1 2
-do
-  for type in edges groups
-  do
-    db="flock_${type}_${FLOCK_ENV}_${i}"
-    echo "drop database if exists $db; create database $db; " | mysql -u"$DB_USERNAME" --password="$DB_PASSWORD"
-    cat recreate.sql | mysql -u"$DB_USERNAME" --password="$DB_PASSWORD" "$db"
-  done
-done
+g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml delete
+g find -hlocalhost | expect empty-file.txt
 
 for i in {0..9}
 do
@@ -37,7 +25,9 @@ for i in `g find -h localhost`; do g info $i; done | expect info.txt
 g find -hlocalhost | expect original-find.txt
 g find -hlocalhost -tSqlShard | expect find-only-sql-shard-type.txt
 
-# Dry run this
+g addforwarding 1 0 localhost/table_a_3
+g forwardings | expect forwardings.txt
+g unforward 1 0 localhost/table_a_3
 
 g -D wrap com.twitter.service.flock.edges.ReplicatingShard localhost/table_b_0 | expect dry-wrap-table_b_0.txt
 g wrap com.twitter.service.flock.edges.ReplicatingShard localhost/table_b_0 | expect wrap-table_b_0.txt
@@ -54,7 +44,3 @@ g links localhost/table_b_0 | expect empty-file.txt
 
 g wrap com.twitter.gizzard.shards.BlockedShard localhost/table_a_3
 g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml subtree 2>&1 | expect subtree.txt
-
-g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml delete
-g find -hlocalhost | expect empty-file.txt
-

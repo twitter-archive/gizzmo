@@ -24,6 +24,27 @@ module Gizzard
     end
   end
   
+  class AddforwardingCommand < Command
+    def run
+      help! if argv.length != 3
+      table_id, base_id, shard_id_text = argv
+      shard_id = ShardId.parse(shard_id_text)
+      service.set_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
+    end
+  end
+
+  class ForwardingsCommand < Command
+    def run
+      service.get_forwardings().sort_by do |f|
+        [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
+      end.reject do |forwarding|
+        @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
+      end.each do |forwarding|
+        puts [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
+      end
+    end
+  end
+
   class SubtreeCommand < Command
     def run
       @roots = []
