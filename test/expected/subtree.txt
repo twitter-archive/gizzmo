@@ -1,3 +1,7 @@
+localhost/table_repl_3
+  localhost/blocked_table_a_3
+    localhost/table_a_3
+  localhost/table_b_3
 localhost/table_repl_0
   localhost/table_a_0
 localhost/table_repl_1
@@ -6,9 +10,8 @@ localhost/table_repl_1
 localhost/table_repl_2
   localhost/table_a_2
   localhost/table_b_2
-localhost/table_repl_3
+localhost/blocked_table_a_3
   localhost/table_a_3
-  localhost/table_b_3
 localhost/table_repl_4
   localhost/table_a_4
   localhost/table_b_4

@@ -48,9 +48,9 @@ module Gizzard
 
     def down(id, depth = 0)
       service.list_downward_links(id).map do |link|
-        down(link.down_id, depth + 1)
         printable = "  " * depth + link.down_id.to_unix
         puts printable
+        down(link.down_id, depth + 1)
       end
     end
   end
