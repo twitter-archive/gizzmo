@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.1.4"
+  s.version = "0.2.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
@@ -36,6 +36,7 @@ Gem::Specification.new do |s|
      "test/expected/dry-wrap-table_b_0.txt",
      "test/expected/empty-file.txt",
      "test/expected/find-only-sql-shard-type.txt",
+     "test/expected/forwardings.txt",
      "test/expected/help-info.txt",
      "test/expected/info.txt",
      "test/expected/links-for-replicating_table_b_0.txt",
