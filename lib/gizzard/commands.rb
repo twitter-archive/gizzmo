@@ -78,12 +78,16 @@ module Gizzard
 
   class ReloadCommand < Command
     def run
-      puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
-      if gets.chomp == "yes"
+      if global_options.force || ask
         service.reload_forwardings
       else
         STDERR.puts "aborted"
       end
+    end
+    
+    def ask
+      puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
+      gets.chomp == "yes" 
     end
   end
 
