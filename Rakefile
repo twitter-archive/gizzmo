@@ -37,6 +37,11 @@ rescue LoadError
 end
 
 task :test do
+  puts 
+  puts "=" * 79
+  puts "You might want to read the README before running tests."
+  puts "=" * 79
+  sleep 2
   exec File.join(File.dirname(__FILE__), "test", "test.sh")
 end
 
