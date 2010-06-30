@@ -22,9 +22,9 @@ module Gizzard
       def inspect
         "#{hostname}/#{table_prefix}"
       end
-      
+
       alias_method :to_unix, :inspect
-      
+
       def self.parse(string)
         new(*string.split("/"))
       end
@@ -46,7 +46,7 @@ module Gizzard
       def inspect(short = false)
         "#{id.inspect}" + (busy? ? " (BUSY)" : "")
       end
-      
+
       def to_unix
         [id.to_unix, class_name, busy? ? "busy" : "unbusy"].join("\t")
       end
@@ -62,11 +62,10 @@ module Gizzard
       def inspect
         "#{up_id.inspect} -> #{down_id.inspect}" + (weight == 1 ? "" : " <#{weight}>")
       end
-      
+
       def to_unix
         [up_id.to_unix, down_id.to_unix, weight].join("\t")
       end
-      
     end
 
     ShardMigration = T.make_struct(:ShardMigration,
@@ -97,11 +96,11 @@ module Gizzard
           STDERR.puts "Error opening log file at #{log_path}.  Continuing..."
         end
       end
-      
+
       def _proxy(method_name, *args)
         cls = self.class.ancestors.find { |cls| cls.respond_to?(:_arg_structs) and cls._arg_structs[method_name.to_sym] }
         arg_class, rv_class = cls._arg_structs[method_name.to_sym]
-        
+
         # Writing methods return void. Methods should never both read and write. If this assumption
         # is violated in the future, dry-run will fail!!
         is_writing_method = rv_class._fields.first.type == ThriftClient::Simple::VOID
@@ -118,13 +117,13 @@ module Gizzard
           raise
         end
       end
-      
+
       def printable(method_name, args, timestamp = false)
         ts = timestamp ? "#{Time.now}\t" : ""
         "#{ts}#{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
       end
-      
-      
+
+
       thrift_method :create_shard, void, field(:shard, struct(ShardInfo), 1), :throws => exception(ShardException)
       thrift_method :delete_shard, void, field(:id, struct(ShardId), 1)
       thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1)
