@@ -36,7 +36,9 @@ rescue LoadError
   end
 end
 
-task :test => :check_dependencies
+task :test do
+  exec File.join(File.dirname(__FILE__), "test", "test.sh")
+end
 
 task :default => :test
 
