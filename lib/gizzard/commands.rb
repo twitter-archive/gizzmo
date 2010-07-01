@@ -63,7 +63,7 @@ module Gizzard
       if links.empty?
         id
       else
-        links.map{|link| link.up_id }.find{|up_id| up(up_id) }
+        links.map { |link| link.up_id }.find { |up_id| up(up_id) }
       end
     end
 
@@ -106,8 +106,8 @@ module Gizzard
       up_id, down_id, weight = argv
       help! if argv.length != 3
       weight = weight.to_i
-      up_id  = ShardId.parse(up_id)
-      down_id  = ShardId.parse(down_id)
+      up_id = ShardId.parse(up_id)
+      down_id = ShardId.parse(down_id)
       link = LinkInfo.new(up_id, down_id, weight)
       service.add_link(link.up_id, link.down_id, link.weight)
       puts link.to_unix
@@ -117,8 +117,8 @@ module Gizzard
   class UnlinkCommand < Command
     def run
       up_id, down_id = argv
-      up_id  = ShardId.parse(up_id)
-      down_id  = ShardId.parse(down_id)
+      up_id = ShardId.parse(up_id)
+      down_id = ShardId.parse(down_id)
       service.remove_link(up_id, down_id)
     end
   end
@@ -128,7 +128,7 @@ module Gizzard
       shard_ids = argv
       help! "No shards specified" if shard_ids.empty?
       shard_ids.each do |shard_id_string|
-        shard_id   = ShardId.parse(shard_id_string)
+        shard_id = ShardId.parse(shard_id_string)
         service.list_upward_links(shard_id).each do |uplink|
           service.list_downward_links(shard_id).each do |downlink|
             service.add_link(uplink.up_id, downlink.down_id, uplink.weight)
