@@ -23,7 +23,7 @@ module Gizzard
       raise HelpNeededError, message
     end
   end
-  
+
   class AddforwardingCommand < Command
     def run
       help! if argv.length != 3
@@ -54,10 +54,10 @@ module Gizzard
       end
       @roots.uniq.each do |root|
         puts root.to_unix
-        down(root, 1)          
+        down(root, 1)
       end
     end
-    
+
     def up(id)
       links = service.list_upward_links(id)
       if links.empty?
@@ -84,10 +84,10 @@ module Gizzard
         STDERR.puts "aborted"
       end
     end
-    
+
     def ask
       puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
-      gets.chomp == "yes" 
+      gets.chomp == "yes"
     end
   end
 
