@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.2.1"
+  s.version = "0.3.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-06-30}
+  s.date = %q{2010-07-09}
   s.default_executable = %q{gizzmo}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
@@ -43,6 +43,7 @@ Gem::Specification.new do |s|
      "test/expected/links-for-table_b_0.txt",
      "test/expected/links-for-table_repl_0.txt",
      "test/expected/original-find.txt",
+     "test/expected/subtree-info.txt",
      "test/expected/subtree.txt",
      "test/expected/unwrapped-replicating_table_b_0.txt",
      "test/expected/unwrapped-table_b_0.txt",
