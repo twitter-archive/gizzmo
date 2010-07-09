@@ -217,4 +217,13 @@ module Gizzard
       end
     end
   end
+
+  class LookupCommand < Command
+    def run
+      table_id, source_id = @argv
+      help!("Requires table id and source id") unless table_id && source_id
+      shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
+      puts shard.to_unix
+    end
+  end
 end

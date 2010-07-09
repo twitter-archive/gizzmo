@@ -85,6 +85,9 @@ subcommands = {
   end,
   'unlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
+  end,
+  'lookup' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} lookup TABLE_ID SOURCE_ID"
   end
 }
 
