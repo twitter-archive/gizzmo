@@ -2,9 +2,15 @@ require "pp"
 module Gizzard
   class Command
     include Thrift
+    
+    attr_reader :buffer
 
-    def self.run(command_name, *args)
-      Gizzard.const_get("#{classify(command_name)}Command").new(*args).run
+    def self.run(command_name, service, global_options, argv, subcommand_options)
+      command = Gizzard.const_get("#{classify(command_name)}Command").new(service, global_options, argv, subcommand_options)
+      command.run
+      if command.buffer && command_name = global_options.render.shift
+        run(command_name, service, global_options, command.buffer, OpenStruct.new)
+      end
     end
 
     def self.classify(string)
@@ -21,6 +27,15 @@ module Gizzard
 
     def help!(message = nil)
       raise HelpNeededError, message
+    end
+    
+    def output(string)
+      if global_options.render.any?
+        @buffer ||= []
+        @buffer << string.strip
+      else 
+        puts string
+      end
     end
   end
 
@@ -40,7 +55,7 @@ module Gizzard
       end.reject do |forwarding|
         @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
       end.each do |forwarding|
-        puts [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
+        output [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
       end
     end
   end
@@ -53,7 +68,7 @@ module Gizzard
         @roots << up(@id)
       end
       @roots.uniq.each do |root|
-        puts root.to_unix
+        output root.to_unix
         down(root, 1)
       end
     end
@@ -70,7 +85,7 @@ module Gizzard
     def down(id, depth = 0)
       service.list_downward_links(id).map do |link|
         printable = "  " * depth + link.down_id.to_unix
-        puts printable
+        output printable
         down(link.down_id, depth + 1)
       end
     end
@@ -86,7 +101,7 @@ module Gizzard
     end
 
     def ask
-      puts "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
+      output "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
       gets.chomp == "yes"
     end
   end
@@ -96,7 +111,7 @@ module Gizzard
       argv.each do |arg|
         id  = ShardId.parse(arg)
         service.delete_shard(id)
-        puts id.to_unix
+        output id.to_unix
       end
     end
   end
@@ -110,7 +125,7 @@ module Gizzard
       down_id = ShardId.parse(down_id)
       link = LinkInfo.new(up_id, down_id, weight)
       service.add_link(link.up_id, link.down_id, link.weight)
-      puts link.to_unix
+      output link.to_unix
     end
   end
 
@@ -135,7 +150,7 @@ module Gizzard
             new_link = LinkInfo.new(uplink.up_id, downlink.down_id, uplink.weight)
             service.remove_link(uplink.up_id, uplink.down_id)
             service.remove_link(downlink.up_id, downlink.down_id)
-            puts new_link.to_unix
+            output new_link.to_unix
           end
         end
         service.delete_shard shard_id
@@ -152,7 +167,7 @@ module Gizzard
       destination_type = command_options.destination_type || ""
       service.create_shard(ShardInfo.new(shard_id = ShardId.new(host, table), class_name, source_type, destination_type, busy))
       service.get_shard(shard_id)
-      puts shard_id.to_unix
+      output shard_id.to_unix
     end
   end
 
@@ -162,10 +177,10 @@ module Gizzard
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
         service.list_upward_links(shard_id).each do |link_info|
-          puts link_info.to_unix
+          output link_info.to_unix
         end
         service.list_downward_links(shard_id).each do |link_info|
-          puts link_info.to_unix
+          output link_info.to_unix
         end
       end
     end
@@ -176,7 +191,7 @@ module Gizzard
       shard_ids = @argv
       shard_ids.each do |shard_id|
         shard_info = service.get_shard(ShardId.parse(shard_id))
-        puts shard_info.to_unix
+        output shard_info.to_unix
       end
     end
   end
@@ -203,7 +218,7 @@ module Gizzard
             service.remove_link(link_info.up_id, link_info.down_id)
           end
         end
-        puts wrapper_id.to_unix
+        output wrapper_id.to_unix
       end
     end
   end
@@ -213,7 +228,7 @@ module Gizzard
       help!("host is a required option") unless command_options.shard_host
       service.shards_for_hostname(command_options.shard_host).each do |shard|
         next if command_options.shard_type && shard.class_name !~ Regexp.new(command_options.shard_type)
-        puts shard.id.to_unix
+        output shard.id.to_unix
       end
     end
   end
@@ -223,7 +238,7 @@ module Gizzard
       table_id, source_id = @argv
       help!("Requires table id and source id") unless table_id && source_id
       shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
-      puts shard.id.to_unix
+      output shard.id.to_unix
     end
   end
 end

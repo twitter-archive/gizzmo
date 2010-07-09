@@ -49,6 +49,8 @@ g links localhost/table_b_0 | expect links-for-table_b_0.txt
 g links localhost/table_repl_0 | expect links-for-table_repl_0.txt
 g links localhost/replicating_table_b_0 | expect links-for-replicating_table_b_0.txt
 
+g --subtree --info find -Hlocalhost | expect subtree-info.txt
+
 g lookup 1 100 | expect-string "localhost/forward_1"
 
 g unwrap localhost/replicating_table_b_0 | expect unwrapped-replicating_table_b_0.txt
