@@ -89,6 +89,12 @@ subcommands = {
   end,
   'lookup' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} lookup TABLE_ID SOURCE_ID"
+  end,
+  'copy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+  end,
+  'busy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} busy"
   end
 }
 

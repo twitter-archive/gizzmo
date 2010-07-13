@@ -2,7 +2,7 @@ require "pp"
 module Gizzard
   class Command
     include Thrift
-    
+
     attr_reader :buffer
 
     def self.run(command_name, service, global_options, argv, subcommand_options)
@@ -28,7 +28,7 @@ module Gizzard
     def help!(message = nil)
       raise HelpNeededError, message
     end
-    
+
     def output(string)
       if global_options.render.any?
         @buffer ||= []
@@ -239,6 +239,22 @@ module Gizzard
       help!("Requires table id and source id") unless table_id && source_id
       shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
       output shard.id.to_unix
+    end
+  end
+
+  class CopyCommand < Command
+    def run
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+      service.copy_shard(from_shard_id, to_shard_id)
+    end
+  end
+
+  class BusyCommand < Command
+    def run
+      service.get_busy_shards().each { |shard_info| output shard_info.to_unix }
     end
   end
 end
