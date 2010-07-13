@@ -16,6 +16,8 @@ subcommand_options = OpenStruct.new
 # Leftover arguments
 argv = nil
 
+GIZZMO_VERSION = File.read(File.dirname(__FILE__) + "/../VERSION") rescue "unable to read version file"
+
 begin
   YAML.load_file(File.join(ENV["HOME"], ".gizzmorc")).each do |k, v|
     global_options.send("#{k}=", v)
@@ -136,6 +138,11 @@ global = OptionParser.new do |opts|
 
   opts.on("-f", "--force", "Don't display confirmation dialogs") do |force|
     global_options.force = force
+  end
+  
+  opts.on_tail("-v", "--version", "Show version") do
+    puts GIZZMO_VERSION
+    exit
   end
 end
 
