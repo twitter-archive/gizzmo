@@ -181,7 +181,7 @@ unless subcommands.include?(subcommand_name)
   exit 1
 end
 
-log = global_options.log || "/tmp/gizzmo.log"
+log = global_options.log || "./gizzmo.log"
 service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
 
 begin
