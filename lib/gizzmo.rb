@@ -184,6 +184,10 @@ end
 log = global_options.log || "./gizzmo.log"
 service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
 
+while !$stdin.tty? && line = STDIN.gets
+  argv << line.strip
+end
+
 begin
   Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)
 rescue HelpNeededError => e
