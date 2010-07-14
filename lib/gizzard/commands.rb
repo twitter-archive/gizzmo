@@ -273,7 +273,7 @@ module Gizzard
       write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_write_only")
       replica_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_replica")
       service.create_shard(ShardInfo.new(write_only_shard_id, "com.twitter.gizzard.shards.WriteOnlyShard", "", "", 0))
-      service.create_shard(ShardInfo.new(replica_shard_id, "com.twitter.gizzard.shards.WriteOnlyShard", "", "", 0))
+      service.create_shard(ShardInfo.new(replica_shard_id, "com.twitter.gizzard.shards.ReplicatingShard", "", "", 0))
       service.add_link(write_only_shard_id, to_shard_id, 1)
       service.list_upward_links(from_shard_id).each do |link|
         service.remove_link(link.up_id, link.down_id)
