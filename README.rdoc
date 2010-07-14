@@ -28,6 +28,10 @@ Run `gizzmo help` for up-to-date usage.
     PARENT=`gizzmo links $REPL | cut -f 1 | grep -v $REPL | head -1`
     gizzmo addlink $PARENT a_shard $NEW_WEIGHT
     gizzmo unwrap $REPL
+    
+== Contributing
+
+Contributions are welcome!  Please send a pull request, or if you're internal to Twitter, please make a branch!  Commits to master, and/or patches without minimal test coverage will be rejected/reverted.
 
 == Running tests
 
