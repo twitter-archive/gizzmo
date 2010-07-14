@@ -2,7 +2,7 @@ require "pp"
 module Gizzard
   class Command
     include Thrift
-
+    
     attr_reader :buffer
 
     def self.run(command_name, service, global_options, argv, subcommand_options)
@@ -14,7 +14,7 @@ module Gizzard
     end
 
     def self.classify(string)
-      string.split(/\W+/).map { |s| s.capitalize }.join("")
+      string.split(/\W+/).map{|s| s.capitalize }.join("")
     end
 
     attr_reader :service, :global_options, :argv, :command_options
@@ -28,12 +28,12 @@ module Gizzard
     def help!(message = nil)
       raise HelpNeededError, message
     end
-
+    
     def output(string)
       if global_options.render.any?
         @buffer ||= []
         @buffer << string.strip
-      else
+      else 
         puts string
       end
     end
@@ -239,87 +239,6 @@ module Gizzard
       help!("Requires table id and source id") unless table_id && source_id
       shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
       output shard.id.to_unix
-    end
-  end
-
-  class CopyCommand < Command
-    def run
-      from_shard_id_string, to_shard_id_string = @argv
-      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
-      from_shard_id = ShardId.parse(from_shard_id_string)
-      to_shard_id = ShardId.parse(to_shard_id_string)
-      service.copy_shard(from_shard_id, to_shard_id)
-    end
-  end
-
-  class BusyCommand < Command
-    def run
-      service.get_busy_shards().each { |shard_info| output shard_info.to_unix }
-    end
-  end
-
-  class SetupMigrateCommand < Command
-    def run
-      from_shard_id_string, to_shard_id_string = @argv
-      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
-      from_shard_id = ShardId.parse(from_shard_id_string)
-      to_shard_id = ShardId.parse(to_shard_id_string)
-
-      if service.list_upward_links(to_shard_id).size > 0
-        STDERR.puts "Destination shard #{to_shard_id} has links to it."
-        exit 1
-      end
-
-      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_write_only")
-      replica_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_replica")
-      service.create_shard(ShardInfo.new(write_only_shard_id, "com.twitter.gizzard.shards.WriteOnlyShard", "", "", 0))
-      service.create_shard(ShardInfo.new(replica_shard_id, "com.twitter.gizzard.shards.ReplicatingShard", "", "", 0))
-      service.add_link(write_only_shard_id, to_shard_id, 1)
-      service.list_upward_links(from_shard_id).each do |link|
-        service.remove_link(link.up_id, link.down_id)
-        service.add_link(link.up_id, replica_shard_id, link.weight)
-      end
-      service.add_link(replica_shard_id, from_shard_id, 1)
-      service.add_link(replica_shard_id, write_only_shard_id, 0)
-      service.replace_forwarding(from_shard_id, replica_shard_id)
-      output replica_shard_id.to_unix
-    end
-  end
-
-  class FinishMigrateCommand < Command
-    def run
-      from_shard_id_string, to_shard_id_string = @argv
-      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
-      from_shard_id = ShardId.parse(from_shard_id_string)
-      to_shard_id = ShardId.parse(to_shard_id_string)
-
-      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_write_only")
-      replica_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_replica")
-
-      # careful. need to validate some basic assumptions.
-      unless global_options.force
-        if service.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
-          STDERR.puts "Uplink from #{from_shard_id} is not a migration replica."
-          exit 1
-        end
-        if service.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
-          STDERR.puts "Uplink from #{to_shard_id} is not a write-only barrier."
-          exit 1
-        end
-        if service.list_upward_links(write_only_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
-          STDERR.puts "Uplink from write-only barrier is not a migration replica."
-          exit 1
-        end
-      end
-
-      service.remove_link(write_only_shard_id, to_shard_id)
-      service.list_upward_links(replica_shard_id).each do |link|
-        service.remove_link(link.up_id, link.down_id)
-        service.add_link(link.up_id, to_shard_id, link.weight)
-      end
-      service.replace_forwarding(replica_shard_id, to_shard_id)
-      service.delete_shard(replica_shard_id)
-      service.delete_shard(write_only_shard_id)
     end
   end
 end

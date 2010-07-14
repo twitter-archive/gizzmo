@@ -91,18 +91,6 @@ subcommands = {
   end,
   'lookup' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} lookup TABLE_ID SOURCE_ID"
-  end,
-  'copy' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-  end,
-  'busy' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} busy"
-  end,
-  'setup-migrate' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} setup-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-  end,
-  'finish-migrate' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} finish-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
   end
 }
 
@@ -125,11 +113,11 @@ global = OptionParser.new do |opts|
   opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
     global_options.port = port
   end
-
+  
   opts.on("--subtree", "Render in subtree mode") do
     global_options.render << "subtree"
   end
-
+  
   opts.on("--info", "Render in info mode") do
     global_options.render << "info"
   end
