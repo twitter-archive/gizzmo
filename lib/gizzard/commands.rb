@@ -65,7 +65,7 @@ module Gizzard
       @roots = []
       argv.each do |arg|
         @id = ShardId.parse(arg)
-        @roots << up(@id)
+        @roots += roots_of(@id)
       end
       @roots.uniq.each do |root|
         output root.to_unix
@@ -73,15 +73,15 @@ module Gizzard
       end
     end
 
-    def up(id)
+    def roots_of(id)
       links = service.list_upward_links(id)
       if links.empty?
-        id
+        [id]
       else
-        links.map { |link| link.up_id }.find { |up_id| up(up_id) }
+        links.map { |link| roots_of(link.up_id) }.flatten
       end
     end
-
+    
     def down(id, depth = 0)
       service.list_downward_links(id).map do |link|
         printable = "  " * depth + link.down_id.to_unix

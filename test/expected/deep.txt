@@ -1,0 +1,10 @@
+localhost/table_deep_repl_0
+  localhost/table_deep_repl_1
+    localhost/table_deep_repl_2
+      localhost/table_deep_repl_3
+        localhost/table_deep_repl_4
+          localhost/table_deep_repl_5
+            localhost/table_deep_repl_6
+              localhost/table_deep_repl_7
+                localhost/table_deep_repl_8
+                  localhost/table_deep_repl_9
