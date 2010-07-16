@@ -198,7 +198,7 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException => e
   STDERR.puts e.message
   exit 1
 rescue Errno::EPIPE
