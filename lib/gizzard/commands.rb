@@ -174,14 +174,17 @@ module Gizzard
 
   class CreateCommand < ShardCommand
     def run
-      help! if argv.length != 3
-      host, table, class_name = argv
+      help! if argv.length < 2
+      class_name, *shard_ids = argv
       busy = 0
       source_type = command_options.source_type || ""
       destination_type = command_options.destination_type || ""
-      service.create_shard(ShardInfo.new(shard_id = ShardId.new(host, table), class_name, source_type, destination_type, busy))
-      service.get_shard(shard_id)
-      output shard_id.to_unix
+      shard_ids.each do |id|
+        shard_id = ShardId.parse(id)
+        service.create_shard(ShardInfo.new(shard_id), class_name, source_type, destination_type, busy)
+        service.get_shard(shard_id)
+        output shard_id.to_unix
+      end
     end
   end
 
