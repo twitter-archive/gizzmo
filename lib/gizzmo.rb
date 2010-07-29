@@ -8,7 +8,8 @@ require "yaml"
 
 DOC_STRINGS = {
   "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
-  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard."
+  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
+  "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority."
 }
 
 ORIGINAL_ARGV = ARGV.dup
