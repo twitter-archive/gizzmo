@@ -142,6 +142,7 @@ module Gizzard
 
       thrift_method :set_forwarding, void, field(:forwarding, struct(Forwarding), 1)
       thrift_method :replace_forwarding, void, field(:old_id, struct(ShardId), 1), field(:new_id, struct(ShardId), 2)
+      thrift_method :remove_forwarding, void, field(:forwarding, struct(Forwarding), 1)
 
       thrift_method :get_forwarding, struct(Forwarding), field(:table_id, i32, 1), field(:base_id, i64, 2)
       thrift_method :get_forwarding_for_shard, struct(Forwarding), field(:shard_id, struct(ShardId), 1)
@@ -153,6 +154,7 @@ module Gizzard
 
       thrift_method :shards_for_hostname, list(struct(ShardInfo)), field(:hostname, string, 1)
       thrift_method :get_busy_shards, list(struct(ShardInfo))
+      thrift_method :list_hostnames, list(string)
 
       thrift_method :rebuild_schema, void
     end

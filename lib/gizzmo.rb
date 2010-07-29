@@ -80,6 +80,14 @@ subcommands = {
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
     separators(opts, DOC_STRINGS["subtree"])
   end,
+  'hosts' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} hosts"
+    separators(opts, DOC_STRINGS["hosts"])
+  end,
+  'deleteforwarding' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} deleteforwarding TABLE_ID BASE_ID SHARD_ID"
+    separators(opts, DOC_STRINGS["deleteforwarding"])
+  end,
   'delete' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
     separators(opts, DOC_STRINGS["delete"])

@@ -62,6 +62,23 @@ module Gizzard
     end
   end
 
+  class DeleteforwardingCommand < ShardCommand
+    def run
+      help! if argv.length != 3
+      table_id, base_id, shard_id_text = argv
+      shard_id = ShardId.parse(shard_id_text)
+      service.remove_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
+    end
+  end
+
+  class HostsCommand < ShardCommand
+    def run
+      service.list_hostnames.map do |host|
+        puts host
+      end
+    end
+  end
+  
   class ForwardingsCommand < ShardCommand
     def run
       service.get_forwardings().sort_by do |f|
