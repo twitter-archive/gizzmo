@@ -181,7 +181,7 @@ module Gizzard
       destination_type = command_options.destination_type || ""
       shard_ids.each do |id|
         shard_id = ShardId.parse(id)
-        service.create_shard(ShardInfo.new(shard_id), class_name, source_type, destination_type, busy)
+        service.create_shard(ShardInfo.new(shard_id, class_name, source_type, destination_type, busy))
         service.get_shard(shard_id)
         output shard_id.to_unix
       end

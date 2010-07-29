@@ -7,6 +7,7 @@ require "gizzard"
 require "yaml"
 
 ORIGINAL_ARGV = ARGV.dup
+zero = File.basename($0)
 
 # Container for parsed options
 global_options     = OpenStruct.new
@@ -28,10 +29,40 @@ rescue => e
   abort "Unknown error loading ~/.gizzmorc: #{e.message}"
 end
 
+def split(string)
+  return [] unless string
+  a = []
+  tokens = string.split(/\s+/)
+  a << tokens.shift
+  tokens.each do |token|
+    s = a.last
+    if s.length + token.length + 1 < 80
+      s << " #{token}"
+    else
+      a << token
+    end
+  end
+  a
+end
+
+def separators(opts, string)
+  opts.separator("")
+  split(string).each do |substr|
+    opts.separator(substr)
+  end
+  opts.separator("")
+end
+
+doc_strings = {
+  "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
+  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard."
+}
+
 subcommands = {
   'create' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} create [options] HOST TABLE_PREFIX CLASS_NAME"
-
+    opts.banner = "Usage: #{zero} create [options] CLASS_NAME SHARD_ID [MORE SHARD_IDS...]"
+    separators(opts, doc_strings["create"])
+    
     opts.on("-s", "--source-type=TYPE") do |s|
       subcommand_options.source_type = s
     end
@@ -41,19 +72,24 @@ subcommands = {
     end
   end,
   'wrap' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
+    opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
+    separators(opts, doc_strings["wrap"])
   end,
   'subtree' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} subtree SHARD_ID"
+    opts.banner = "Usage: #{zero} subtree SHARD_ID"
+    separators(opts, doc_strings["subtree"])
   end,
   'delete' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
+    opts.banner = "Usage: #{zero} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
+    separators(opts, doc_strings["delete"])
   end,
   'addforwarding' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} addforwarding TABLE_ID BASE_ID SHARD_ID"
+    opts.banner = "Usage: #{zero} addforwarding TABLE_ID BASE_ID SHARD_ID"
+    separators(opts, doc_strings["addforwarding"])
   end,
   'forwardings' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} show [options]"
+    opts.banner = "Usage: #{zero} show [options]"
+    separators(opts, doc_strings["forwardings"])
 
     opts.on("-t", "--tables=IDS", "Show only the specified table ids (comma separated)") do |table_ids|
       subcommand_options.table_ids ||= []
@@ -61,10 +97,12 @@ subcommands = {
     end
   end,
   'unwrap' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"
+    opts.banner = "Usage: #{zero} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"
+    separators(opts, doc_strings["unwrap"])
   end,
   'find' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} find [options]"
+    opts.banner = "Usage: #{zero} find [options]"
+    separators(opts, doc_strings["find"])
 
     opts.on("-t", "--type=TYPE", "Return only shards of the specified TYPE") do |shard_type|
       subcommand_options.shard_type = shard_type
@@ -75,52 +113,82 @@ subcommands = {
     end
   end,
   'links' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} links SHARD_ID [MORE SHARD_IDS...]"
+    opts.banner = "Usage: #{zero} links SHARD_ID [MORE SHARD_IDS...]"
+    separators(opts, doc_strings["links"])
   end,
   'info' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} info SHARD_ID [MORE SHARD_IDS...]"
+    opts.banner = "Usage: #{zero} info SHARD_ID [MORE SHARD_IDS...]"
+    separators(opts, doc_strings["info"])
   end,
   'reload' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} reload"
+    opts.banner = "Usage: #{zero} reload"
+    separators(opts, doc_strings["reload"])
   end,
   'addlink' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
+    opts.banner = "Usage: #{zero} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
+    separators(opts, doc_strings["addlink"])
   end,
   'unlink' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
+    opts.banner = "Usage: #{zero} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
+    separators(opts, doc_strings["unlink"])
   end,
   'lookup' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} lookup TABLE_ID SOURCE_ID"
+    opts.banner = "Usage: #{zero} lookup TABLE_ID SOURCE_ID"
+    separators(opts, doc_strings["lookup"])
   end,
   'copy' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    opts.banner = "Usage: #{zero} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, doc_strings["copy"])
   end,
   'busy' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} busy"
+    opts.banner = "Usage: #{zero} busy"
+    separators(opts, doc_strings["busy"])
   end,
   'setup-migrate' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} setup-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    opts.banner = "Usage: #{zero} setup-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, doc_strings["setup-migrate"])
   end,
   'finish-migrate' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} finish-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    opts.banner = "Usage: #{zero} finish-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, doc_strings["finish-migrate"])
   end,
   'inject' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} inject PRIORITY JOBS..."
+    opts.banner = "Usage: #{zero} inject PRIORITY JOBS..."
+    separators(opts, doc_strings["inject"])
   end
 }
 
 global = OptionParser.new do |opts|
-  opts.banner = "Usage: #{$0} [global-options] SUBCOMMAND [subcommand-options]"
+  opts.banner = "Usage: #{zero} [global-options] SUBCOMMAND [subcommand-options]"
+  opts.separator ""
+  opts.separator "Gizzmo is a tool for manipulating the forwardings and replication structure of"
+  opts.separator "Gizzard-based datastores.  It can also perform bulk job operations."
+  opts.separator ""
+  opts.separator "You can type `#{zero} help SUBCOMMAND` for help on a specific subcommand. It's"
+  opts.separator "also useful to remember that global options come *before* the subcommand, while"
+  opts.separator "subcommand options come *after* the subcommand."
+  opts.separator ""
+  opts.separator "You may find it useful to create a ~/.gizzmorc file, which is simply YAML"
+  opts.separator "key/value pairs corresponding to options you want by default. A common .gizzmorc"
+  opts.separator "simply contain:"
+  opts.separator ""
+  opts.separator "    host: localhost"
+  opts.separator "    port: 7917"
   opts.separator ""
   opts.separator "Subcommands:"
   subcommands.keys.compact.sort.each do |sc|
-    opts.separator "  #{sc}"
+    base = "  #{sc}"
+    if doc = doc_strings[sc]
+      base += " " * (20 - base.length)
+      base += " -- "
+      base += doc[0..(76 - base.length)]
+      base += "..."
+    end
+    opts.separator base
   end
   opts.separator ""
-  opts.separator "You can type `#{$0} help SUBCOMMAND` for help on a specific subcommand."
   opts.separator ""
   opts.separator "Global options:"
-
   opts.on("-H", "--host=HOSTNAME", "HOSTNAME of remote thrift service") do |host|
     global_options.host = host
   end
@@ -212,7 +280,7 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException, Errno::ECONNREFUSED => e
   STDERR.puts e.message
   exit 1
 rescue Errno::EPIPE
