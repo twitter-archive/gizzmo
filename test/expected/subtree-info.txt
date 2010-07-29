@@ -29,5 +29,3 @@ localhost/table_b_8	com.twitter.service.flock.edges.SqlShard	unbusy
 localhost/table_repl_9	com.twitter.service.flock.edges.ReplicatingShard	unbusy
 localhost/table_a_9	com.twitter.service.flock.edges.SqlShard	unbusy
 localhost/table_b_9	com.twitter.service.flock.edges.SqlShard	unbusy
-localhost/replicating_table_b_0	com.twitter.service.flock.edges.ReplicatingShard	unbusy
-localhost/table_b_0	com.twitter.service.flock.edges.SqlShard	unbusy

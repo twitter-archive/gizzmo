@@ -128,11 +128,11 @@ global = OptionParser.new do |opts|
   opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
     global_options.port = port
   end
-
+  
   opts.on("--subtree", "Render in subtree mode") do
     global_options.render << "subtree"
   end
-
+  
   opts.on("--info", "Render in info mode") do
     global_options.render << "info"
   end
@@ -212,7 +212,7 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException => e
   STDERR.puts e.message
   exit 1
 rescue Errno::EPIPE

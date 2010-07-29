@@ -62,3 +62,14 @@ g links localhost/table_b_0 | expect empty-file.txt
 g wrap com.twitter.gizzard.shards.BlockedShard localhost/table_a_3
 g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml subtree 2>&1 | expect subtree.txt
 g find -hlocalhost | ../bin/gizzmo -Cconfig.yaml subtree 2>&1 | expect subtree.txt
+
+# test a deep tree
+g create localhost "table_deep_repl_0" com.twitter.service.flock.edges.ReplicatingShard
+for i in {1..9}
+do
+  last=$((i-1))
+  g create localhost "table_deep_repl_$i" com.twitter.service.flock.edges.ReplicatingShard
+  g addlink "localhost/table_deep_repl_$last" "localhost/table_deep_repl_$i" 2
+done
+
+g subtree localhost/table_deep_repl_5 | expect deep.txt

@@ -2,7 +2,7 @@ require "pp"
 module Gizzard
   class Command
     include Thrift
-
+    
     attr_reader :buffer
 
     def self.run(command_name, global_options, argv, subcommand_options, log)
@@ -16,7 +16,7 @@ module Gizzard
     end
 
     def self.classify(string)
-      string.split(/\W+/).map { |s| s.capitalize }.join("")
+      string.split(/\W+/).map{|s| s.capitalize }.join("")
     end
 
     attr_reader :service, :global_options, :argv, :command_options
@@ -30,12 +30,12 @@ module Gizzard
     def help!(message = nil)
       raise HelpNeededError, message
     end
-
+    
     def output(string)
       if global_options.render.any?
         @buffer ||= []
         @buffer << string.strip
-      else
+      else 
         puts string
       end
     end
@@ -79,7 +79,7 @@ module Gizzard
       @roots = []
       argv.each do |arg|
         @id = ShardId.parse(arg)
-        @roots << up(@id)
+        @roots += roots_of(@id)
       end
       @roots.uniq.each do |root|
         output root.to_unix
@@ -87,15 +87,15 @@ module Gizzard
       end
     end
 
-    def up(id)
+    def roots_of(id)
       links = service.list_upward_links(id)
       if links.empty?
-        id
+        [id]
       else
-        links.map { |link| link.up_id }.find { |up_id| up(up_id) }
+        links.map { |link| roots_of(link.up_id) }.flatten
       end
     end
-
+    
     def down(id, depth = 0)
       service.list_downward_links(id).map do |link|
         printable = "  " * depth + link.down_id.to_unix
