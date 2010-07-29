@@ -2,7 +2,7 @@ require "pp"
 module Gizzard
   class Command
     include Thrift
-    
+
     attr_reader :buffer
 
     def self.run(command_name, global_options, argv, subcommand_options, log)
@@ -30,12 +30,12 @@ module Gizzard
     def help!(message = nil)
       raise HelpNeededError, message
     end
-    
+
     def output(string)
       if global_options.render.any?
         @buffer ||= []
         @buffer << string.strip
-      else 
+      else
         puts string
       end
     end
@@ -95,7 +95,7 @@ module Gizzard
         links.map { |link| roots_of(link.up_id) }.flatten
       end
     end
-    
+
     def down(id, depth = 0)
       service.list_downward_links(id).map do |link|
         printable = "  " * depth + link.down_id.to_unix
