@@ -103,6 +103,9 @@ subcommands = {
   end,
   'finish-migrate' => OptionParser.new do |opts|
     opts.banner = "Usage: #{$0} finish-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+  end,
+  'inject' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} inject PRIORITY JOBS..."
   end
 }
 
@@ -151,7 +154,7 @@ global = OptionParser.new do |opts|
   opts.on("-f", "--force", "Don't display confirmation dialogs") do |force|
     global_options.force = force
   end
-  
+
   opts.on_tail("-v", "--version", "Show version") do
     puts GIZZMO_VERSION
     exit
@@ -194,14 +197,13 @@ unless subcommands.include?(subcommand_name)
 end
 
 log = global_options.log || "./gizzmo.log"
-service = Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
 
 while !$stdin.tty? && line = STDIN.gets
   argv << line.strip
 end
 
 begin
-  Gizzard::Command.run(subcommand_name, service, global_options, argv, subcommand_options)
+  Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
 rescue HelpNeededError => e
   if e.class.name != e.message
     STDERR.puts("=" * 80)

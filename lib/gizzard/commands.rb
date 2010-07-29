@@ -5,8 +5,10 @@ module Gizzard
 
     attr_reader :buffer
 
-    def self.run(command_name, service, global_options, argv, subcommand_options)
-      command = Gizzard.const_get("#{classify(command_name)}Command").new(service, global_options, argv, subcommand_options)
+    def self.run(command_name, global_options, argv, subcommand_options, log)
+      command_class = Gizzard.const_get("#{classify(command_name)}Command")
+      service = command_class.make_service(global_options, log)
+      command = command_class.new(service, global_options, argv, subcommand_options)
       command.run
       if command.buffer && command_name = global_options.render.shift
         run(command_name, service, global_options, command.buffer, OpenStruct.new)
@@ -39,7 +41,19 @@ module Gizzard
     end
   end
 
-  class AddforwardingCommand < Command
+  class ShardCommand < Command
+    def self.make_service(global_options, log)
+      Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
+    end
+  end
+
+  class JobCommand < Command
+    def self.make_service(global_options, log)
+      Gizzard::Thrift::JobManager.new(global_options.host, global_options.port + 2, log, global_options.dry)
+    end
+  end
+
+  class AddforwardingCommand < ShardCommand
     def run
       help! if argv.length != 3
       table_id, base_id, shard_id_text = argv
@@ -48,7 +62,7 @@ module Gizzard
     end
   end
 
-  class ForwardingsCommand < Command
+  class ForwardingsCommand < ShardCommand
     def run
       service.get_forwardings().sort_by do |f|
         [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
@@ -60,7 +74,7 @@ module Gizzard
     end
   end
 
-  class SubtreeCommand < Command
+  class SubtreeCommand < ShardCommand
     def run
       @roots = []
       argv.each do |arg|
@@ -91,7 +105,7 @@ module Gizzard
     end
   end
 
-  class ReloadCommand < Command
+  class ReloadCommand < ShardCommand
     def run
       if global_options.force || ask
         service.reload_forwardings
@@ -106,7 +120,7 @@ module Gizzard
     end
   end
 
-  class DeleteCommand < Command
+  class DeleteCommand < ShardCommand
     def run
       argv.each do |arg|
         id  = ShardId.parse(arg)
@@ -116,7 +130,7 @@ module Gizzard
     end
   end
 
-  class AddlinkCommand < Command
+  class AddlinkCommand < ShardCommand
     def run
       up_id, down_id, weight = argv
       help! if argv.length != 3
@@ -129,7 +143,7 @@ module Gizzard
     end
   end
 
-  class UnlinkCommand < Command
+  class UnlinkCommand < ShardCommand
     def run
       up_id, down_id = argv
       up_id = ShardId.parse(up_id)
@@ -138,7 +152,7 @@ module Gizzard
     end
   end
 
-  class UnwrapCommand < Command
+  class UnwrapCommand < ShardCommand
     def run
       shard_ids = argv
       help! "No shards specified" if shard_ids.empty?
@@ -158,7 +172,7 @@ module Gizzard
     end
   end
 
-  class CreateCommand < Command
+  class CreateCommand < ShardCommand
     def run
       help! if argv.length != 3
       host, table, class_name = argv
@@ -171,7 +185,7 @@ module Gizzard
     end
   end
 
-  class LinksCommand < Command
+  class LinksCommand < ShardCommand
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id_text|
@@ -186,7 +200,7 @@ module Gizzard
     end
   end
 
-  class InfoCommand < Command
+  class InfoCommand < ShardCommand
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id|
@@ -196,7 +210,7 @@ module Gizzard
     end
   end
 
-  class WrapCommand < Command
+  class WrapCommand < ShardCommand
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
       prefix_prefix = wrapping_class_name.split(".").last.downcase.gsub("shard", "") + "_"
       ShardId.new("localhost", prefix_prefix + shard_info.id.table_prefix)
@@ -223,7 +237,7 @@ module Gizzard
     end
   end
 
-  class FindCommand < Command
+  class FindCommand < ShardCommand
     def run
       help!("host is a required option") unless command_options.shard_host
       service.shards_for_hostname(command_options.shard_host).each do |shard|
@@ -233,7 +247,7 @@ module Gizzard
     end
   end
 
-  class LookupCommand < Command
+  class LookupCommand < ShardCommand
     def run
       table_id, source_id = @argv
       help!("Requires table id and source id") unless table_id && source_id
@@ -242,7 +256,7 @@ module Gizzard
     end
   end
 
-  class CopyCommand < Command
+  class CopyCommand < ShardCommand
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
@@ -252,13 +266,13 @@ module Gizzard
     end
   end
 
-  class BusyCommand < Command
+  class BusyCommand < ShardCommand
     def run
       service.get_busy_shards().each { |shard_info| output shard_info.to_unix }
     end
   end
 
-  class SetupMigrateCommand < Command
+  class SetupMigrateCommand < ShardCommand
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
@@ -286,7 +300,7 @@ module Gizzard
     end
   end
 
-  class FinishMigrateCommand < Command
+  class FinishMigrateCommand < ShardCommand
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
@@ -320,6 +334,23 @@ module Gizzard
       service.replace_forwarding(replica_shard_id, to_shard_id)
       service.delete_shard(replica_shard_id)
       service.delete_shard(write_only_shard_id)
+    end
+  end
+
+  class InjectCommand < JobCommand
+    def run
+      priority, *jobs = @argv
+      help!("Requires priority") unless priority and jobs.size > 0
+      count = 0
+      jobs.each do |job|
+        service.inject_job(priority.to_i, job)
+        count += 1
+        # FIXME add -q --quiet option
+        STDERR.print "."
+        STDERR.print "#{count}" if count % 100 == 0
+        STDERR.flush
+      end
+      STDERR.print "\n"
     end
   end
 end

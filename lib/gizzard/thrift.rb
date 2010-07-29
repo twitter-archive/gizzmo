@@ -86,7 +86,7 @@ module Gizzard
       end
     end
 
-    class ShardManager < T::ThriftService
+    class GizzmoService < T::ThriftService
       def initialize(host, port, log_path, dry_run = false)
         super(host, port)
         @dry = dry_run
@@ -122,8 +122,9 @@ module Gizzard
         ts = timestamp ? "#{Time.now}\t" : ""
         "#{ts}#{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
       end
+    end
 
-
+    class ShardManager < GizzmoService
       thrift_method :create_shard, void, field(:shard, struct(ShardInfo), 1), :throws => exception(ShardException)
       thrift_method :delete_shard, void, field(:id, struct(ShardId), 1)
       thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1)
@@ -154,6 +155,17 @@ module Gizzard
       thrift_method :get_busy_shards, list(struct(ShardInfo))
 
       thrift_method :rebuild_schema, void
+    end
+
+    class JobManager < GizzmoService
+      thrift_method :retry_errors, void
+      thrift_method :stop_writes, void
+      thrift_method :resume_writes, void
+      thrift_method :retry_errors_for, void, field(:priority, i32, 1)
+      thrift_method :stop_writes_for, void, field(:priority, i32, 1)
+      thrift_method :resume_writes_for, void, field(:priority, i32, 1)
+      thrift_method :is_writing, bool, field(:priority, i32, 1)
+      thrift_method :inject_job, void, field(:priority, i32, 1), field(:job, string, 2)
     end
   end
 end
