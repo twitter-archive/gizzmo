@@ -6,6 +6,11 @@ require "ostruct"
 require "gizzard"
 require "yaml"
 
+DOC_STRINGS = {
+  "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
+  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard."
+}
+
 ORIGINAL_ARGV = ARGV.dup
 zero = File.basename($0)
 
@@ -53,15 +58,10 @@ def separators(opts, string)
   opts.separator("")
 end
 
-doc_strings = {
-  "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
-  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard."
-}
-
 subcommands = {
   'create' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} create [options] CLASS_NAME SHARD_ID [MORE SHARD_IDS...]"
-    separators(opts, doc_strings["create"])
+    separators(opts, DOC_STRINGS["create"])
     
     opts.on("-s", "--source-type=TYPE") do |s|
       subcommand_options.source_type = s
@@ -73,23 +73,23 @@ subcommands = {
   end,
   'wrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
-    separators(opts, doc_strings["wrap"])
+    separators(opts, DOC_STRINGS["wrap"])
   end,
   'subtree' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
-    separators(opts, doc_strings["subtree"])
+    separators(opts, DOC_STRINGS["subtree"])
   end,
   'delete' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} delete SHARD_ID_TO_DELETE [MORE SHARD_IDS]"
-    separators(opts, doc_strings["delete"])
+    separators(opts, DOC_STRINGS["delete"])
   end,
   'addforwarding' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} addforwarding TABLE_ID BASE_ID SHARD_ID"
-    separators(opts, doc_strings["addforwarding"])
+    separators(opts, DOC_STRINGS["addforwarding"])
   end,
   'forwardings' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} show [options]"
-    separators(opts, doc_strings["forwardings"])
+    separators(opts, DOC_STRINGS["forwardings"])
 
     opts.on("-t", "--tables=IDS", "Show only the specified table ids (comma separated)") do |table_ids|
       subcommand_options.table_ids ||= []
@@ -98,11 +98,11 @@ subcommands = {
   end,
   'unwrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"
-    separators(opts, doc_strings["unwrap"])
+    separators(opts, DOC_STRINGS["unwrap"])
   end,
   'find' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} find [options]"
-    separators(opts, doc_strings["find"])
+    separators(opts, DOC_STRINGS["find"])
 
     opts.on("-t", "--type=TYPE", "Return only shards of the specified TYPE") do |shard_type|
       subcommand_options.shard_type = shard_type
@@ -114,47 +114,47 @@ subcommands = {
   end,
   'links' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} links SHARD_ID [MORE SHARD_IDS...]"
-    separators(opts, doc_strings["links"])
+    separators(opts, DOC_STRINGS["links"])
   end,
   'info' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} info SHARD_ID [MORE SHARD_IDS...]"
-    separators(opts, doc_strings["info"])
+    separators(opts, DOC_STRINGS["info"])
   end,
   'reload' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} reload"
-    separators(opts, doc_strings["reload"])
+    separators(opts, DOC_STRINGS["reload"])
   end,
   'addlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
-    separators(opts, doc_strings["addlink"])
+    separators(opts, DOC_STRINGS["addlink"])
   end,
   'unlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
-    separators(opts, doc_strings["unlink"])
+    separators(opts, DOC_STRINGS["unlink"])
   end,
   'lookup' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} lookup TABLE_ID SOURCE_ID"
-    separators(opts, doc_strings["lookup"])
+    separators(opts, DOC_STRINGS["lookup"])
   end,
   'copy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-    separators(opts, doc_strings["copy"])
+    separators(opts, DOC_STRINGS["copy"])
   end,
   'busy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} busy"
-    separators(opts, doc_strings["busy"])
+    separators(opts, DOC_STRINGS["busy"])
   end,
   'setup-migrate' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} setup-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-    separators(opts, doc_strings["setup-migrate"])
+    separators(opts, DOC_STRINGS["setup-migrate"])
   end,
   'finish-migrate' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} finish-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-    separators(opts, doc_strings["finish-migrate"])
+    separators(opts, DOC_STRINGS["finish-migrate"])
   end,
   'inject' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} inject PRIORITY JOBS..."
-    separators(opts, doc_strings["inject"])
+    separators(opts, DOC_STRINGS["inject"])
   end
 }
 
@@ -178,7 +178,7 @@ global = OptionParser.new do |opts|
   opts.separator "Subcommands:"
   subcommands.keys.compact.sort.each do |sc|
     base = "  #{sc}"
-    if doc = doc_strings[sc]
+    if doc = DOC_STRINGS[sc]
       base += " " * (20 - base.length)
       base += " -- "
       base += doc[0..(76 - base.length)]
