@@ -78,7 +78,7 @@ module Gizzard
       end
     end
   end
-  
+
   class ForwardingsCommand < ShardCommand
     def run
       service.get_forwardings().sort_by do |f|
@@ -256,8 +256,104 @@ module Gizzard
       end
     end
   end
-  
-  class ClusterreportCommand < ShardCommand
+
+  class RebalanceCommand < ShardCommand
+
+    class NamedArray < Array
+      attr_reader :name
+      def initialize(name)
+        @name = name
+      end
+    end
+
+    def run
+      ids = @argv.map{|arg| ShardId.new(*arg.split("/")) rescue nil }.compact
+      by_host = ids.inject({}) do |memo, id|
+        memo[id.hostname] ||= NamedArray.new(id.hostname)
+        memo[id.hostname] << id
+        memo
+      end
+
+      sets = by_host.values
+
+      begin
+        sorted = sets.sort_by{|s| s.length }
+        longest = sorted.last
+        shortest = sorted.first
+        shortest.push longest.pop
+      end while longest.length > shortest.length + 1
+
+      shard_info = nil
+      sets.each do |set|
+        host = set.name
+        set.each do |id|
+          if id.hostname != host
+            shard_info ||= service.get_shard(id)
+            old = id.to_unix
+            id.hostname = host
+            puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{old}"
+            puts "gizzmo copy #{old} #{id.to_unix}"
+            puts "gizzmo delete #{old}"
+          end
+        end
+      end
+    end
+  end
+
+  class PairCommand < ShardCommand
+    def run
+      ids = []
+      @argv.map do |host|
+        service.shards_for_hostname(host).each do |shard|
+          ids << shard.id
+        end
+      end
+
+      ids_by_table = {}
+      ids.map do |id|
+        ids_by_table[id.table_prefix] ||= []
+        ids_by_table[id.table_prefix] << id
+      end
+
+      ids_by_host = {}
+      ids.map do |id|
+        ids_by_host[id.hostname] ||= []
+        ids_by_host[id.hostname] << id
+      end
+
+      overlaps = {}
+      ids_by_table.values.each do |arr|
+        key = arr.map{|id| id.hostname }.sort
+        overlaps[key] ||= 0
+        overlaps[key]  += 1
+      end
+
+      displayed = {}
+      overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
+        next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
+        id_a = ids_by_host[host_a].first
+        id_b = ids_by_host[host_b].first
+        weight_a = service.list_upward_links(id_a).first.weight
+        weight_b = service.list_upward_links(id_b).first.weight
+        if weight_a > weight_b
+          puts "#{host_a}\t#{host_b}"
+        else
+          puts "#{host_b}\t#{host_a}"
+        end
+        displayed[host_a] = true
+        displayed[host_b] = true
+      end
+      remaining = @argv - displayed.keys
+      loop do
+        a = remaining.shift
+        b = remaining.shift
+        break unless a && b
+        puts "#{a}\t#{b}"
+      end
+    end
+  end
+
+  class ReportCommand < ShardCommand
     def run
       regex = @argv.first
       help!("regex is a required option") unless regex
@@ -267,9 +363,10 @@ module Gizzard
         counts = {}
         service.shards_for_hostname(host).each do |shard|
           id = shard.id.to_unix
-          key = id[regex, 1] || id[regex, 0]
-          counts[key] ||= 0
-          counts[key] += 1
+          if key = id[regex, 1] || id[regex, 0]
+            counts[key] ||= 0
+            counts[key] += 1
+          end
         end
         counts.sort.each do |k, v|
           puts "  %3d %s" % [v, k]
@@ -277,13 +374,15 @@ module Gizzard
       end
     end
   end
-  
+
   class FindCommand < ShardCommand
     def run
-      help!("host is a required option") unless command_options.shard_host
-      service.shards_for_hostname(command_options.shard_host).each do |shard|
-        next if command_options.shard_type && shard.class_name !~ Regexp.new(command_options.shard_type)
-        output shard.id.to_unix
+      hosts = @argv << command_options.shard_host
+      hosts.compact.each do |host|
+        service.shards_for_hostname(host).each do |shard|
+          next if command_options.shard_type && shard.class_name !~ Regexp.new(command_options.shard_type)
+          output shard.id.to_unix
+        end
       end
     end
   end

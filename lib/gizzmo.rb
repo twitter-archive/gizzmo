@@ -63,7 +63,7 @@ subcommands = {
   'create' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} create [options] CLASS_NAME SHARD_ID [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["create"])
-    
+
     opts.on("-s", "--source-type=TYPE") do |s|
       subcommand_options.source_type = s
     end
@@ -76,9 +76,17 @@ subcommands = {
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["wrap"])
   end,
-  'clusterreport' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} clusterreport RUBY_REGEX"
-    separators(opts, DOC_STRINGS["clusterreport"])
+  'report' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} report RUBY_REGEX"
+    separators(opts, DOC_STRINGS["report"])
+  end,
+  'rebalance' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} rebalance RUBY_REGEX"
+    separators(opts, DOC_STRINGS["rebalance"])
+  end,
+  'pair' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} pair"
+    separators(opts, DOC_STRINGS["pair"])
   end,
   'subtree' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
@@ -213,11 +221,11 @@ global = OptionParser.new do |opts|
   opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
     global_options.port = port
   end
-  
+
   opts.on("--subtree", "Render in subtree mode") do
     global_options.render << "subtree"
   end
-  
+
   opts.on("--info", "Render in info mode") do
     global_options.render << "info"
   end

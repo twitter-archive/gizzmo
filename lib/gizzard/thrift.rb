@@ -23,6 +23,10 @@ module Gizzard
         "#{hostname}/#{table_prefix}"
       end
 
+      def <=>(o)
+        self.hostname <=> o.hostname
+      end
+
       alias_method :to_unix, :inspect
 
       def self.parse(string)
