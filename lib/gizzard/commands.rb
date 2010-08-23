@@ -266,7 +266,8 @@ module Gizzard
         puts host
         counts = {}
         service.shards_for_hostname(host).each do |shard|
-          key = shard[regex, 1] || shard[regex, 0]
+          id = shard.id.to_unix
+          key = id[regex, 1] || id[regex, 0]
           counts[key] ||= 0
           counts[key] += 1
         end
