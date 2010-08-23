@@ -76,6 +76,10 @@ subcommands = {
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["wrap"])
   end,
+  'report' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} clusterreport RUBY_REGEX"
+    separators(opts, DOC_STRINGS["clusterreport"])
+  end,
   'subtree' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
     separators(opts, DOC_STRINGS["subtree"])

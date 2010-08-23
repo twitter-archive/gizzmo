@@ -256,7 +256,27 @@ module Gizzard
       end
     end
   end
-
+  
+  class ClusterreportCommand < ShardCommand
+    def run
+      regex = @argv.first
+      help!("regex is a required option") unless regex
+      regex = Regexp.compile(regex)
+      service.list_hostnames.map do |host|
+        puts host
+        counts = {}
+        service.shards_for_hostname(host).each do |shard|
+          key = shard[regex, 1] || shard[regex, 0]
+          counts[key] ||= 0
+          counts[key] += 1
+        end
+        counts.sort.each do |k, v|
+          puts "  %3d %s" % [v, k]
+        end
+      end
+    end
+  end
+  
   class FindCommand < ShardCommand
     def run
       help!("host is a required option") unless command_options.shard_host
