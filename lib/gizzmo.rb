@@ -81,8 +81,16 @@ subcommands = {
     separators(opts, DOC_STRINGS["report"])
   end,
   'rebalance' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} rebalance RUBY_REGEX"
+    opts.banner = "Usage: #{zero} rebalance"
     separators(opts, DOC_STRINGS["rebalance"])
+    
+    opts.on("-h", "--hosts=list") do |h|
+      subcommand_options.hosts = h
+    end
+  end,
+  'repair' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} repair MASTER SLAVE [MASTER SLAVE...]"
+    separators(opts, DOC_STRINGS["repair"])
   end,
   'pair' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} pair"
