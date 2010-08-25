@@ -83,7 +83,7 @@ subcommands = {
   'rebalance' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} rebalance"
     separators(opts, DOC_STRINGS["rebalance"])
-    
+
     opts.on("-h", "--hosts=list") do |h|
       subcommand_options.hosts = h
     end
@@ -230,6 +230,10 @@ global = OptionParser.new do |opts|
     global_options.port = port
   end
 
+  opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
+    global_options.retry = r
+  end
+
   opts.on("--subtree", "Render in subtree mode") do
     global_options.render << "subtree"
   end
@@ -303,8 +307,20 @@ while !$stdin.tty? && line = STDIN.gets
   argv << line.strip
 end
 
+tries_left = global_options.retry.to_i + 1
 begin
-  Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
+  while (tries_left -= 1) >= 0
+    begin
+      Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
+      break
+    rescue
+      if tries_left > 0
+        STDERR.puts "Retrying..."
+      else
+        raise
+      end
+    end
+  end
 rescue HelpNeededError => e
   if e.class.name != e.message
     STDERR.puts("=" * 80)
