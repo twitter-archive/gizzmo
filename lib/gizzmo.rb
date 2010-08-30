@@ -128,6 +128,9 @@ subcommands = {
       subcommand_options.table_ids ||= []
       subcommand_options.table_ids +=  table_ids.split(",").map { |s| s.to_i }
     end
+    opts.on("-x", "--hex", "Show base ids in hex") do
+      subcommand_options.hex = true
+    end
   end,
   'unwrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} unwrap SHARD_ID_TO_REMOVE [MORE SHARD_IDS]"

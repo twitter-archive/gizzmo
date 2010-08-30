@@ -86,7 +86,7 @@ module Gizzard
       end.reject do |forwarding|
         @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
       end.each do |forwarding|
-        output [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
+        output [ forwarding.table_id, @command_options.hex ? ("%015x" % forwarding.base_id) : forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
       end
     end
   end
