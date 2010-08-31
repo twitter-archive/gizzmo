@@ -1,4 +1,8 @@
 module Gizzard
+  class MigratorConfig
+    attr_accessor :namespace, :table_prefix, :graph_id, :source_type, :destination_type
+  end
+
   class Migrator
     BALANCE_TOLERANCE = 1
 
@@ -11,11 +15,12 @@ module Gizzard
     # populated via derive_changes
     attr_reader :new_templates, :unrecognized_templates, :similar_templates, :unchanged_templates
 
-    def initialize(existing_map, config_templates, default_total_shards, forwarding_generator)
+    def initialize(existing_map, config_templates, default_total_shards, config, forwarding_generator)
       @configured_templates = config_templates
       @existing_map = existing_map
       @existing_templates = existing_map.keys
       @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
+      @config = config
       @forwarding_generator = forwarding_generator
       derive_changes
     end
@@ -66,12 +71,13 @@ module Gizzard
         step_size = FORWARDING_SPACE / shard_count
         (0...shard_count).map { |i| FORWARDING_SPACE_MIN + (i * step_size) }.sort_by { rand }
       else
-        step_size = (1 << 60) / options[:count]
+        step_size = (1 << 60) / shard_count
         (0...shard_count).map { |i| step_size * i }
       end
 
       bases.each_with_index do |base_id, i|
-        forwardings[base_id] = "status_%05d" % (i + 1)
+        table_name = [ @config.namespace, @config.table_prefix, @config.graph_id, "%04d" % i ].compact.join("_")
+        forwardings[base_id] = table_name
       end
 
       forwardings
@@ -136,7 +142,7 @@ module Gizzard
       # transformation for each one.
       (configured_shards.to_a - existing_shards.to_a).inject({}) do |transformations, (shard, to)|
         from = existing_shards[shard]
-        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shard_ids << shard
+        (transformations[[from, to]] ||= Transformation.new(from, to, [], @config)).shard_ids << shard
         transformations
       end.values
     end

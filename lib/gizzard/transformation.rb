@@ -50,10 +50,11 @@ module Gizzard
       :copy_shard => 4
     }
 
-    def initialize(from_template, to_template, shard_ids)
+    def initialize(from_template, to_template, shard_ids, config)
       @from = from_template
       @to = to_template
       @shard_ids = shard_ids
+      @config = config
     end
 
     def paginate(page_size = DEFAULT_CONCURRENT_COPIES)
@@ -264,7 +265,7 @@ module Gizzard
 
     def info(shard)
       shard_id = @current_shard_id or raise "no current shard id!"
-      shard.to_shard_info(shard_id)
+      shard.to_shard_info(@config, shard_id)
     end
 
     def copy_destination?(shard)

@@ -40,6 +40,10 @@ module Gizzard
       type =~ /ReplicatingShard/
     end
 
+    def short_type
+      type.split(".").last
+    end
+
     def identifier
       replicating? ? type.to_s : "#{type}:#{host}"
     end
@@ -91,13 +95,12 @@ module Gizzard
 
     # Materialization
 
-    def to_shard_id(namespace, table_prefix, graph_id, shard_number)
-      table_name = [ namespace, table_prefix, graph_id, "%04d" % shard_number ].compact.join("_")
-      Thrift::ShardId.new(host, table_name)
+    def to_shard_id(table_name)
+      Thrift::ShardId.new(host, concrete? ? table_name : table_name + "_" + short_type)
     end
 
-    def to_shard_info(namespace, table_prefix, graph_id, shard_number, source_type, destination_type)
-      Thrift::ShardInfo.new(to_shard_id(namespace, table_prefix, graph_id, shard_number), type, source_type, destination_type, 0)
+    def to_shard_info(config, table_name)
+      Thrift::ShardInfo.new(to_shard_id(table_name), type, config.source_type, config.destination_type, 0)
     end
 
 
