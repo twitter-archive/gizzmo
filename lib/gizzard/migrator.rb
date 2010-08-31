@@ -11,11 +11,12 @@ module Gizzard
     # populated via derive_changes
     attr_reader :new_templates, :unrecognized_templates, :similar_templates, :unchanged_templates
 
-    def initialize(existing_map, config_templates, default_total_shards = nil)
+    def initialize(existing_map, config_templates, default_total_shards, forwarding_generator)
       @configured_templates = config_templates
       @existing_map = existing_map
       @existing_templates = existing_map.keys
-      @total_shards = @existing_map.values.map {|a| a.length }.inject {|a,b| a + b } || default_total_shards
+      @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
+      @forwarding_generator = forwarding_generator
       derive_changes
     end
 
@@ -58,11 +59,16 @@ module Gizzard
     end
 
     def generate_new_forwardings(shard_count)
-      srand(42) # so we have consistently random forwarding mappings
-
-      step_size = FORWARDING_SPACE / shard_count
       forwardings = {}
-      bases = (0...shard_count).map { |i| FORWARDING_SPACE_MIN + (i * step_size) }.sort_by { rand }
+      bases = if @forwarding_generator == :random
+        srand(42) # so we have consistently random forwarding mappings
+
+        step_size = FORWARDING_SPACE / shard_count
+        (0...shard_count).map { |i| FORWARDING_SPACE_MIN + (i * step_size) }.sort_by { rand }
+      else
+        step_size = (1 << 60) / options[:count]
+        (0...shard_count).map { |i| step_size * i }
+      end
 
       bases.each_with_index do |base_id, i|
         forwardings[base_id] = "status_%05d" % (i + 1)
