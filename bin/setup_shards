@@ -72,6 +72,8 @@ migrator_config.prefix = table_name
 migrator_config.table_id = options[:table_id]
 migrator_config.source_type = config['source_type'] || ''
 migrator_config.destination_type = config['destination_type'] || ''
+migrator_config.forwarding_space = config['forwarding_space'] || 2 ** 64
+migrator_config.forwarding_space_min = config['forwarding_space_min'] || 2 ** 63 * -1
 
 querying_nameserver = Gizzard::Nameserver.new(config['app_hosts'] || 'localhost', :dry_run => false)
 mutating_nameserver = Gizzard::Nameserver.new(config['app_hosts'] || 'localhost', :dry_run => options[:dry_run])
@@ -114,7 +116,7 @@ end
 puts "\nCalculating changes...\n"
 
 
-migrator = Gizzard::Migrator.new(existing_map, new_templates, total_shards, migrator_config, :ordered)
+migrator = Gizzard::Migrator.new(existing_map, new_templates, total_shards, migrator_config)
 
 puts "\nUNCHANGED:"
 pp migrator.unchanged_templates

@@ -1,8 +1,8 @@
 module Gizzard
   class MigratorConfig
-    attr_accessor :prefix, :table_id, :source_type, :destination_type
+    attr_accessor :prefix, :table_id, :source_type, :destination_type, :forwarding_space, :forwarding_space_min
 
-    def initialize(opts)
+    def initialize(opts = {})
       opts.each {|(k,v)| send("#{k}=", v) if respond_to? "{k}=" }
     end
   end
@@ -10,22 +10,17 @@ module Gizzard
   class Migrator
     BALANCE_TOLERANCE = 1
 
-    FORWARDING_SPACE = 2 ** 64
-    FORWARDING_SPACE_MIN = 2 ** 63 * -1
-    FORWARDING_SPACE_MAX = 2 ** 63 - 1
-
     attr_reader :configured_templates, :existing_map, :existing_templates, :total_shards
 
     # populated via derive_changes
     attr_reader :new_templates, :unrecognized_templates, :similar_templates, :unchanged_templates
 
-    def initialize(existing_map, config_templates, default_total_shards, config, forwarding_generator)
+    def initialize(existing_map, config_templates, default_total_shards, config)
       @configured_templates = config_templates
       @existing_map = existing_map
       @existing_templates = existing_map.keys
       @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
       @config = config
-      @forwarding_generator = forwarding_generator
       derive_changes
     end
 
@@ -69,15 +64,8 @@ module Gizzard
 
     def generate_new_forwardings(shard_count)
       forwardings = {}
-      bases = if @forwarding_generator == :random
-        srand(42) # so we have consistently random forwarding mappings
-
-        step_size = FORWARDING_SPACE / shard_count
-        (0...shard_count).map { |i| FORWARDING_SPACE_MIN + (i * step_size) }.sort_by { rand }
-      else
-        step_size = (1 << 60) / shard_count
-        (0...shard_count).map { |i| step_size * i }
-      end
+      step_size = @config.forwarding_space / shard_count
+      bases = (0...shard_count).map { |i| @config.forwarding_space_min + (i * step_size) }
 
       bases.each_with_index do |base_id, i|
         table_name = [ @config.prefix, @config.table_id, "%04d" % i ].compact.join("_")
