@@ -174,9 +174,15 @@ module Gizzard
     def collapse_jobs(jobs)
       jobs.reject do |(type_1, arg1_1, arg2_1)|
         jobs.find do |(type_2, arg1_2, arg2_2)|
-          JOB_INVERSES[type_1] == type_2 &&
-            arg1_1.eql?(arg1_2, false) &&
-            (arg2_1.nil? || arg2_1.eql?(arg2_2, false))
+          if JOB_INVERSES[type_1] == type_2
+            if arg2_1.nil? # shard creation. wieght doesn't matter.
+              arg1_1.eql?(arg1_2, false, false)
+            else
+              arg1_1.eql?(arg1_2, false, false) && arg2_1.eql?(arg2_2, false)
+            end
+          else
+            false
+          end
         end
       end
     end

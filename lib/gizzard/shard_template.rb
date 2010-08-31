@@ -123,20 +123,24 @@ module Gizzard
       (self.descendant_identifiers & other.descendant_identifiers).length > 0
     end
 
-    def <=>(other, deep = true)
+    def <=>(other, deep = true, include_weight = true)
       raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
 
-      if (cmp = [weight, host, type.to_s] <=> [other.weight, other.host, other.type.to_s]) == 0
-        # only sort children if necessary...
-        deep ? children <=> other.children : 0
+      if (cmp = [host, type.to_s] <=> [other.host, other.type.to_s]) == 0
+        if (cmp = include_weight ? weight <=> other.weight : 0) == 0
+          # only sort children if necessary...
+          deep ? children <=> other.children : 0
+        else
+          cmp
+        end
       else
         cmp
       end
     end
 
-    def eql?(other, deep = true)
+    def eql?(other, deep = true, include_weight = true)
       return false unless other.is_a? ShardTemplate
-      (self.<=>(other,deep)).zero?
+      (self.<=>(other, deep, include_weight)).zero?
     end
 
     def hash
