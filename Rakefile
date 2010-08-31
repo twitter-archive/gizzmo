@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'rake'
+require 'spec/rake/spectask'
 
 begin
   require 'jeweler'
@@ -23,6 +24,14 @@ Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
 
+Spec::Rake::SpecTask.new(:spec) do |t|
+  spec_opts = File.expand_path('spec/spec.opts')
+  if File.exist? spec_opts
+    t.spec_opts = ['--options', "\"#{spec_opts}\""]
+  end
+  t.spec_files = FileList['spec/**/*_spec.rb']
+end
+
 begin
   require 'rcov/rcovtask'
   Rcov::RcovTask.new do |test|
@@ -37,7 +46,7 @@ rescue LoadError
 end
 
 task :test do
-  puts 
+  puts
   puts "=" * 79
   puts "You might want to read the README before running tests."
   puts "=" * 79
