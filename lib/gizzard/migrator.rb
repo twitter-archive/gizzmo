@@ -1,6 +1,6 @@
 module Gizzard
   class MigratorConfig
-    attr_accessor :namespace, :table_prefix, :graph_id, :source_type, :destination_type
+    attr_accessor :namespace, :table_prefix, :table_id, :source_type, :destination_type
   end
 
   class Migrator
@@ -60,7 +60,7 @@ module Gizzard
       rebalance_shards(configured_map)
 
       # transformation generation
-      @transformations.concat generate_transformations(existing_map, configured_map)
+      @transformations = generate_transformations(existing_map, configured_map) + @transformations
     end
 
     def generate_new_forwardings(shard_count)
@@ -76,7 +76,7 @@ module Gizzard
       end
 
       bases.each_with_index do |base_id, i|
-        table_name = [ @config.namespace, @config.table_prefix, @config.graph_id, "%04d" % i ].compact.join("_")
+        table_name = [ @config.namespace, @config.table_prefix, @config.table_id, "%04d" % i ].compact.join("_")
         forwardings[base_id] = table_name
       end
 
