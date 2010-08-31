@@ -18,6 +18,13 @@ module Gizzard
 
     INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
 
+    SHARD_SUFFIXES = {
+      "ReplicatingShard" => 'replicating',
+      "ReadOnlyShard" => 'read_only',
+      "WriteOnlyShard" => 'write_only',
+      "BlockedShard" => 'blocked'
+    }
+
     attr_reader :type, :weight
 
     def initialize(type, host, weight, children)
@@ -98,11 +105,12 @@ module Gizzard
     # Materialization
 
     def to_shard_id(table_name)
-      Thrift::ShardId.new(host, concrete? ? table_name : table_name + "_" + short_type)
+      name = [table_name, SHARD_SUFFIXES[short_type]].compact.join("_")
+      Thrift::ShardId.new(host, name)
     end
 
     def to_shard_info(config, table_name)
-      Thrift::ShardInfo.new(to_shard_id(table_name), type, config.source_type, config.destination_type, 0)
+      Thrift::ShardInfo.new(to_shard_id(table_name), type, config.source_type || '', config.destination_type || '', 0)
     end
 
 

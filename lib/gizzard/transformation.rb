@@ -31,7 +31,7 @@ module Gizzard
   end
 
   class Transformation
-    attr_reader :from, :to, :shard_ids
+    attr_reader :from, :to, :shard_names
 
     DEFAULT_CONCURRENT_COPIES = 5
 
@@ -50,16 +50,16 @@ module Gizzard
       :copy_shard => 4
     }
 
-    def initialize(from_template, to_template, shard_ids, config)
+    def initialize(from_template, to_template, shard_names, config)
       @from = from_template
       @to = to_template
-      @shard_ids = shard_ids
+      @shard_names = shard_names
       @config = config
     end
 
     def paginate(page_size = DEFAULT_CONCURRENT_COPIES)
       if must_copy?
-        slices = shard_ids.inject([[]]) do |slices, id|
+        slices = shard_names.inject([[]]) do |slices, id|
           slices.last << id
           slices << [] if slices.last.length >= page_size
           slices
@@ -97,7 +97,7 @@ module Gizzard
       return if nameserver.dryrun?
 
       operations[:copy].each do |(type, from, to)|
-        each_id do
+        each_shard do
           if nameserver.get_shard(id(to)).busy?
             sleep 1; redo
           end
@@ -125,9 +125,9 @@ module Gizzard
       op_inspect = [prepare_inspect, copy_inspect, cleanup_inspect].join
 
       if with_shards
-        "[#{shard_ids.length} SHARDS: #{shard_ids.sort.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+        "[#{shard_names.length} SHARDS: #{shard_names.sort.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       else
-        "[#{shard_ids.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+        "[#{shard_names.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       end
     end
 
@@ -183,12 +183,12 @@ module Gizzard
 
     def expand_create_job(job)
       type, arg1, arg2 = job
-      shard = (type == :create_shard) ? arg1 : arg2
+      template = (type == :create_shard) ? arg1 : arg2
 
       ops = {:prepare => [], :copy => [], :cleanup => []}
 
-      if copy_destination? shard
-        write_only_wrapper = ShardTemplate.new(:write_only, nil, 0, [shard])
+      if copy_destination? template
+        write_only_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, [template])
 
         if type == :add_link
           ops[:prepare] << add_link(arg1, write_only_wrapper)
@@ -213,11 +213,11 @@ module Gizzard
 
     def expand_delete_job(job)
       type, arg1, arg2 = job
-      shard = (type == :delete_shard) ? arg1 : arg2
+      template = (type == :delete_shard) ? arg1 : arg2
 
       ops = {:prepare => [], :copy => [], :cleanup => []}
 
-      if copy_source? shard
+      if copy_source? template
         ops[:cleanup] << job
       else
         ops[:prepare] << job
@@ -235,41 +235,41 @@ module Gizzard
 
       case type
       when :copy_shard
-        each_id { nameserver.copy_shard(id(arg1), id(arg2)) }
+        each_shard { nameserver.copy_shard(id(arg1), id(arg2)) }
       when :add_link
-        each_id { nameserver.add_link(id(arg1), id(arg2), arg2.weight) }
+        each_shard { nameserver.add_link(id(arg1), id(arg2), arg2.weight) }
       when :remove_link
-        each_id { nameserver.remove_link(id(arg1), id(arg2)) }
+        each_shard { nameserver.remove_link(id(arg1), id(arg2)) }
       when :create_shard
-        each_id { nameserver.create_shard(info(arg1)) }
+        each_shard { nameserver.create_shard(info(arg1)) }
       when :delete_shard
-        each_id { nameserver.delete_shard(id(arg1)) }
+        each_shard { nameserver.delete_shard(id(arg1)) }
       else
         raise ArgumentError, "unknown job type #{type.inspect}"
       end
     end
 
-    def each_id
-      shard_ids.each do |id|
-        @current_shard_id = id
+    def each_shard
+      shard_names.each do |shard|
+        @current_shard = shard
         yield
       end
     ensure
-      @current_shard_id = nil
+      @current_shard = nil
     end
 
-    def id(shard)
-      shard_id = @current_shard_id or raise "no current shard id!"
-      shard.to_shard_id(shard_id)
+    def id(template)
+      shard = @current_shard or raise "no current shard id!"
+      template.to_shard_id(shard)
     end
 
-    def info(shard)
-      shard_id = @current_shard_id or raise "no current shard id!"
-      shard.to_shard_info(@config, shard_id)
+    def info(template)
+      shard = @current_shard or raise "no current shard id!"
+      template.to_shard_info(@config, shard)
     end
 
-    def copy_destination?(shard)
-      shard.concrete? && !from.nil? && !from.descendant_identifiers.include?(shard.identifier)
+    def copy_destination?(template)
+      template.concrete? && !from.nil? && !from.descendant_identifiers.include?(template.identifier)
     end
 
 
@@ -277,9 +277,9 @@ module Gizzard
       from.copy_source if from
     end
 
-    def copy_source?(shard)
+    def copy_source?(template)
       return false unless copy_source
-      shard.descendant_identifiers.include? copy_source.identifier
+      template.descendant_identifiers.include? copy_source.identifier
     end
 
     def add_link(from, to)
@@ -290,12 +290,12 @@ module Gizzard
       [:remove_link, from, to]
     end
 
-    def create_shard(shard)
-      [:create_shard, shard]
+    def create_shard(template)
+      [:create_shard, template]
     end
 
-    def delete_shard(shard)
-      [:delete_shard, shard]
+    def delete_shard(template)
+      [:delete_shard, template]
     end
 
     def copy_shard(from, to)
