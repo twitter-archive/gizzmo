@@ -245,7 +245,7 @@ global = OptionParser.new do |opts|
     global_options.render << "info"
   end
 
-  opts.on("-D", "--dry-run", "") do |port|
+  opts.on("-D", "--dry-run", "") do
     global_options.dry = true
   end
 
