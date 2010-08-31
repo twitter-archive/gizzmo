@@ -16,6 +16,8 @@ module Gizzard
       "BlockedShard",
     ]
 
+    INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
+
     attr_reader :type, :weight
 
     def initialize(type, host, weight, children)

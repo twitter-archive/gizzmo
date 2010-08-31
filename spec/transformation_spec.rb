@@ -31,21 +31,23 @@ describe Gizzard::Transformation do
     @nameserver = stub!.subject
     stub(@nameserver).dryrun? { false }
 
-    @from_template = make_shard_template 'replicating' => [{'blocked' => "sql:host1"}, "sql:host2"]
-    @to_template = make_shard_template 'replicating' => %w(sql:host2 sql:host3)
+    @config = Gizzard::MigratorConfig.new :prefix => "status", :table_id => 0
 
-    @host_1_template = Gizzard::ShardTemplate.new(:sql, 'host1', 1, [])
-    @host_2_template = Gizzard::ShardTemplate.new(:sql, 'host2', 1, [])
-    @host_3_template = Gizzard::ShardTemplate.new(:sql, 'host3', 1, [])
+    @from_template = make_shard_template 'ReplicatingShard' => [{'BlockedShard' => "SqlShard:host1"}, "SqlShard:host2"]
+    @to_template = make_shard_template 'ReplicatingShard' => %w(SqlShard:host2 SqlShard:host3)
+
+    @host_1_template = Gizzard::ShardTemplate.new('SqlShard', 'host1', 1, [])
+    @host_2_template = Gizzard::ShardTemplate.new('SqlShard', 'host2', 1, [])
+    @host_3_template = Gizzard::ShardTemplate.new('SqlShard', 'host3', 1, [])
 
     @host_1_id = Gizzard::Thrift::ShardId.new(@host_1_template.host, 'status_001')
-    @host_1_info = Gizzard::Thrift::ShardInfo.new(@host_1_id, @host_1_template.java_type, "", "", 0)
+    @host_1_info = Gizzard::Thrift::ShardInfo.new(@host_1_id, @host_1_template.type, "", "", 0)
     @host_2_id = Gizzard::Thrift::ShardId.new(@host_2_template.host, 'status_001')
-    @host_2_info = Gizzard::Thrift::ShardInfo.new(@host_2_id, @host_2_template.java_type, "", "", 0)
+    @host_2_info = Gizzard::Thrift::ShardInfo.new(@host_2_id, @host_2_template.type, "", "", 0)
     @host_3_id = Gizzard::Thrift::ShardId.new(@host_3_template.host, 'status_001')
-    @host_3_info = Gizzard::Thrift::ShardInfo.new(@host_3_id, @host_3_template.java_type, "", "", 0)
+    @host_3_info = Gizzard::Thrift::ShardInfo.new(@host_3_id, @host_3_template.type, "", "", 0)
 
-    @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001))
+    @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001), @config)
   end
 
   describe "prepare!" do
@@ -313,7 +315,7 @@ describe Gizzard::Transformation do
     end
 
     it "returns false if there is no from template (no shards available as sources)" do
-      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001))
+      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001), @config)
       @trans.copy_source?(@host_1_template).should == false
       @trans.copy_source?(@host_2_template).should == false
       @trans.copy_source?(@host_3_template).should == false

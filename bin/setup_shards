@@ -68,8 +68,7 @@ table_name = options[:table_name] || config['table_name']
 usage(parser, "Must define table_name or -t") unless table_name
 
 migrator_config = Gizzard::MigratorConfig.new
-migrator_config.namespace = config['namespace'] || nil
-migrator_config.table_prefix = table_name
+migrator_config.prefix = table_name
 migrator_config.table_id = options[:table_id]
 migrator_config.source_type = config['source_type'] || ''
 migrator_config.destination_type = config['destination_type'] || ''

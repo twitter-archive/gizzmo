@@ -1,6 +1,10 @@
 module Gizzard
   class MigratorConfig
-    attr_accessor :namespace, :table_prefix, :table_id, :source_type, :destination_type
+    attr_accessor :prefix, :table_id, :source_type, :destination_type
+
+    def initialize(opts)
+      opts.each {|(k,v)| send("#{k}=", v) if respond_to? "{k}=" }
+    end
   end
 
   class Migrator
@@ -76,7 +80,7 @@ module Gizzard
       end
 
       bases.each_with_index do |base_id, i|
-        table_name = [ @config.namespace, @config.table_prefix, @config.table_id, "%04d" % i ].compact.join("_")
+        table_name = [ @config.prefix, @config.table_id, "%04d" % i ].compact.join("_")
         forwardings[base_id] = table_name
       end
 
