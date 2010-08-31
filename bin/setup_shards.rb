@@ -1,14 +1,12 @@
 #!/usr/bin/env ruby
 
-$: << "/Users/robey/twitter/gizzmo/lib"
-require 'rubygems'
 require 'yaml'
 require 'ostruct'
 require 'gizzard'
 
-#require 'migrator'
-#require 'transformation'
-
+require 'gizzard/migrator'
+require 'gizzard/transformation'
+require 'gizzard/shard_template'
 
 def usage(parser, reason)
   puts
