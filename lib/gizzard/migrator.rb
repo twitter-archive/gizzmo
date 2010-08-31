@@ -42,7 +42,7 @@ module Gizzard
         # be rebalanced later.
         configured_map.values.first.concat forwardings.values
 
-        @transformations << ForwardingTransformation.new(forwardings)
+        @transformations << ForwardingTransformation.new(@config.table_id, forwardings)
       end
 
       # map the unchanged templates straight over

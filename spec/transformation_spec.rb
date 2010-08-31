@@ -8,7 +8,7 @@ describe Gizzard::ForwardingTransformation do
       0 => 'status_002',
       100 => 'status_003'
     }
-    @trans = Gizzard::ForwardingTransformation.new(@forwardings)
+    @trans = Gizzard::ForwardingTransformation.new(nil, @forwardings)
   end
 
   describe "apply!" do
@@ -17,6 +17,7 @@ describe Gizzard::ForwardingTransformation do
         table = @forwardings.delete(forwarding.base_id)
         table.should_not be_nil
 
+        forwarding.table_id.should == 0
         forwarding.shard_id.hostname.should == "localhost"
         forwarding.shard_id.table_prefix.should == "#{table}_replicating"
       end

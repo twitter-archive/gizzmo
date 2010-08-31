@@ -1,6 +1,7 @@
 module Gizzard
   class ForwardingTransformation
-    def initialize(forwardings)
+    def initialize(table_id, forwardings)
+      @table_id = table_id
       @forwardings = forwardings.dup
     end
 
@@ -15,7 +16,7 @@ module Gizzard
     def apply!(nameserver)
       @forwardings.each do |(base_id, table)|
         shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, []).to_shard_id(table)
-        forwarding = Thrift::Forwarding.new(0, base_id, shard_id)
+        forwarding = Thrift::Forwarding.new(table_id, base_id, shard_id)
 
         nameserver.set_forwarding(forwarding)
       end
@@ -23,10 +24,14 @@ module Gizzard
 
     def inspect(with_shards = false)
       forwardings_inspect = @forwardings.sort_by { |base, table| base }.map do |base, table|
-        "  #{'%016x' % base} -> #{table}"
+        "  #{'%d %016x' % [table_id, base]} -> #{table}"
       end.join("\n")
 
       "[#{@forwardings.length} FORWARDINGS:\n#{forwardings_inspect}\n]"
+    end
+
+    def table_id
+      @table_id || 0
     end
   end
 
