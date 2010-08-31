@@ -48,20 +48,42 @@ module Gizzard
     end
   end
 
+  class Manifest
+    attr_reader :forwardings, :links, :shards, :prefix_translation_map
 
-  class MockNameserver
-    def initialize(*hosts)
+    def initialize(nameserver)
+      @forwardings = nameserver.get_forwardings
+      @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
+      @shards = collect_shards(nameserver, links)
+      @prefix_translation_map = @shards.inject({}) do |m, (id, info)|
+        #TODO generate translation map here
+      end
     end
 
-    def get_shard(id)
-      Gizzard::Thrift::ShardInfo.new(id, "", "", "", 0)
+    private
+
+    def collect_links(nameserver, roots)
+      links = Hash.new {|h,k| h[k] = [] }
+
+      collector = lambda do |parent|
+        children = nameserver.list_downward_links(parent).map do |link|
+          links[link.up_id] << [link.down_id, link.weight]
+          link.down_id
+        end
+
+        children.each { |child| collector.call(child) }
+      end
+
+      roots.each {|root| collector.call(root) }
+      links
     end
 
-    def reload_forwardings
-    end
+    def collect_shards(nameserver, links)
+      shard_ids = links.keys + links.values.inject([]) do |ids, nodes|
+        nodes.each {|id, weight| ids << id }; ids
+      end
 
-    def method_missing(method, *args)
-      puts "#{method.to_s.upcase}:\t#{args.map{|a| a.inspect }.join(",\t")}"
+      shard_ids.inject({}) {|h, id| h.update id => nameserver.get_shard(id) }
     end
   end
 end

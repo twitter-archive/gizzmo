@@ -4,6 +4,7 @@ require 'yaml'
 require 'ostruct'
 require 'gizzard'
 
+require 'gizzard/nameserver'
 require 'gizzard/migrator'
 require 'gizzard/transformation'
 require 'gizzard/shard_template'
@@ -96,7 +97,8 @@ if File.exist? EXISTING_CONFIG_CACHE
   end
 else
   puts "Querying nameserver..."
-  existing_map = Gizzard::ShardTemplate.existing_template_map(querying_nameserver)
+  manifest = Gizzard::Manifest.new(querying_nameserver)
+  existing_map = Gizzard::ShardTemplate.existing_template_map(manifest)
 
   existing_config = { 'partitions' => [], 'shards' => [] }
 
@@ -107,9 +109,6 @@ else
 
   File.open(EXISTING_CONFIG_CACHE, 'w') { |f| f.write YAML.dump(existing_config) }
 end
-
-
-
 
 
 
