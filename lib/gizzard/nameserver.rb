@@ -1,5 +1,8 @@
 module Gizzard
   class Nameserver
+
+    DEFAULT_PORT = 7917
+
     attr_reader :hosts, :logfile, :dryrun
     alias dryrun? dryrun
 
@@ -34,6 +37,7 @@ module Gizzard
 
     def create_client(host)
       host, port = host.split(":")
+      port ||= DEFAULT_PORT
       Gizzard::Thrift::ShardManager.new(host, port.to_i, logfile, dryrun)
     end
 

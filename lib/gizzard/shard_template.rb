@@ -6,10 +6,6 @@ module Gizzard
     DEFAULT_WEIGHT = 1
 
     GIZZARD_SHARD_TYPES = [
-      "com.twitter.gizzard.shards.ReplicatingShard",
-      "com.twitter.gizzard.shards.ReadOnlyShard",
-      "com.twitter.gizzard.shards.WriteOnlyShard",
-      "com.twitter.gizzard.shards.BlockedShard",
       "ReplicatingShard",
       "ReadOnlyShard",
       "WriteOnlyShard",
@@ -33,11 +29,11 @@ module Gizzard
     end
 
     def concrete?
-      !GIZZARD_SHARD_TYPES.include? type
+      self.class.concrete? type
     end
 
     def replicating?
-      type =~ /ReplicatingShard/
+      short_type == 'ReplicatingShard'
     end
 
     def short_type
@@ -159,10 +155,7 @@ module Gizzard
 
     module Introspection
       def from_shard_info(info, link_weight = nil, children = [])
-        class_sym = SHARD_TYPES.index(info.class_name) or raise "unrecognized shard type #{info.class_name}"
-        host = info.id.hostname
-
-        new(class_sym, host, link_weight, info.source_type, info.destination_type, children)
+        new(info.class_name, info.id.hostname, link_weight, info.source_type, info.destination_type, children)
       end
 
       def existing_template_map(manifest)
@@ -171,7 +164,7 @@ module Gizzard
 
         manifest.forwardings.map{|f| [f.table_id, f.base_id, f.shard_id] }.each do |(table_id, base_id, shard_id)|
           tree = build_tree(shard_id, DEFAULT_WEIGHT, manifest)
-          trees[tree][table_id] << shard_id.table_prefix
+          trees[tree][table_id] << shard_id.table_prefix.match(/\d{3,}/)[0]
         end
 
         trees
@@ -192,6 +185,10 @@ module Gizzard
 
 
     module Configuration
+      def concrete?(type)
+        !GIZZARD_SHARD_TYPES.include? type.split('.').last
+      end
+
       def from_config(config, conf_tree)
         shard, children = parse_link_struct(conf_tree)
         type, host, weight = parse_shard_definition(shard)
@@ -214,7 +211,7 @@ module Gizzard
         type, arg1, arg2 = definition.split(":")
 
         host, weight =
-          if GIZZARD_SHARD_TYPES.include? type
+          unless concrete? type
             if arg2 or YAML.load(arg1.to_s).is_a? String
               raise ArgumentError, "cannot specify a host for #{type} shard in: #{definition.inspect}"
             end

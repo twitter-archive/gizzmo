@@ -17,11 +17,34 @@ module Gizzard
 
     def initialize(existing_map, config_templates, default_total_shards, config)
       @configured_templates = config_templates
-      @existing_map = existing_map
+
+      # turn table => [shards] map to an array of "table_shard" strings
+      @existing_map = existing_map.inject({}) do |m, (template, tables)|
+        names = tables.inject([]) {|e, (t, shards)| shards.each {|s| e << "#{config.prefix}_#{t}_#{s}" }; e }
+        m.update template => names
+      end
+
       @existing_templates = existing_map.keys
       @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
       @config = config
+
       derive_changes
+    end
+
+    def prepare!(nameserver)
+      transformations.each {|t| t.prepare! nameserver }
+    end
+
+    def copy!(nameserver)
+      transformations.each {|t| t.copy! nameserver }
+    end
+
+    def wait_for_copies(nameserver)
+      transformations.each {|t| t.wait_for_copies nameserver }
+    end
+
+    def cleanup!(nameserver)
+      transformations.each {|t| t.cleanup! nameserver }
     end
 
     def transformations
@@ -62,6 +85,8 @@ module Gizzard
       @transformations = generate_transformations(existing_map, configured_map) + @transformations
     end
 
+    private
+
     def generate_new_forwardings(shard_count)
       forwardings = {}
       step_size = @config.forwarding_space / shard_count
@@ -74,24 +99,6 @@ module Gizzard
 
       forwardings
     end
-
-    def prepare!(nameserver)
-      transformations.each {|t| t.prepare! nameserver }
-    end
-
-    def copy!(nameserver)
-      transformations.each {|t| t.copy! nameserver }
-    end
-
-    def wait_for_copies(nameserver)
-      transformations.each {|t| t.wait_for_copies nameserver }
-    end
-
-    def cleanup!(nameserver)
-      transformations.each {|t| t.cleanup! nameserver }
-    end
-
-    private
 
     def move_unchanged(existing, configured)
       unchanged_templates.each {|u| configured[u] = existing[u].dup }
@@ -134,7 +141,7 @@ module Gizzard
       # transformation for each one.
       (configured_shards.to_a - existing_shards.to_a).inject({}) do |transformations, (shard, to)|
         from = existing_shards[shard]
-        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shard_ids << shard
+        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shard_names << shard
         transformations
       end.values
     end
