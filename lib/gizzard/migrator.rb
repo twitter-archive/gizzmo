@@ -6,8 +6,8 @@ module Gizzard
       opts.each {|(k,v)| send("#{k}=", v) if respond_to? "{k}=" }
     end
 
-    def shard_name(table_id, enum)
-      [prefix, table_id, "%04d" % enum].join("_")
+    def shard_name(enum)
+      [prefix, table_id, "%04d" % enum].compact.join("_")
     end
   end
 
@@ -67,9 +67,9 @@ module Gizzard
 
         # add the new table ids to a member of the configured map. will
         # be rebalanced later.
-        configured_map.values.first.concat forwardings.values.map {|enum| [@config.table_id, enum] }
+        configured_map.values.first.concat forwardings.values
 
-        @transformations << ForwardingTransformation.new(@config.table_id, forwardings.inject({}) {|f, (b, e)| f.update b => @config.shard_name(@config.table_id, e) })
+        @transformations << ForwardingTransformation.new(@config.table_id, forwardings.inject({}) {|f, (b, e)| f.update b => @config.shard_name(e) })
       end
 
       # map the unchanged templates straight over

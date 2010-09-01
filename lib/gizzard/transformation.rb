@@ -271,19 +271,16 @@ module Gizzard
 
     def id(template)
       @current_shard or raise "no current shard id!"
-      table_id, enum = *@current_shard
+      name = @current_config.shard_name(@current_shard)
 
-      name = @current_config.shard_name(table_id, enum)
       canonical = template.to_shard_id(name)
       @current_config.manifest.existing_shard_ids[canonical] || canonical
     end
 
     def info(template)
-      @current_shard or raise "no current shard id!"
-      table_id, enum = *@current_shard
+      id = id(template)
 
-      name = @current_config.shard_name(table_id, enum)
-      info = template.to_shard_info(name)
+      info = template.to_shard_info(id.table_prefix)
       info.id = id(template)
       info
     end

@@ -13,6 +13,15 @@ module Gizzard
       @hosts = hosts.flatten
     end
 
+    def get_forwardings(table_id=nil)
+      forwardings = client.get_forwardings
+      if table_id
+        forwardings.select {|f| f.table_id == table_id }
+      else
+        forwardings
+      end
+    end
+
     def reload_forwardings
       all_clients.each {|c| with_retry { c.reload_forwardings } }
     end
@@ -56,10 +65,10 @@ module Gizzard
     attr_reader :forwardings, :links, :shards, :existing_shard_ids, :template_map
 
     def initialize(nameserver, config)
-      @forwardings = nameserver.get_forwardings
+      @config = config
+      @forwardings = nameserver.get_forwardings(@config.table_id)
       @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
       @shards = collect_shards(nameserver, links)
-      @config = config
 
       build_template_map!
     end
@@ -91,7 +100,7 @@ module Gizzard
 
       template = ShardTemplate.from_shard_info(shards[shard_id], link_weight, children)
 
-      canonical_id = template.to_shard_id(@config.shard_name(table_id, enum))
+      canonical_id = template.to_shard_id(@config.shard_name(enum))
       @existing_shard_ids[canonical_id] = shard_id
 
       template
