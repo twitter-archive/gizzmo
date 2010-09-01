@@ -53,25 +53,56 @@ module Gizzard
   end
 
   class Manifest
-    attr_reader :forwardings, :links, :shards, :prefix_translation_map
+    attr_reader :forwardings, :links, :shards, :existing_shard_ids, :template_map
 
-    def initialize(nameserver)
+    def initialize(nameserver, config)
       @forwardings = nameserver.get_forwardings
       @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
       @shards = collect_shards(nameserver, links)
-      @prefix_translation_map = @shards.inject({}) do |m, (id, info)|
-        #TODO generate translation map here
+      @config = config
+
+      build_template_map!
+    end
+
+    def build_template_map!
+      # can't use a default block for these as they wouldn't be marshalable.
+      # map[template][table_id] #=> [shard_enums...]
+      @template_map = {}
+
+      # map[table_id][shard_enum][hostname] #=> shard_name
+      @existing_shard_ids = {}
+
+      forwardings.map{|f| [f.table_id, f.base_id, f.shard_id] }.each do |(table_id, base_id, shard_id)|
+        enum = shard_id.table_prefix.match(/\d{3,}/)[0].to_i
+        tree = build_tree(table_id, enum, shard_id, ShardTemplate::DEFAULT_WEIGHT)
+
+        ((@template_map[tree] ||= {})[table_id] ||= []) << enum
       end
     end
 
     private
 
+    # FIXME: figure out how to remove the side-effect of adding to the
+    # name map
+    def build_tree(table_id, enum, shard_id, link_weight)
+      children = (links[shard_id] || []).map do |(child_id, child_weight)|
+        build_tree(table_id, enum, child_id, child_weight)
+      end
+
+      template = ShardTemplate.from_shard_info(shards[shard_id], link_weight, children)
+
+      canonical_id = template.to_shard_id(@config.shard_name(table_id, enum))
+      @existing_shard_ids[canonical_id] = shard_id
+
+      template
+    end
+
     def collect_links(nameserver, roots)
-      links = Hash.new {|h,k| h[k] = [] }
+      links = {}
 
       collector = lambda do |parent|
         children = nameserver.list_downward_links(parent).map do |link|
-          links[link.up_id] << [link.down_id, link.weight]
+          (links[link.up_id] ||= []) << [link.down_id, link.weight]
           link.down_id
         end
 

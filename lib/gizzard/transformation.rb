@@ -13,7 +13,7 @@ module Gizzard
       false
     end
 
-    def apply!(nameserver)
+    def apply!(nameserver, config)
       @forwardings.each do |(base_id, table)|
         shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, '', '', []).to_shard_id(table)
         forwarding = Thrift::Forwarding.new(table_id, base_id, shard_id)
@@ -36,7 +36,7 @@ module Gizzard
   end
 
   class Transformation
-    attr_reader :from, :to, :shard_names
+    attr_reader :from, :to, :shards
 
     DEFAULT_CONCURRENT_COPIES = 5
 
@@ -55,15 +55,15 @@ module Gizzard
       :copy_shard => 4
     }
 
-    def initialize(from_template, to_template, shard_names)
+    def initialize(from_template, to_template, shards)
       @from = from_template
       @to = to_template
-      @shard_names = shard_names
+      @shards = shards
     end
 
     def paginate(page_size = DEFAULT_CONCURRENT_COPIES)
       if must_copy?
-        slices = shard_names.inject([[]]) do |slices, id|
+        slices = shards.inject([[]]) do |slices, id|
           slices.last << id
           slices << [] if slices.last.length >= page_size
           slices
@@ -78,30 +78,30 @@ module Gizzard
       end
     end
 
-    def apply!(nameserver)
+    def apply!(nameserver, config)
       raise "involves copies!" if must_copy?
 
-      prepare! nameserver
-      cleanup! nameserver
+      prepare! nameserver, config
+      cleanup! nameserver, config
     end
 
-    def prepare!(nameserver)
-      operations[:prepare].each {|job| apply_job(job, nameserver) }
+    def prepare!(nameserver, config)
+      operations[:prepare].each {|job| apply_job(job, nameserver, config) }
     end
 
-    def copy!(nameserver)
-      operations[:copy].each {|job| apply_job(job, nameserver) }
+    def copy!(nameserver, config)
+      operations[:copy].each {|job| apply_job(job, nameserver, config) }
     end
 
     def must_copy?
       !operations[:copy].empty?
     end
 
-    def wait_for_copies(nameserver)
+    def wait_for_copies(nameserver, config)
       return if nameserver.dryrun?
 
       operations[:copy].each do |(type, from, to)|
-        each_shard do
+        each_shard(config) do
           if nameserver.get_shard(id(to)).busy?
             sleep 1; redo
           end
@@ -109,8 +109,8 @@ module Gizzard
       end
     end
 
-    def cleanup!(nameserver)
-      operations[:cleanup].each {|job| apply_job(job, nameserver) }
+    def cleanup!(nameserver, config)
+      operations[:cleanup].each {|job| apply_job(job, nameserver, config) }
     end
 
     def inspect(with_shards = false)
@@ -129,9 +129,9 @@ module Gizzard
       op_inspect = [prepare_inspect, copy_inspect, cleanup_inspect].join
 
       if with_shards
-        "[#{shard_names.length} SHARDS: #{shard_names.sort.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+        "[#{shards.length} SHARDS: #{shards.sort.map {|(t,s)| "#{t}_%04d" % s }.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       else
-        "[#{shard_names.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+        "[#{shards.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       end
     end
 
@@ -240,42 +240,52 @@ module Gizzard
       jobs.sort_by {|(type, _, _)| JOB_PRIORITIES[type] }
     end
 
-    def apply_job(job, nameserver)
+    def apply_job(job, nameserver, config)
       type, arg1, arg2 = job
 
       case type
       when :copy_shard
-        each_shard { nameserver.copy_shard(id(arg1), id(arg2)) }
+        each_shard(config) { nameserver.copy_shard(id(arg1), id(arg2)) }
       when :add_link
-        each_shard { nameserver.add_link(id(arg1), id(arg2), arg2.weight) }
+        each_shard(config) { nameserver.add_link(id(arg1), id(arg2), arg2.weight) }
       when :remove_link
-        each_shard { nameserver.remove_link(id(arg1), id(arg2)) }
+        each_shard(config) { nameserver.remove_link(id(arg1), id(arg2)) }
       when :create_shard
-        each_shard { nameserver.create_shard(info(arg1)) }
+        each_shard(config) { nameserver.create_shard(info(arg1)) }
       when :delete_shard
-        each_shard { nameserver.delete_shard(id(arg1)) }
+        each_shard(config) { nameserver.delete_shard(id(arg1)) }
       else
         raise ArgumentError, "unknown job type #{type.inspect}"
       end
     end
 
-    def each_shard
-      shard_names.each do |shard|
+    def each_shard(config)
+      @current_config = config
+      shards.each do |shard|
         @current_shard = shard
         yield
       end
     ensure
-      @current_shard = nil
+      @current_config = @current_shard = nil
     end
 
     def id(template)
-      shard = @current_shard or raise "no current shard id!"
-      template.to_shard_id(shard)
+      @current_shard or raise "no current shard id!"
+      table_id, enum = *@current_shard
+
+      name = @current_config.shard_name(table_id, enum)
+      canonical = template.to_shard_id(name)
+      @current_config.manifest.existing_shard_ids[canonical] || canonical
     end
 
     def info(template)
-      shard = @current_shard or raise "no current shard id!"
-      template.to_shard_info(shard)
+      @current_shard or raise "no current shard id!"
+      table_id, enum = *@current_shard
+
+      name = @current_config.shard_name(table_id, enum)
+      info = template.to_shard_info(name)
+      info.id = id(template)
+      info
     end
 
     def copy_destination?(template)

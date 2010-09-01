@@ -79,6 +79,7 @@ module Gizzard
     end
 
     def copy_source
+      return nil if copy_sources.empty?
       copy_sources.to_a.sort {|a,b| a.last <=> b.last }.first.first
     end
 
@@ -156,28 +157,6 @@ module Gizzard
     module Introspection
       def from_shard_info(info, link_weight = nil, children = [])
         new(info.class_name, info.id.hostname, link_weight, info.source_type, info.destination_type, children)
-      end
-
-      def existing_template_map(manifest)
-        # trees[template][graph_id][table_id]
-        trees = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] } }
-
-        manifest.forwardings.map{|f| [f.table_id, f.base_id, f.shard_id] }.each do |(table_id, base_id, shard_id)|
-          tree = build_tree(shard_id, DEFAULT_WEIGHT, manifest)
-          trees[tree][table_id] << shard_id.table_prefix.match(/\d{3,}/)[0]
-        end
-
-        trees
-      end
-
-      private
-
-      def build_tree(root_id, link_weight, manifest)
-        children = manifest.links[root_id].map do |(child_id, child_weight)|
-          build_tree(child_id, child_weight, manifest)
-        end
-
-        from_shard_info(manifest.shards[root_id], link_weight, children)
       end
     end
 

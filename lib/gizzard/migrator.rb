@@ -1,9 +1,13 @@
 module Gizzard
   class MigratorConfig
-    attr_accessor :prefix, :table_id, :source_type, :destination_type, :forwarding_space, :forwarding_space_min
+    attr_accessor :prefix, :table_id, :source_type, :destination_type, :forwarding_space, :forwarding_space_min, :manifest
 
     def initialize(opts = {})
       opts.each {|(k,v)| send("#{k}=", v) if respond_to? "{k}=" }
+    end
+
+    def shard_name(table_id, enum)
+      [prefix, table_id, "%04d" % enum].join("_")
     end
   end
 
@@ -18,10 +22,10 @@ module Gizzard
     def initialize(existing_map, config_templates, default_total_shards, config)
       @configured_templates = config_templates
 
-      # turn table => [shards] map to an array of "table_shard" strings
+      # turn table => [shards] map to an array of [table, shard] arrays
       @existing_map = existing_map.inject({}) do |m, (template, tables)|
-        names = tables.inject([]) {|e, (t, shards)| shards.each {|s| e << "#{config.prefix}_#{t}_#{s}" }; e }
-        m.update template => names
+        shards = tables.inject([]) {|e, (t, shards)| shards.each {|s| e << [t, s] }; e }
+        m.update template => shards
       end
 
       @existing_templates = existing_map.keys
@@ -32,19 +36,19 @@ module Gizzard
     end
 
     def prepare!(nameserver)
-      transformations.each {|t| t.prepare! nameserver }
+      transformations.each {|t| t.prepare! nameserver, @config }
     end
 
     def copy!(nameserver)
-      transformations.each {|t| t.copy! nameserver }
+      transformations.each {|t| t.copy! nameserver, @config }
     end
 
     def wait_for_copies(nameserver)
-      transformations.each {|t| t.wait_for_copies nameserver }
+      transformations.each {|t| t.wait_for_copies nameserver, @config }
     end
 
     def cleanup!(nameserver)
-      transformations.each {|t| t.cleanup! nameserver }
+      transformations.each {|t| t.cleanup! nameserver, @config }
     end
 
     def transformations
@@ -63,9 +67,9 @@ module Gizzard
 
         # add the new table ids to a member of the configured map. will
         # be rebalanced later.
-        configured_map.values.first.concat forwardings.values
+        configured_map.values.first.concat forwardings.values.map {|enum| [@config.table_id, enum] }
 
-        @transformations << ForwardingTransformation.new(@config.table_id, forwardings)
+        @transformations << ForwardingTransformation.new(@config.table_id, forwardings.inject({}) {|f, (b, e)| f.update b => @config.shard_name(@config.table_id, e) })
       end
 
       # map the unchanged templates straight over
@@ -93,8 +97,7 @@ module Gizzard
       bases = (0...shard_count).map { |i| @config.forwarding_space_min + (i * step_size) }
 
       bases.each_with_index do |base_id, i|
-        table_name = [ @config.prefix, @config.table_id, "%04d" % i ].compact.join("_")
-        forwardings[base_id] = table_name
+        forwardings[base_id] = i
       end
 
       forwardings
@@ -141,7 +144,7 @@ module Gizzard
       # transformation for each one.
       (configured_shards.to_a - existing_shards.to_a).inject({}) do |transformations, (shard, to)|
         from = existing_shards[shard]
-        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shard_names << shard
+        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shards << shard
         transformations
       end.values
     end
