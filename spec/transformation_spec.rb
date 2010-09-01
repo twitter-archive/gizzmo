@@ -37,9 +37,9 @@ describe Gizzard::Transformation do
     @from_template = make_shard_template 'ReplicatingShard' => [{'BlockedShard' => "SqlShard:host1"}, "SqlShard:host2"]
     @to_template = make_shard_template 'ReplicatingShard' => %w(SqlShard:host2 SqlShard:host3)
 
-    @host_1_template = Gizzard::ShardTemplate.new('SqlShard', 'host1', 1, [])
-    @host_2_template = Gizzard::ShardTemplate.new('SqlShard', 'host2', 1, [])
-    @host_3_template = Gizzard::ShardTemplate.new('SqlShard', 'host3', 1, [])
+    @host_1_template = make_shard_template 'SqlShard:host1'
+    @host_2_template = make_shard_template 'SqlShard:host2'
+    @host_3_template = make_shard_template 'SqlShard:host3'
 
     @host_1_id = Gizzard::Thrift::ShardId.new(@host_1_template.host, 'status_001')
     @host_1_info = Gizzard::Thrift::ShardInfo.new(@host_1_id, @host_1_template.type, "", "", 0)
@@ -48,7 +48,7 @@ describe Gizzard::Transformation do
     @host_3_id = Gizzard::Thrift::ShardId.new(@host_3_template.host, 'status_001')
     @host_3_info = Gizzard::Thrift::ShardInfo.new(@host_3_id, @host_3_template.type, "", "", 0)
 
-    @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001), @config)
+    @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001))
   end
 
   describe "prepare!" do
@@ -135,7 +135,7 @@ describe Gizzard::Transformation do
       before do
         @trans.copy_destination?(@host_3_template).should == true
 
-        @write_only_wrapper = Gizzard::ShardTemplate.new('WriteOnlyShard', nil, 0, [@host_3_template])
+        @write_only_wrapper = Gizzard::ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [@host_3_template])
         @job = [:add_link, @to_template, @host_3_template]
         @ops = @trans.expand_create_job(@job)
       end
@@ -155,7 +155,7 @@ describe Gizzard::Transformation do
       before do
         @trans.copy_destination?(@host_3_template).should == true
 
-        @write_only_wrapper = Gizzard::ShardTemplate.new('WriteOnlyShard', nil, 0, [@host_3_template])
+        @write_only_wrapper = Gizzard::ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [@host_3_template])
         @job = [:create_shard, @host_3_template]
         @ops = @trans.expand_create_job(@job)
       end
@@ -255,7 +255,7 @@ describe Gizzard::Transformation do
     describe "each_shard" do
       it "executes the given block for each shard_enum, with @current_shard_enum set during each run" do
         ids = %w(status_001 status_002 status_003)
-        @trans = Gizzard::Transformation.new(nil, nil, ids, @config)
+        @trans = Gizzard::Transformation.new(nil, nil, ids)
         looped_ids = []
 
         @trans.each_shard do
@@ -286,7 +286,7 @@ describe Gizzard::Transformation do
     end
 
     it "returns false when there is no from_template (completely new shards, no data to copy)" do
-      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001), @config)
+      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001))
       @trans.copy_destination?(@host_1_template).should == false
       @trans.copy_destination?(@host_2_template).should == false
       @trans.copy_destination?(@host_3_template).should == false
@@ -316,7 +316,7 @@ describe Gizzard::Transformation do
     end
 
     it "returns false if there is no from template (no shards available as sources)" do
-      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001), @config)
+      @trans = Gizzard::Transformation.new(nil, @to_template, %w(status_001))
       @trans.copy_source?(@host_1_template).should == false
       @trans.copy_source?(@host_2_template).should == false
       @trans.copy_source?(@host_3_template).should == false

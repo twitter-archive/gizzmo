@@ -82,7 +82,7 @@ usage(parser, "Config file must contain a 'partitions' definition") unless confi
 
 # Where the magic happens:
 
-new_templates = config['partitions'].map { |p| Gizzard::ShardTemplate.from_config(p) }
+new_templates = config['partitions'].map { |p| Gizzard::ShardTemplate.from_config(migrator_config, p) }
 
 EXISTING_CONFIG_CACHE = File.expand_path(".existing_shards.yml")
 
@@ -94,7 +94,7 @@ if File.exist? EXISTING_CONFIG_CACHE
 
   existing_config["partitions"].each_with_index do |tree, i|
     shards = existing_config["shards"][i]
-    existing_map[Gizzard::ShardTemplate.from_config(tree)] = shards
+    existing_map[Gizzard::ShardTemplate.from_config(migrator_config, tree)] = shards
   end
 else
   puts "Querying nameserver..."

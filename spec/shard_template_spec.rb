@@ -4,12 +4,6 @@ describe Gizzard::ShardTemplate do
   describe "concrete?" do
   end
 
-  describe "valid?" do
-  end
-
-  describe "java_type" do
-  end
-
   describe "identifier" do
   end
 

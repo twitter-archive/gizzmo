@@ -18,7 +18,7 @@ require 'gizzard/migrator'
 require 'gizzard/shard_template'
 
 
-def make_shard_template(config)
-  config = YAML.load(config) if config.is_a? String
-  Gizzard::ShardTemplate.from_config(config)
+def make_shard_template(conf_tree)
+  config = Gizzard::MigratorConfig.new
+  Gizzard::ShardTemplate.from_config(config, conf_tree)
 end

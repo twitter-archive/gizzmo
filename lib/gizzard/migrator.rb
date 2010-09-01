@@ -134,7 +134,7 @@ module Gizzard
       # transformation for each one.
       (configured_shards.to_a - existing_shards.to_a).inject({}) do |transformations, (shard, to)|
         from = existing_shards[shard]
-        (transformations[[from, to]] ||= Transformation.new(from, to, [], @config)).shard_ids << shard
+        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shard_ids << shard
         transformations
       end.values
     end

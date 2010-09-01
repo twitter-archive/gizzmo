@@ -15,7 +15,7 @@ module Gizzard
 
     def apply!(nameserver)
       @forwardings.each do |(base_id, table)|
-        shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, []).to_shard_id(table)
+        shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, '', '', []).to_shard_id(table)
         forwarding = Thrift::Forwarding.new(table_id, base_id, shard_id)
 
         nameserver.set_forwarding(forwarding)
@@ -55,11 +55,10 @@ module Gizzard
       :copy_shard => 4
     }
 
-    def initialize(from_template, to_template, shard_names, config)
+    def initialize(from_template, to_template, shard_names)
       @from = from_template
       @to = to_template
       @shard_names = shard_names
-      @config = config
     end
 
     def paginate(page_size = DEFAULT_CONCURRENT_COPIES)
@@ -199,7 +198,7 @@ module Gizzard
       ops = {:prepare => [], :copy => [], :cleanup => []}
 
       if copy_destination? template
-        write_only_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, [template])
+        write_only_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [template])
 
         if type == :add_link
           ops[:prepare] << add_link(arg1, write_only_wrapper)
@@ -276,7 +275,7 @@ module Gizzard
 
     def info(template)
       shard = @current_shard or raise "no current shard id!"
-      template.to_shard_info(@config, shard)
+      template.to_shard_info(shard)
     end
 
     def copy_destination?(template)

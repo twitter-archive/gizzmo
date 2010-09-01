@@ -25,24 +25,15 @@ module Gizzard
       "BlockedShard" => 'blocked'
     }
 
-    attr_reader :type, :weight
+    attr_reader :type, :weight, :source_type, :dest_type
 
-    def initialize(type, host, weight, children)
-      @type, @host, @weight, @children = type, host, weight, children
+    def initialize(type, host, weight, source_type, dest_type, children)
+      @type, @host, @weight, @source_type, @dest_type, @children =
+        type, host, weight, source_type || '', dest_type || '', children
     end
 
     def concrete?
       !GIZZARD_SHARD_TYPES.include? type
-    end
-
-    def valid?
-      return false if concrete? and !children.empty?
-      return false if !replicating? && children.length > 1
-      return false if replicating? && children.any? { |child| child.replicating? }
-
-      children.each { |child| return false unless child.valid? }
-
-      true
     end
 
     def replicating?
@@ -54,7 +45,7 @@ module Gizzard
     end
 
     def identifier
-      replicating? ? type.to_s : "#{type}:#{host}"
+      replicating? ? short_type.to_s : "#{short_type}:#{host}"
     end
 
     def host
@@ -78,7 +69,7 @@ module Gizzard
     end
 
     def copy_sources(multiplier = 1.0)
-      return {} if INVALID_COPY_TYPES.include? type
+      return {} if INVALID_COPY_TYPES.include? short_type
 
       if concrete?
         { self => multiplier }
@@ -109,8 +100,8 @@ module Gizzard
       Thrift::ShardId.new(host, name)
     end
 
-    def to_shard_info(config, table_name)
-      Thrift::ShardInfo.new(to_shard_id(table_name), type, config.source_type || '', config.destination_type || '', 0)
+    def to_shard_info(table_name)
+      Thrift::ShardInfo.new(to_shard_id(table_name), type, source_type || '', dest_type || '', 0)
     end
 
 
@@ -167,57 +158,33 @@ module Gizzard
     # Class Methods
 
     module Introspection
-      def existing_template_map(nameserver)
-        forwardings = nameserver.get_forwardings
-        roots = forwardings.map { |f| f.shard_id }
-        links = collect_links(nameserver, roots)
-        shard_map = collect_shards(nameserver, links)
+      def from_shard_info(info, link_weight = nil, children = [])
+        class_sym = SHARD_TYPES.index(info.class_name) or raise "unrecognized shard type #{info.class_name}"
+        host = info.id.hostname
 
-        trees = Hash.new { |h,k| h[k] = [] }
+        new(class_sym, host, link_weight, info.source_type, info.destination_type, children)
+      end
 
-        roots.each do |root|
-          tree = build_tree(root, DEFAULT_WEIGHT, shard_map, links)
-          trees[tree] << root.table_prefix
+      def existing_template_map(manifest)
+        # trees[template][graph_id][table_id]
+        trees = Hash.new {|h,k| h[k] = Hash.new {|h,k| h[k] = [] } }
+
+        manifest.forwardings.map{|f| [f.table_id, f.base_id, f.shard_id] }.each do |(table_id, base_id, shard_id)|
+          tree = build_tree(shard_id, DEFAULT_WEIGHT, manifest)
+          trees[tree][table_id] << shard_id.table_prefix
         end
+
         trees
       end
 
       private
 
-      def build_tree(root_id, link_weight, shard_repo, link_repo)
-        host = root_id.hostname
-
-        children = link_repo[root_id].map do |child_id, child_weight|
-          build_tree(child_id, child_weight, shard_repo, link_repo)
+      def build_tree(root_id, link_weight, manifest)
+        children = manifest.links[root_id].map do |(child_id, child_weight)|
+          build_tree(child_id, child_weight, manifest)
         end
 
-        p shard_repo
-        new(shard_repo[root_id].class_name, host, link_weight, children)
-      end
-
-      def collect_links(nameserver, roots)
-        links = Hash.new { |h, k| h[k] = [] }
-
-        collector = lambda do |parent|
-          children = nameserver.list_downward_links(parent).map do |link|
-            links[link.up_id] << [link.down_id, link.weight]
-            link.down_id
-          end
-
-          children.each { |child| collector.call(child) }
-        end
-
-        roots.each {|root| collector.call(root) }
-        links
-      end
-
-      def collect_shards(nameserver, links)
-        shard_ids = links.keys + links.values.inject([]) do |ids, nodes|
-          nodes.each { |id, weight| ids << id }
-          ids
-        end
-
-        shard_ids.inject({}) { |h, id| h.update id => nameserver.get_shard(id) }
+        from_shard_info(manifest.shards[root_id], link_weight, children)
       end
     end
 
@@ -225,10 +192,10 @@ module Gizzard
 
 
     module Configuration
-      def from_config(obj)
-        shard, children = parse_link_struct(obj)
+      def from_config(config, conf_tree)
+        shard, children = parse_link_struct(conf_tree)
         type, host, weight = parse_shard_definition(shard)
-        new(type, host, weight, Array(children).map { |child| from_config(child) })
+        new(type, host, weight, config.source_type, config.destination_type, Array(children).map { |child| from_config(config, child) })
       end
 
       private
