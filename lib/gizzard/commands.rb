@@ -5,13 +5,13 @@ module Gizzard
 
     attr_reader :buffer
 
-    def self.run(command_name, global_options, argv, subcommand_options, log)
+    def self.run(command_name, global_options, argv, subcommand_options, log, service=nil)
       command_class = Gizzard.const_get("#{classify(command_name)}Command")
-      service = command_class.make_service(global_options, log)
+      service = command_class.make_service(global_options, log) if service.nil?
       command = command_class.new(service, global_options, argv, subcommand_options)
       command.run
       if command.buffer && command_name = global_options.render.shift
-        run(command_name, service, global_options, command.buffer, OpenStruct.new)
+        run(command_name, global_options, command.buffer, OpenStruct.new, log, service)
       end
     end
 
