@@ -229,7 +229,7 @@ module Gizzard
       end
     end
   end
-  
+
   class RepairCommand < ShardCommand
     def run
       args = @argv.dup.map{|a| a.split(/\s+/)}.flatten
@@ -297,7 +297,7 @@ module Gizzard
         memo[id.hostname] << id
         memo
       end
-      
+
       additional_hosts.each do |host|
         by_host[host] ||= NamedArray.new(host)
       end
@@ -417,9 +417,15 @@ module Gizzard
 
   class LookupCommand < ShardCommand
     def run
-      table_id, source_id = @argv
-      help!("Requires table id and source id") unless table_id && source_id
-      shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
+      table_id, source = @argv
+      help!("Requires table id and source") unless table_id && source
+      case @command_options.hash_function
+      when :fnv
+        source_id = Hash.fnv1a_64(source)
+      else
+        source_id = source.to_i
+      end
+      shard = service.find_current_forwarding(table_id.to_i, source_id)
       output shard.id.to_unix
     end
   end
