@@ -74,3 +74,6 @@ do
 done
 
 g subtree localhost/table_deep_repl_5 | expect deep.txt
+
+g flush --all
+g flush 1

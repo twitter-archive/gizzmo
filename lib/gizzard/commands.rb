@@ -527,4 +527,16 @@ module Gizzard
       STDERR.print "\n"
     end
   end
+
+  class FlushCommand < JobCommand
+    def run
+      args = @argv[0]
+      help!("Requires --all, or a job priority id.") unless args || command_options.flush_all
+      if command_options.flush_all
+        service.retry_errors()
+      else
+        service.retry_errors_for(args.to_i)
+      end
+    end
+  end
 end
