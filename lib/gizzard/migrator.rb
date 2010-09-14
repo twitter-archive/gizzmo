@@ -7,6 +7,7 @@ module Gizzard
     end
 
     def shard_name(enum)
+      table_id_segment = (table_id && table_id < 0) ? "n#{table_id.abs}" : table_id
       [prefix, table_id, "%04d" % enum].compact.join("_")
     end
   end
