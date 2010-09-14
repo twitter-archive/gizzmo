@@ -9,7 +9,9 @@ require "yaml"
 DOC_STRINGS = {
   "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
-  "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority."
+  "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
+  "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
+  "flush" => "Flush error queue for a given priority."
 }
 
 ORIGINAL_ARGV = ARGV.dup
@@ -169,8 +171,12 @@ subcommands = {
     separators(opts, DOC_STRINGS["unlink"])
   end,
   'lookup' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} lookup TABLE_ID SOURCE_ID"
+    opts.banner = "Usage: #{zero} lookup [options] TABLE_ID SOURCE"
     separators(opts, DOC_STRINGS["lookup"])
+
+    opts.on("--fnv", "Use FNV1A_64 hash on source") do
+      subcommand_options.hash_function = :fnv
+    end
   end,
   'copy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
@@ -191,6 +197,14 @@ subcommands = {
   'inject' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} inject PRIORITY JOBS..."
     separators(opts, DOC_STRINGS["inject"])
+  end,
+  'flush' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} flush --all|PRIORITY"
+    separators(opts, DOC_STRINGS["flush"])
+
+    opts.on("--all", "Flush all error queues.") do
+      subcommand_options.flush_all = true
+    end
   end
 }
 
@@ -230,7 +244,7 @@ global = OptionParser.new do |opts|
   end
 
   opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
-    global_options.port = port
+    global_options.port = port.to_i
   end
 
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|

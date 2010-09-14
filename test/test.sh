@@ -6,7 +6,7 @@ function g {
 }
 
 function expect {
-  diff -u - "expected/$1" && echo "    success." || echo "    failed." && exit 1
+  diff -u - "expected/$1" && echo "    success." || (echo "    failed." && exit 1)
 }
 
 function expect-string {
@@ -19,9 +19,9 @@ g find -hlocalhost | expect empty-file.txt
 
 for i in {0..9}
 do
-  g create localhost "table_repl_$i" com.twitter.service.flock.edges.ReplicatingShard
-  g create localhost "table_a_$i" com.twitter.service.flock.edges.SqlShard --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g create localhost "table_b_$i" com.twitter.service.flock.edges.SqlShard --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+  g create com.twitter.service.flock.edges.ReplicatingShard localhost/table_repl_$i
+  g create com.twitter.service.flock.edges.SqlShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+  g create com.twitter.service.flock.edges.SqlShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
   g addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
   g addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
 done
@@ -52,6 +52,7 @@ g links localhost/replicating_table_b_0 | expect links-for-replicating_table_b_0
 g --subtree --info find -Hlocalhost | expect subtree-info.txt
 
 g lookup 1 100 | expect-string "localhost/forward_1"
+g lookup --fnv 1 "hello" | expect-string "localhost/forward_1"
 
 g unwrap localhost/replicating_table_b_0 | expect unwrapped-replicating_table_b_0.txt
 g links localhost/table_b_0 | expect unwrapped-table_b_0.txt
@@ -73,3 +74,6 @@ do
 done
 
 g subtree localhost/table_deep_repl_5 | expect deep.txt
+
+g flush --all
+g flush 1
