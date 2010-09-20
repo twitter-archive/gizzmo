@@ -1,5 +1,5 @@
 module Gizzard
-  module Hash
+  module Digest
     def self.fnv1a_64(data)
       prime = 1099511628211
       rv = 0xcbf29ce484222325
