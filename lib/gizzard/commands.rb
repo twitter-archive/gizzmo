@@ -421,7 +421,7 @@ module Gizzard
       help!("Requires table id and source") unless table_id && source
       case @command_options.hash_function
       when :fnv
-        source_id = Hash.fnv1a_64(source)
+        source_id = Digest.fnv1a_64(source)
       else
         source_id = source.to_i
       end
