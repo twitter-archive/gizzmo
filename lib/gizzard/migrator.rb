@@ -22,12 +22,7 @@ module Gizzard
 
     def initialize(existing_map, config_templates, default_total_shards, config)
       @configured_templates = config_templates
-
-      # turn table => [shards] map to an array of [table, shard] arrays
-      @existing_map = existing_map.inject({}) do |m, (template, tables)|
-        shards = tables.inject([]) {|e, (t, shards)| shards.each {|s| e << [t, s] }; e }
-        m.update template => shards
-      end
+      @existing_map = existing_map
 
       @existing_templates = existing_map.keys
       @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
@@ -66,7 +61,7 @@ module Gizzard
         # no forwardings exist, we must populate the forwarding index.
         forwardings = generate_new_forwardings(total_shards)
 
-        # add the new table ids to a member of the configured map. will
+        # add the new shard ids to a member of the configured map. will
         # be rebalanced later.
         configured_map.values.first.concat forwardings.values
 

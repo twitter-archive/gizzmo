@@ -129,7 +129,7 @@ module Gizzard
       op_inspect = [prepare_inspect, copy_inspect, cleanup_inspect].join
 
       if with_shards
-        "[#{shards.length} SHARDS: #{shards.sort.map {|(t,s)| "#{t}_%04d" % s }.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+        "[#{shards.length} SHARDS: #{shards.sort.map {|s| "%04d" % s }.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       else
         "[#{shards.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
       end

@@ -75,17 +75,17 @@ module Gizzard
 
     def build_template_map!
       # can't use a default block for these as they wouldn't be marshalable.
-      # map[template][table_id] #=> [shard_enums...]
+      # map[template] #=> [shard_enums...]
       @template_map = {}
 
-      # map[table_id][shard_enum][hostname] #=> shard_name
+      # map[canonical_id] #=> shard_name
       @existing_shard_ids = {}
 
-      forwardings.map{|f| [f.table_id, f.base_id, f.shard_id] }.each do |(table_id, base_id, shard_id)|
+      forwardings.map{|f| [f.base_id, f.shard_id] }.each do |(base_id, shard_id)|
         enum = shard_id.table_prefix.match(/\d{3,}/)[0].to_i
-        tree = build_tree(table_id, enum, shard_id, ShardTemplate::DEFAULT_WEIGHT)
+        tree = build_tree(enum, shard_id, ShardTemplate::DEFAULT_WEIGHT)
 
-        ((@template_map[tree] ||= {})[table_id] ||= []) << enum
+        (@template_map[tree] ||= []) << enum
       end
     end
 
@@ -93,9 +93,9 @@ module Gizzard
 
     # FIXME: figure out how to remove the side-effect of adding to the
     # name map
-    def build_tree(table_id, enum, shard_id, link_weight)
+    def build_tree(enum, shard_id, link_weight)
       children = (links[shard_id] || []).map do |(child_id, child_weight)|
-        build_tree(table_id, enum, child_id, child_weight)
+        build_tree(enum, child_id, child_weight)
       end
 
       template = ShardTemplate.from_shard_info(shards[shard_id], link_weight, children)
