@@ -57,7 +57,7 @@ module Gizzard
       yield
     rescue ThriftClient::Simple::ThriftException
       times -= 1
-      times < 0 ? raise : retry
+      (times < 0) ? raise : retry
     end
   end
 

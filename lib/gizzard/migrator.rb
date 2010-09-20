@@ -128,7 +128,7 @@ module Gizzard
       # moved shards over, add their shards to the first template. they will get rebalanced later
       leftover_shards = unrecognized.inject([]) {|a, u| a.concat existing[u] }
 
-      configured.last.concat leftover_shards unless leftover_shards.empty?
+      configured.values.last.concat leftover_shards unless leftover_shards.empty?
     end
 
     def rebalance_shards(configured)
