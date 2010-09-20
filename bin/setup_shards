@@ -2,6 +2,7 @@
 
 require 'yaml'
 require 'ostruct'
+require 'optparse'
 require 'gizzard'
 
 require 'gizzard/nameserver'
