@@ -5,13 +5,13 @@ module Gizzard
 
     attr_reader :buffer
 
-    def self.run(command_name, global_options, argv, subcommand_options, log)
+    def self.run(command_name, global_options, argv, subcommand_options, log, service=nil)
       command_class = Gizzard.const_get("#{classify(command_name)}Command")
-      service = command_class.make_service(global_options, log)
+      service = command_class.make_service(global_options, log) if service.nil?
       command = command_class.new(service, global_options, argv, subcommand_options)
       command.run
       if command.buffer && command_name = global_options.render.shift
-        run(command_name, service, global_options, command.buffer, OpenStruct.new)
+        run(command_name, global_options, command.buffer, OpenStruct.new, log, service)
       end
     end
 
@@ -86,7 +86,7 @@ module Gizzard
       end.reject do |forwarding|
         @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
       end.each do |forwarding|
-        output [ forwarding.table_id, forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
+        output [ forwarding.table_id, @command_options.hex ? ("%016x" % forwarding.base_id) : forwarding.base_id, forwarding.shard_id.to_unix ].join("\t")
       end
     end
   end
@@ -425,9 +425,15 @@ module Gizzard
 
   class LookupCommand < ShardCommand
     def run
-      table_id, source_id = @argv
-      help!("Requires table id and source id") unless table_id && source_id
-      shard = service.find_current_forwarding(table_id.to_i, source_id.to_i)
+      table_id, source = @argv
+      help!("Requires table id and source") unless table_id && source
+      case @command_options.hash_function
+      when :fnv
+        source_id = Digest.fnv1a_64(source)
+      else
+        source_id = source.to_i
+      end
+      shard = service.find_current_forwarding(table_id.to_i, source_id)
       output shard.id.to_unix
     end
   end
@@ -527,6 +533,18 @@ module Gizzard
         STDERR.flush
       end
       STDERR.print "\n"
+    end
+  end
+
+  class FlushCommand < JobCommand
+    def run
+      args = @argv[0]
+      help!("Requires --all, or a job priority id.") unless args || command_options.flush_all
+      if command_options.flush_all
+        service.retry_errors()
+      else
+        service.retry_errors_for(args.to_i)
+      end
     end
   end
 end
