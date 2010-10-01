@@ -84,6 +84,10 @@ subcommands = {
     opts.banner = "Usage: #{zero} rebalance"
     separators(opts, DOC_STRINGS["rebalance"])
 
+    opts.on("-w", "--write-only=CLASS") do |w|
+      subcommand_options.write_only_shard = w
+    end
+
     opts.on("-h", "--hosts=list") do |h|
       subcommand_options.hosts = h
     end
@@ -158,7 +162,7 @@ subcommands = {
     separators(opts, DOC_STRINGS["reload"])
   end,
   'addlink' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
+    opts.banner = "Usage: #{zero} addlink PARENT_SHARD_ID WEIGHT"
     separators(opts, DOC_STRINGS["addlink"])
   end,
   'unlink' => OptionParser.new do |opts|

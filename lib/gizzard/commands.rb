@@ -229,7 +229,7 @@ module Gizzard
       end
     end
   end
-  
+
   class RepairCommand < ShardCommand
     def run
       args = @argv.dup.map{|a| a.split(/\s+/)}.flatten
@@ -289,7 +289,9 @@ module Gizzard
     end
 
     def run
-      puts command_options.inspect
+      help! "No shards specified" if @argv.empty?
+      shards = []
+      command_options.write_only_shard ||= "com.twitter.gizzard.shards.WriteOnlyShard"
       additional_hosts = (command_options.hosts || "").split(/[\s,]+/)
       ids = @argv.map{|arg| ShardId.new(*arg.split("/")) rescue nil }.compact
       by_host = ids.inject({}) do |memo, id|
@@ -297,7 +299,7 @@ module Gizzard
         memo[id.hostname] << id
         memo
       end
-      
+
       additional_hosts.each do |host|
         by_host[host] ||= NamedArray.new(host)
       end
@@ -312,7 +314,6 @@ module Gizzard
       end while longest.length > shortest.length + 1
 
       shard_info = nil
-      puts sets.map{|l|l.length}.inspect
       sets.each do |set|
         host = set.name
         set.each do |id|
@@ -320,11 +321,17 @@ module Gizzard
             shard_info ||= service.get_shard(id)
             old = id.to_unix
             id.hostname = host
-            puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{id.to_unix}"
-            puts "gizzmo copy #{old} #{id.to_unix}"
+            shards << [old, id.to_unix]
           end
         end
       end
+
+      new_shards = shards.map{|(old, new)| new }
+
+      puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
+      puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
+      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
+      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
 
@@ -359,8 +366,9 @@ module Gizzard
       displayed = {}
       overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
-        id_a = ids_by_host[host_a].first
-        id_b = ids_by_host[host_b].first
+        id_a = ids_by_host[host_a].find{|id| service.list_upward_links(id).size > 0 }
+        id_b = ids_by_host[host_b].find{|id| service.list_upward_links(id).size > 0 }
+        next unless id_a && id_b
         weight_a = service.list_upward_links(id_a).first.weight
         weight_b = service.list_upward_links(id_b).first.weight
         if weight_a > weight_b
