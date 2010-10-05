@@ -254,8 +254,8 @@ module Gizzard
 
   class WrapCommand < ShardCommand
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
-      prefix_prefix = wrapping_class_name.split(".").last.downcase.gsub("shard", "") + "_"
-      ShardId.new("localhost", prefix_prefix + shard_info.id.table_prefix)
+      suffix = "_" + wrapping_class_name.split(".").last.downcase.gsub("shard", "")
+      ShardId.new("localhost", shard_info.id.table_prefix + suffix)
     end
 
     def run
@@ -330,7 +330,6 @@ module Gizzard
 
       puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
       puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
-      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
       shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
