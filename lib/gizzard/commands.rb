@@ -1,4 +1,5 @@
 require "pp"
+require "digest/md5"
 module Gizzard
   class Command
     include Thrift
@@ -390,23 +391,76 @@ module Gizzard
 
   class ReportCommand < ShardCommand
     def run
-      regex = @argv.first
-      help!("regex is a required option") unless regex
-      regex = Regexp.compile(regex)
-      service.list_hostnames.map do |host|
-        puts host
-        counts = {}
-        service.shards_for_hostname(host).each do |shard|
-          id = shard.id.to_unix
-          if key = id[regex, 1] || id[regex, 0]
-            counts[key] ||= 0
-            counts[key] += 1
-          end
-        end
-        counts.sort.each do |k, v|
-          puts "  %3d %s" % [v, k]
+      things = @argv.map do |shard|
+        parse(down(ShardId.parse(shard))).join("\n")
+      end
+      
+      group(things).each do |string, things|
+        puts "=== " + ::Digest::MD5.hexdigest(string)[0..10] + ": #{things.length}" + " ====================" 
+        puts string
+      end
+      
+      # def run
+      #   @roots = []
+      #   argv.each do |arg|
+      #     @id = ShardId.parse(arg)
+      #     @roots += roots_of(@id)
+      #   end
+      #   @roots.uniq.each do |root|
+      #     output root.to_unix
+      #     down(root, 1)
+      #   end
+      # end
+      # 
+      # def roots_of(id)
+      #   links = service.list_upward_links(id)
+      #   if links.empty?
+      #     [id]
+      #   else
+      #     links.map { |link| roots_of(link.up_id) }.flatten
+      #   end
+      # end
+      # 
+      # def down(id, depth = 0)
+      #   service.list_downward_links(id).map do |link|
+      #     printable = "  " * depth + link.down_id.to_unix
+      #     output printable
+      #     down(link.down_id, depth + 1)
+      #   end
+      # end
+    end
+    
+    def group(arr)
+      arr.inject({}) do |m, e|
+        m[e] ||= []
+        m[e] << e
+        m
+      end
+    end
+    
+    def parse(obj, id = nil, depth = 0)
+      case obj
+      when Hash
+        id, prefix = parse(obj.keys.first, id, depth) 
+        [prefix] + parse(obj.values.first, id, depth + 1)
+      when String
+        host, prefix = obj.split("/")
+        host = "db" if host != "localhost"
+        id ||= prefix[/\w+ward_\d+_\d+/]
+        prefix = ("  " * depth) + host + "/" + prefix.sub(id, "[ID]")
+        [id, prefix]
+      when Array
+        obj.map do |e|
+          parse e, id, depth
         end
       end
+    end
+    
+    def down(id)
+      vals = service.list_downward_links(id).map do |link|
+        down(link.down_id)
+      end
+      {id.to_unix => vals}
     end
   end
 
