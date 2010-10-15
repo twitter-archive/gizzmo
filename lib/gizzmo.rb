@@ -162,6 +162,10 @@ subcommands = {
     opts.banner = "Usage: #{zero} reload"
     separators(opts, DOC_STRINGS["reload"])
   end,
+  'drill' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} drill SIGNATURE"
+    separators(opts, DOC_STRINGS["drill"])
+  end,
   'addlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} addlink PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
     separators(opts, DOC_STRINGS["addlink"])
@@ -339,12 +343,12 @@ def custom_timeout(seconds)
     begin
       require "rubygems"
       require "system_timer"
-      SystemTimer.timeout_after(seconds) do
+      SystemTimer.timeout_after(seconds.to_i) do
         yield
       end
     rescue LoadError
       require "timeout"
-      Timeout.timeout(seconds) do
+      Timeout.timeout(seconds.to_i) do
         yield
       end
     end

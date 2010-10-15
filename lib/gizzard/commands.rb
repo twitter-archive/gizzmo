@@ -396,38 +396,13 @@ module Gizzard
       end
       
       group(things).each do |string, things|
-        puts "=== " + ::Digest::MD5.hexdigest(string)[0..10] + ": #{things.length}" + " ====================" 
+        puts "=== " + sign(string) + ": #{things.length}" + " ====================" 
         puts string
       end
-      
-      # def run
-      #   @roots = []
-      #   argv.each do |arg|
-      #     @id = ShardId.parse(arg)
-      #     @roots += roots_of(@id)
-      #   end
-      #   @roots.uniq.each do |root|
-      #     output root.to_unix
-      #     down(root, 1)
-      #   end
-      # end
-      # 
-      # def roots_of(id)
-      #   links = service.list_upward_links(id)
-      #   if links.empty?
-      #     [id]
-      #   else
-      #     links.map { |link| roots_of(link.up_id) }.flatten
-      #   end
-      # end
-      # 
-      # def down(id, depth = 0)
-      #   service.list_downward_links(id).map do |link|
-      #     printable = "  " * depth + link.down_id.to_unix
-      #     output printable
-      #     down(link.down_id, depth + 1)
-      #   end
-      # end
+    end
+    
+    def sign(string)
+      ::Digest::MD5.hexdigest(string)[0..10]
     end
     
     def group(arr)
@@ -435,23 +410,23 @@ module Gizzard
         m[e] ||= []
         m[e] << e
         m
-      end
+      end.to_a.sort_by{|k, v| v.length}.reverse
     end
     
-    def parse(obj, id = nil, depth = 0)
+    def parse(obj, id = nil, depth = 0, sub = true)
       case obj
       when Hash
-        id, prefix = parse(obj.keys.first, id, depth) 
-        [prefix] + parse(obj.values.first, id, depth + 1)
+        id, prefix = parse(obj.keys.first, id, depth, sub) 
+        [prefix] + parse(obj.values.first, id, depth + 1, sub)
       when String
         host, prefix = obj.split("/")
-        host = "db" if host != "localhost"
+        host = "db" if host != "localhost" && sub
         id ||= prefix[/\w+ward_\d+_\d+/]
-        prefix = ("  " * depth) + host + "/" + prefix.sub(id, "[ID]")
+        prefix = ("  " * depth) + host + "/" + (sub ? prefix.sub(id, "[ID]") : prefix)
         [id, prefix]
       when Array
         obj.map do |e|
-          parse e, id, depth
+          parse e, id, depth, sub
         end
       end
     end
@@ -463,6 +438,19 @@ module Gizzard
       {id.to_unix => vals}
     end
   end
+  
+  class DrillCommand < ReportCommand 
+    def run
+      signature = @argv.shift
+      @argv.map do |shard|
+        if sign(parse(down(ShardId.parse(shard))).join("\n")) == signature
+          puts parse(down(ShardId.parse(shard)), nil, 0, false).join("\n")
+        end
+      end
+    end
+  end
+  
+  
 
   class FindCommand < ShardCommand
     def run
