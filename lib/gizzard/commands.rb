@@ -449,8 +449,6 @@ module Gizzard
       end
     end
   end
-  
-  
 
   class FindCommand < ShardCommand
     def run
