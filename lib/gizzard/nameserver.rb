@@ -98,7 +98,8 @@ module Gizzard
         build_tree(enum, child_id, child_weight)
       end
 
-      template = ShardTemplate.from_shard_info(shards[shard_id], link_weight, children)
+      info = shards[shard_id] or raise "shard info not found for: #{shard_id}"
+      template = ShardTemplate.from_shard_info(info, link_weight, children)
 
       canonical_id = template.to_shard_id(@config.shard_name(enum))
       @existing_shard_ids[canonical_id] = shard_id
