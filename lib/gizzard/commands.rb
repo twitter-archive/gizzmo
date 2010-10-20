@@ -421,7 +421,7 @@ module Gizzard
       when String
         host, prefix = obj.split("/")
         host = "db" if host != "localhost" && sub
-        id ||= prefix[/\w+ward_\d+_\d+/]
+        id ||= prefix[/(\w+ward_)?\d+_\d+(_\w+ward)?/]
         prefix = ("  " * depth) + host + "/" + ((sub && id) ? prefix.sub(id, "[ID]") : prefix)
         [id, prefix]
       when Array
