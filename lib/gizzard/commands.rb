@@ -422,7 +422,7 @@ module Gizzard
         host, prefix = obj.split("/")
         host = "db" if host != "localhost" && sub
         id ||= prefix[/\w+ward_\d+_\d+/]
-        prefix = ("  " * depth) + host + "/" + (sub ? prefix.sub(id, "[ID]") : prefix)
+        prefix = ("  " * depth) + host + "/" + ((sub && id) ? prefix.sub(id, "[ID]") : prefix)
         [id, prefix]
       when Array
         obj.map do |e|
