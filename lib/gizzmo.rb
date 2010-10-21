@@ -176,8 +176,11 @@ subcommands = {
   end,
   
   'report' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} report"
+    opts.banner = "Usage: #{zero} report [options]"
     separators(opts, DOC_STRINGS["report"])
+    opts.on("--flat", "Show flat report") do
+      subcommand_options.flat = true
+    end
   end,
   
   'lookup' => OptionParser.new do |opts|

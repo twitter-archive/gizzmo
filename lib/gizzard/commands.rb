@@ -391,13 +391,20 @@ module Gizzard
 
   class ReportCommand < ShardCommand
     def run
+      
       things = @argv.map do |shard|
         parse(down(ShardId.parse(shard))).join("\n")
       end
       
-      group(things).each do |string, things|
-        puts "=== " + sign(string) + ": #{things.length}" + " ====================" 
-        puts string
+      if command_options.flat
+        things.zip(@argv).each do |thing, shard_id|
+          puts "#{sign(thing)}\t#{shard_id}"
+        end
+      else
+        group(things).each do |string, things|
+          puts "=== " + sign(string) + ": #{things.length}" + " ====================" 
+          puts string
+        end
       end
     end
     
