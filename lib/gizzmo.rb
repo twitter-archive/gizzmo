@@ -85,9 +85,11 @@ subcommands = {
     opts.on("-w", "--write-only=CLASS") do |w|
       subcommand_options.write_only_shard = w
     end
-
     opts.on("-h", "--hosts=list") do |h|
       subcommand_options.hosts = h
+    end
+    opts.on("-x", "--exclude-hosts=list") do |x|
+      subcommand_options.exclude_hosts = x
     end
   end,
   'repair' => OptionParser.new do |opts|

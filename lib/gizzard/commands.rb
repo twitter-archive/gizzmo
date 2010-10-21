@@ -176,8 +176,14 @@ module Gizzard
       help! "No shards specified" if shard_ids.empty?
       shard_ids.each do |shard_id_string|
         shard_id = ShardId.parse(shard_id_string)
-        service.list_upward_links(shard_id).each do |uplink|
-          service.list_downward_links(shard_id).each do |downlink|
+
+        upward_links = service.list_upward_links(shard_id)
+        downward_links = service.list_downward_links(shard_id)
+        
+        help! "Shard must not be a root or leaf" if upward_links.length == 0 or downward_links.length == 0
+
+        upward_links.each do |uplink|
+          downward_links.each do |downlink|
             service.add_link(uplink.up_id, downlink.down_id, uplink.weight)
             new_link = LinkInfo.new(uplink.up_id, downlink.down_id, uplink.weight)
             service.remove_link(uplink.up_id, uplink.down_id)
@@ -211,6 +217,7 @@ module Gizzard
       shard_ids = @argv
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
+        next if !shard_id
         service.list_upward_links(shard_id).each do |link_info|
           output link_info.to_unix
         end
@@ -294,6 +301,7 @@ module Gizzard
       shards = []
       command_options.write_only_shard ||= "com.twitter.gizzard.shards.WriteOnlyShard"
       additional_hosts = (command_options.hosts || "").split(/[\s,]+/)
+      exclude_hosts = (command_options.exclude_hosts || "").split(/[\s,]+/)
       ids = @argv.map{|arg| ShardId.new(*arg.split("/")) rescue nil }.compact
       by_host = ids.inject({}) do |memo, id|
         memo[id.hostname] ||= NamedArray.new(id.hostname)
@@ -305,10 +313,32 @@ module Gizzard
         by_host[host] ||= NamedArray.new(host)
       end
 
+      exclude_hosts.each do |host|
+        by_host[host] ||= NamedArray.new(host)
+      end
+
       sets = by_host.values
+      exclude_sets = exclude_hosts.map{|host| by_host[host]}
+      target_sets = sets - exclude_sets
+
+      exclude_sets.each do |set|
+        while set.length > 0
+          sorted = target_sets.sort_by{|s| s.length}
+          shortest = sorted.first
+          shortest.push set.pop
+        end
+      end
+
+      exclude_sets.each do |set|
+        while set.length > 0
+          sorted = target_sets.sort_by{|s| s.length}
+          shortest = sorted.first
+          shortest.push set.pop
+        end
+      end
 
       begin
-        sorted = sets.sort_by{|s| s.length }
+        sorted = target_sets.sort_by{|s| s.length }
         longest = sorted.last
         shortest = sorted.first
         shortest.push longest.pop
