@@ -5,15 +5,14 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.7.3"
+  s.version = "0.8.0.a1"
 
-  s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
+  s.required_rubygems_version = Gem::Requirement.new("> 1.3.1") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-09-08}
-  s.default_executable = %q{gizzmo}
+  s.date = %q{2010-09-20}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
-  s.executables = ["gizzmo"]
+  s.executables = ["gizzmo", "setup_shards"]
   s.extra_rdoc_files = [
     "LICENSE",
      "README.rdoc"
@@ -26,13 +25,22 @@ Gem::Specification.new do |s|
      "Rakefile",
      "VERSION",
      "bin/gizzmo",
+     "bin/setup_shards",
      "gizzmo.gemspec",
      "lib/gizzard.rb",
      "lib/gizzard/commands.rb",
-     "lib/gizzard/hash.rb",
+     "lib/gizzard/digest.rb",
+     "lib/gizzard/migrator.rb",
+     "lib/gizzard/nameserver.rb",
+     "lib/gizzard/shard_template.rb",
      "lib/gizzard/thrift.rb",
+     "lib/gizzard/transformation.rb",
      "lib/gizzmo.rb",
      "lib/vendor/thrift_client/simple.rb",
+     "spec/shard_template_spec.rb",
+     "spec/spec.opts",
+     "spec/spec_helper.rb",
+     "spec/transformation_spec.rb",
      "test/config.yaml",
      "test/expected/deep.txt",
      "test/expected/dry-wrap-table_b_0.txt",
@@ -60,7 +68,10 @@ Gem::Specification.new do |s|
   s.rubygems_version = %q{1.3.7}
   s.summary = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.test_files = [
-    "test/helper.rb"
+    "spec/shard_template_spec.rb",
+     "spec/spec_helper.rb",
+     "spec/transformation_spec.rb",
+     "test/helper.rb"
   ]
 
   if s.respond_to? :specification_version then
