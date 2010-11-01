@@ -2,6 +2,7 @@ module Gizzard
   class Nameserver
 
     DEFAULT_PORT = 7917
+    RETRIES = 3
 
     attr_reader :hosts, :logfile, :dryrun
     alias dryrun? dryrun
@@ -53,58 +54,63 @@ module Gizzard
     private
 
     def with_retry
-      times ||= 3
+      times ||= RETRIES
       yield
     rescue ThriftClient::Simple::ThriftException
       times -= 1
-      (times < 0) ? raise : retry
+      (times < 0) ? raise : (sleep 0.1; retry)
     end
   end
 
+  Shard = Struct.new(:info, :children, :weight)
+
+  class Shard
+    def id; info.id; end
+  end
+
   class Manifest
-    attr_reader :forwardings, :links, :shards, :existing_shard_ids, :template_map
+    attr_reader :forwardings, :links, :shard_infos, :trees, :template_map
 
     def initialize(nameserver, config)
       @config = config
-      @forwardings = nameserver.get_forwardings(@config.table_id)
+      @forwardings = collect_forwardings(nameserver, @config.table_id)
       @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
-      @shards = collect_shards(nameserver, links)
+      @shard_infos = collect_shard_infos(nameserver, links)
+      @trees = forwardings.inject({}) do |h, forwarding|
+        h.update forwarding => build_tree(forwarding.shard_id)
+      end
 
-      build_template_map!
-    end
-
-    def build_template_map!
-      # can't use a default block for these as they wouldn't be marshalable.
-      # map[template] #=> [shard_enums...]
-      @template_map = {}
-
-      # map[canonical_id] #=> shard_name
-      @existing_shard_ids = {}
-
-      forwardings.map{|f| [f.base_id, f.shard_id] }.each do |(base_id, shard_id)|
-        enum = shard_id.table_prefix.match(/\d{3,}/)[0].to_i
-        tree = build_tree(enum, shard_id, ShardTemplate::DEFAULT_WEIGHT)
-
-        (@template_map[tree] ||= []) << enum
+      @template_map = @trees.inject do |h, (forwarding, shard)|
+        (h[build_template(shard)] ||= []) << forwarding; h
       end
     end
 
     private
 
-    # FIXME: figure out how to remove the side-effect of adding to the
-    # name map
-    def build_tree(enum, shard_id, link_weight)
+    def build_tree(shard_id, link_weight = nil)
       children = (links[shard_id] || []).map do |(child_id, child_weight)|
-        build_tree(enum, child_id, child_weight)
+        build_tree(child_id, child_weight)
       end
 
-      info = shards[shard_id] or raise "shard info not found for: #{shard_id}"
-      template = ShardTemplate.from_shard_info(info, link_weight, children)
+      info = shard_infos[shard_id] or raise "shard info not found for: #{shard_id}"
+      Shard.new(info, children, link_weight)
+    end
 
-      canonical_id = template.to_shard_id(@config.shard_name(enum))
-      @existing_shard_ids[canonical_id] = shard_id
+    def build_template(shard)
+      children = shard.children.map do |child|
+        build_template(child)
+      end
 
-      template
+      ShardTemplate.new(shard.info.class_name,
+                        shard.id.hostname,
+                        shard.weight,
+                        shard.info.source_type,
+                        shard.info.destination_type,
+                        children)
+    end
+
+    def collect_forwardings(nameserver, table_id)
+      nameserver.get_forwardings(table_id)
     end
 
     def collect_links(nameserver, roots)
@@ -123,7 +129,7 @@ module Gizzard
       links
     end
 
-    def collect_shards(nameserver, links)
+    def collect_shard_infos(nameserver, links)
       shard_ids = links.keys + links.values.inject([]) do |ids, nodes|
         nodes.each {|id, weight| ids << id }; ids
       end
