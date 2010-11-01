@@ -3,6 +3,7 @@ module Gizzard
 
     DEFAULT_PORT = 7917
     RETRIES = 3
+    PARALLELISM = 20
 
     attr_reader :hosts, :logfile, :dryrun
     alias dryrun? dryrun
@@ -20,6 +21,47 @@ module Gizzard
         forwardings.select {|f| f.table_id == table_id }
       else
         forwardings
+      end
+    end
+
+    def get_all_links(forwardings=nil)
+      mutex         = Mutex.new
+      all_links     = {}
+      forwardings ||= client.get_forwardings
+      forwardings   = forwardings.dup
+
+      Thread.abort_on_exception = true
+
+      threads = (0..(PARALLELISM - 1)).map do |i|
+        Thread.new do
+          done   = {}
+          client = create_client(hosts.first)
+
+          while f = mutex.synchronize { forwardings.pop }
+            pending = [f.shard_id]
+
+            until pending.empty?
+              id = pending.pop
+
+              unless done[id]
+                links = with_retry { client.list_downward_links id }
+                links.each {|l| pending << l.down_id }
+                mutex.synchronize { links.each {|l| all_links[l] = true } }
+                done[id] = true
+              end
+            end
+          end
+        end
+      end
+
+      threads.each {|t| t.join }
+
+      all_links.keys
+    end
+
+    def get_all_shards
+      client.list_hostnames.inject([]) do |a, hostname|
+        a.concat client.shards_for_hostname(hostname)
       end
     end
 
@@ -76,21 +118,28 @@ module Gizzard
     attr_reader :forwardings, :links, :shard_infos, :trees, :template_map
 
     def initialize(nameserver, table_id)
-      @forwardings = collect_forwardings(nameserver, table_id)
-      @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
-      @shard_infos = collect_shard_infos(nameserver, links)
+      @forwardings = nameserver.get_forwardings(table_id)
+
+      @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
+        (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
+      end
+
+      @shard_infos = nameserver.get_all_shards.inject({}) do |h, shard|
+        h.update shard.id => shard
+      end
+
       @trees = forwardings.inject({}) do |h, forwarding|
         h.update forwarding => build_tree(forwarding.shard_id)
       end
 
-      @template_map = @trees.inject do |h, (forwarding, shard)|
+      @template_map = @trees.inject({}) do |h, (forwarding, shard)|
         (h[build_template(shard)] ||= []) << forwarding; h
       end
     end
 
     private
 
-    def build_tree(shard_id, link_weight = nil)
+    def build_tree(shard_id, link_weight=ShardTemplate::DEFAULT_WEIGHT)
       children = (links[shard_id] || []).map do |(child_id, child_weight)|
         build_tree(child_id, child_weight)
       end
@@ -110,34 +159,6 @@ module Gizzard
                         shard.info.source_type,
                         shard.info.destination_type,
                         children)
-    end
-
-    def collect_forwardings(nameserver, table_id)
-      nameserver.get_forwardings(table_id)
-    end
-
-    def collect_links(nameserver, roots)
-      links = {}
-
-      collector = lambda do |parent|
-        children = nameserver.list_downward_links(parent).map do |link|
-          (links[link.up_id] ||= []) << [link.down_id, link.weight]
-          link.down_id
-        end
-
-        children.each { |child| collector.call(child) }
-      end
-
-      roots.each {|root| collector.call(root) }
-      links
-    end
-
-    def collect_shard_infos(nameserver, links)
-      shard_ids = links.keys + links.values.inject([]) do |ids, nodes|
-        nodes.each {|id, weight| ids << id }; ids
-      end
-
-      shard_ids.inject({}) {|h, id| h.update id => nameserver.get_shard(id) }
     end
   end
 end

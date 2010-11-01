@@ -637,7 +637,9 @@ module Gizzard
       table_id = (@argv.first || 0).to_i
       manifest = nameserver.manifest(table_id)
 
-      p manifest.template_map.keys
+      manifest.template_map.map {|(t, fs)| [fs.length, t] }.sort.reverse.each do |count, template|
+        printf "%4d %s\n", count, template.inspect
+      end
     end
   end
 end
