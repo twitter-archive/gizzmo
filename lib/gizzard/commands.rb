@@ -179,7 +179,7 @@ module Gizzard
 
         upward_links = service.list_upward_links(shard_id)
         downward_links = service.list_downward_links(shard_id)
-        
+
         help! "Shard must not be a root or leaf" if upward_links.length == 0 or downward_links.length == 0
 
         upward_links.each do |uplink|
@@ -421,27 +421,27 @@ module Gizzard
 
   class ReportCommand < ShardCommand
     def run
-      
+
       things = @argv.map do |shard|
         parse(down(ShardId.parse(shard))).join("\n")
       end
-      
+
       if command_options.flat
         things.zip(@argv).each do |thing, shard_id|
           puts "#{sign(thing)}\t#{shard_id}"
         end
       else
         group(things).each do |string, things|
-          puts "=== " + sign(string) + ": #{things.length}" + " ====================" 
+          puts "=== " + sign(string) + ": #{things.length}" + " ===================="
           puts string
         end
       end
     end
-    
+
     def sign(string)
       ::Digest::MD5.hexdigest(string)[0..10]
     end
-    
+
     def group(arr)
       arr.inject({}) do |m, e|
         m[e] ||= []
@@ -449,11 +449,11 @@ module Gizzard
         m
       end.to_a.sort_by{|k, v| v.length}.reverse
     end
-    
+
     def parse(obj, id = nil, depth = 0, sub = true)
       case obj
       when Hash
-        id, prefix = parse(obj.keys.first, id, depth, sub) 
+        id, prefix = parse(obj.keys.first, id, depth, sub)
         [prefix] + parse(obj.values.first, id, depth + 1, sub)
       when String
         host, prefix = obj.split("/")
@@ -467,7 +467,7 @@ module Gizzard
         end
       end
     end
-    
+
     def down(id)
       vals = service.list_downward_links(id).map do |link|
         down(link.down_id)
@@ -475,8 +475,8 @@ module Gizzard
       {id.to_unix => vals}
     end
   end
-  
-  class DrillCommand < ReportCommand 
+
+  class DrillCommand < ReportCommand
     def run
       signature = @argv.shift
       @argv.map do |shard|
@@ -621,6 +621,23 @@ module Gizzard
       else
         service.retry_errors_for(args.to_i)
       end
+    end
+  end
+
+  class TopologyCommand < ShardCommand
+    def self.make_service(global_options, log)
+      host = [global_options.host, global_options.port].join(":")
+      Gizzard::Nameserver.new(host, :log => log, :dry_run => global_options.dry)
+    end
+
+    alias nameserver service
+
+    def run
+      puts "querying nameserver..."
+      table_id = (@argv.first || 0).to_i
+      manifest = nameserver.manifest(table_id)
+
+      p manifest.template_map.keys
     end
   end
 end

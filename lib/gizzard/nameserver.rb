@@ -35,6 +35,10 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
+    def manifest(table_id=0)
+      Manifest.new(self, table_id)
+    end
+
     private
 
     def client
@@ -71,9 +75,8 @@ module Gizzard
   class Manifest
     attr_reader :forwardings, :links, :shard_infos, :trees, :template_map
 
-    def initialize(nameserver, config)
-      @config = config
-      @forwardings = collect_forwardings(nameserver, @config.table_id)
+    def initialize(nameserver, table_id)
+      @forwardings = collect_forwardings(nameserver, table_id)
       @links = collect_links(nameserver, forwardings.map {|f| f.shard_id })
       @shard_infos = collect_shard_infos(nameserver, links)
       @trees = forwardings.inject({}) do |h, forwarding|
