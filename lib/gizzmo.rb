@@ -222,6 +222,12 @@ subcommands = {
     end
   end,
   'topology' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} topology [options] TABLE_ID"
+    separators(opts, DOC_STRINGS["topology"])
+
+    opts.on("--forwardings", "Show topology of forwardings instead of counts") do
+      subcommand_options.forwardings = true
+    end
   end
 }
 

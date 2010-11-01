@@ -635,10 +635,16 @@ module Gizzard
     def run
       puts "querying nameserver..."
       table_id = (@argv.first || 0).to_i
-      manifest = nameserver.manifest(table_id)
+      template_map = nameserver.manifest(table_id).template_map
 
-      manifest.template_map.map {|(t, fs)| [fs.length, t] }.sort.reverse.each do |count, template|
-        printf "%4d %s\n", count, template.inspect
+      if command_options.forwardings
+        template_map.inject([]) {|h, (t, fs)| t = t.inspect; fs.each {|f| h << [f.base_id, t] }; h }.sort.each do |id, t|
+          puts "%25d\t%s" % [id, t]
+        end
+      else
+        template_map.map {|(t, fs)| [fs.length, t, fs] }.sort.reverse.each do |count, template, forwardings|
+          puts "%4d %s" % [count, template.inspect]
+        end
       end
     end
   end
