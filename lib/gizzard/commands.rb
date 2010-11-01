@@ -1,4 +1,5 @@
 require "pp"
+require "digest/md5"
 module Gizzard
   class Command
     include Thrift
@@ -175,8 +176,14 @@ module Gizzard
       help! "No shards specified" if shard_ids.empty?
       shard_ids.each do |shard_id_string|
         shard_id = ShardId.parse(shard_id_string)
-        service.list_upward_links(shard_id).each do |uplink|
-          service.list_downward_links(shard_id).each do |downlink|
+
+        upward_links = service.list_upward_links(shard_id)
+        downward_links = service.list_downward_links(shard_id)
+        
+        help! "Shard must not be a root or leaf" if upward_links.length == 0 or downward_links.length == 0
+
+        upward_links.each do |uplink|
+          downward_links.each do |downlink|
             service.add_link(uplink.up_id, downlink.down_id, uplink.weight)
             new_link = LinkInfo.new(uplink.up_id, downlink.down_id, uplink.weight)
             service.remove_link(uplink.up_id, uplink.down_id)
@@ -210,6 +217,7 @@ module Gizzard
       shard_ids = @argv
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
+        next if !shard_id
         service.list_upward_links(shard_id).each do |link_info|
           output link_info.to_unix
         end
@@ -254,8 +262,8 @@ module Gizzard
 
   class WrapCommand < ShardCommand
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
-      prefix_prefix = wrapping_class_name.split(".").last.downcase.gsub("shard", "") + "_"
-      ShardId.new("localhost", prefix_prefix + shard_info.id.table_prefix)
+      suffix = "_" + wrapping_class_name.split(".").last.downcase.gsub("shard", "")
+      ShardId.new("localhost", shard_info.id.table_prefix + suffix)
     end
 
     def run
@@ -289,8 +297,11 @@ module Gizzard
     end
 
     def run
-      puts command_options.inspect
+      help! "No shards specified" if @argv.empty?
+      shards = []
+      command_options.write_only_shard ||= "com.twitter.gizzard.shards.WriteOnlyShard"
       additional_hosts = (command_options.hosts || "").split(/[\s,]+/)
+      exclude_hosts = (command_options.exclude_hosts || "").split(/[\s,]+/)
       ids = @argv.map{|arg| ShardId.new(*arg.split("/")) rescue nil }.compact
       by_host = ids.inject({}) do |memo, id|
         memo[id.hostname] ||= NamedArray.new(id.hostname)
@@ -302,17 +313,38 @@ module Gizzard
         by_host[host] ||= NamedArray.new(host)
       end
 
+      exclude_hosts.each do |host|
+        by_host[host] ||= NamedArray.new(host)
+      end
+
       sets = by_host.values
+      exclude_sets = exclude_hosts.map{|host| by_host[host]}
+      target_sets = sets - exclude_sets
+
+      exclude_sets.each do |set|
+        while set.length > 0
+          sorted = target_sets.sort_by{|s| s.length}
+          shortest = sorted.first
+          shortest.push set.pop
+        end
+      end
+
+      exclude_sets.each do |set|
+        while set.length > 0
+          sorted = target_sets.sort_by{|s| s.length}
+          shortest = sorted.first
+          shortest.push set.pop
+        end
+      end
 
       begin
-        sorted = sets.sort_by{|s| s.length }
+        sorted = target_sets.sort_by{|s| s.length }
         longest = sorted.last
         shortest = sorted.first
         shortest.push longest.pop
       end while longest.length > shortest.length + 1
 
       shard_info = nil
-      puts sets.map{|l|l.length}.inspect
       sets.each do |set|
         host = set.name
         set.each do |id|
@@ -320,11 +352,16 @@ module Gizzard
             shard_info ||= service.get_shard(id)
             old = id.to_unix
             id.hostname = host
-            puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{id.to_unix}"
-            puts "gizzmo copy #{old} #{id.to_unix}"
+            shards << [old, id.to_unix]
           end
         end
       end
+
+      new_shards = shards.map{|(old, new)| new }
+
+      puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
+      puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
+      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
 
@@ -359,8 +396,9 @@ module Gizzard
       displayed = {}
       overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
-        id_a = ids_by_host[host_a].first
-        id_b = ids_by_host[host_b].first
+        id_a = ids_by_host[host_a].find{|id| service.list_upward_links(id).size > 0 }
+        id_b = ids_by_host[host_b].find{|id| service.list_upward_links(id).size > 0 }
+        next unless id_a && id_b
         weight_a = service.list_upward_links(id_a).first.weight
         weight_b = service.list_upward_links(id_b).first.weight
         if weight_a > weight_b
@@ -383,21 +421,67 @@ module Gizzard
 
   class ReportCommand < ShardCommand
     def run
-      regex = @argv.first
-      help!("regex is a required option") unless regex
-      regex = Regexp.compile(regex)
-      service.list_hostnames.map do |host|
-        puts host
-        counts = {}
-        service.shards_for_hostname(host).each do |shard|
-          id = shard.id.to_unix
-          if key = id[regex, 1] || id[regex, 0]
-            counts[key] ||= 0
-            counts[key] += 1
-          end
+      
+      things = @argv.map do |shard|
+        parse(down(ShardId.parse(shard))).join("\n")
+      end
+      
+      if command_options.flat
+        things.zip(@argv).each do |thing, shard_id|
+          puts "#{sign(thing)}\t#{shard_id}"
         end
-        counts.sort.each do |k, v|
-          puts "  %3d %s" % [v, k]
+      else
+        group(things).each do |string, things|
+          puts "=== " + sign(string) + ": #{things.length}" + " ====================" 
+          puts string
+        end
+      end
+    end
+    
+    def sign(string)
+      ::Digest::MD5.hexdigest(string)[0..10]
+    end
+    
+    def group(arr)
+      arr.inject({}) do |m, e|
+        m[e] ||= []
+        m[e] << e
+        m
+      end.to_a.sort_by{|k, v| v.length}.reverse
+    end
+    
+    def parse(obj, id = nil, depth = 0, sub = true)
+      case obj
+      when Hash
+        id, prefix = parse(obj.keys.first, id, depth, sub) 
+        [prefix] + parse(obj.values.first, id, depth + 1, sub)
+      when String
+        host, prefix = obj.split("/")
+        host = "db" if host != "localhost" && sub
+        id ||= prefix[/(\w+ward_)?\d+_\d+(_\w+ward)?/]
+        prefix = ("  " * depth) + host + "/" + ((sub && id) ? prefix.sub(id, "[ID]") : prefix)
+        [id, prefix]
+      when Array
+        obj.map do |e|
+          parse e, id, depth, sub
+        end
+      end
+    end
+    
+    def down(id)
+      vals = service.list_downward_links(id).map do |link|
+        down(link.down_id)
+      end
+      {id.to_unix => vals}
+    end
+  end
+  
+  class DrillCommand < ReportCommand 
+    def run
+      signature = @argv.shift
+      @argv.map do |shard|
+        if sign(parse(down(ShardId.parse(shard))).join("\n")) == signature
+          puts parse(down(ShardId.parse(shard)), nil, 0, false).join("\n")
         end
       end
     end

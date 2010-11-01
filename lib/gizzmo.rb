@@ -78,16 +78,18 @@ subcommands = {
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["wrap"])
   end,
-  'report' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} report RUBY_REGEX"
-    separators(opts, DOC_STRINGS["report"])
-  end,
   'rebalance' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} rebalance"
     separators(opts, DOC_STRINGS["rebalance"])
 
+    opts.on("-w", "--write-only=CLASS") do |w|
+      subcommand_options.write_only_shard = w
+    end
     opts.on("-h", "--hosts=list") do |h|
       subcommand_options.hosts = h
+    end
+    opts.on("-x", "--exclude-hosts=list") do |x|
+      subcommand_options.exclude_hosts = x
     end
   end,
   'repair' => OptionParser.new do |opts|
@@ -162,14 +164,27 @@ subcommands = {
     opts.banner = "Usage: #{zero} reload"
     separators(opts, DOC_STRINGS["reload"])
   end,
+  'drill' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} drill SIGNATURE"
+    separators(opts, DOC_STRINGS["drill"])
+  end,
   'addlink' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} link PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
+    opts.banner = "Usage: #{zero} addlink PARENT_SHARD_ID CHILD_SHARD_ID WEIGHT"
     separators(opts, DOC_STRINGS["addlink"])
   end,
   'unlink' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
     separators(opts, DOC_STRINGS["unlink"])
   end,
+  
+  'report' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} report [options]"
+    separators(opts, DOC_STRINGS["report"])
+    opts.on("--flat", "Show flat report") do
+      subcommand_options.flat = true
+    end
+  end,
+  
   'lookup' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} lookup [options] TABLE_ID SOURCE"
     separators(opts, DOC_STRINGS["lookup"])
@@ -250,6 +265,10 @@ global = OptionParser.new do |opts|
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
     global_options.retry = r
   end
+  
+  opts.on("-t", "--timeout=SECONDS", "SECONDS to let the command run") do |r|
+    global_options.timeout = r
+  end
 
   opts.on("--subtree", "Render in subtree mode") do
     global_options.render << "subtree"
@@ -324,11 +343,32 @@ while !$stdin.tty? && line = STDIN.gets
   argv << line.strip
 end
 
+def custom_timeout(seconds)
+  if seconds
+    begin
+      require "rubygems"
+      require "system_timer"
+      SystemTimer.timeout_after(seconds.to_i) do
+        yield
+      end
+    rescue LoadError
+      require "timeout"
+      Timeout.timeout(seconds.to_i) do
+        yield
+      end
+    end
+  else
+    yield
+  end
+end
+
 tries_left = global_options.retry.to_i + 1
 begin
   while (tries_left -= 1) >= 0
     begin
-      Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
+      custom_timeout(global_options.timeout) do
+        Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
+      end
       break
     rescue
       if tries_left > 0
