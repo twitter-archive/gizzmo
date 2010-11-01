@@ -154,15 +154,6 @@ module Gizzard
 
     # Class Methods
 
-    module Introspection
-      def from_shard_info(info, link_weight = nil, children = [])
-        new(info.class_name, info.id.hostname, link_weight, info.source_type, info.destination_type, children)
-      end
-    end
-
-    extend Introspection
-
-
     module Configuration
       def concrete?(type)
         !GIZZARD_SHARD_TYPES.include? type.split('.').last
