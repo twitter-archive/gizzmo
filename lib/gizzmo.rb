@@ -104,6 +104,14 @@ subcommands = {
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
     separators(opts, DOC_STRINGS["subtree"])
   end,
+  'markbusy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} markbusy SHARD_ID"
+    separators(opts, DOC_STRINGS["markbusy"])
+  end,
+  'markunbusy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} markunbusy SHARD_ID"
+    separators(opts, DOC_STRINGS["markunbusy"])
+  end,
   'hosts' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} hosts"
     separators(opts, DOC_STRINGS["hosts"])
@@ -176,7 +184,7 @@ subcommands = {
     opts.banner = "Usage: #{zero} unlink PARENT_SHARD_ID CHILD_SHARD_ID"
     separators(opts, DOC_STRINGS["unlink"])
   end,
-  
+
   'report' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} report [options]"
     separators(opts, DOC_STRINGS["report"])
@@ -184,7 +192,7 @@ subcommands = {
       subcommand_options.flat = true
     end
   end,
-  
+
   'lookup' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} lookup [options] TABLE_ID SOURCE"
     separators(opts, DOC_STRINGS["lookup"])
@@ -265,7 +273,7 @@ global = OptionParser.new do |opts|
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
     global_options.retry = r
   end
-  
+
   opts.on("-t", "--timeout=SECONDS", "SECONDS to let the command run") do |r|
     global_options.timeout = r
   end
