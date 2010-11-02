@@ -370,21 +370,9 @@ def custom_timeout(seconds)
   end
 end
 
-tries_left = global_options.retry.to_i + 1
-begin
-  while (tries_left -= 1) >= 0
-    begin
-      custom_timeout(global_options.timeout) do
-        Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
-      end
-      break
-    rescue
-      if tries_left > 0
-        STDERR.puts "Retrying..."
-      else
-        raise
-      end
-    end
+begin      
+  custom_timeout(global_options.timeout) do
+    Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
   end
 rescue HelpNeededError => e
   if e.class.name != e.message
