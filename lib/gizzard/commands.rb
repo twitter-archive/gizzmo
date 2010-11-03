@@ -41,16 +41,37 @@ module Gizzard
       end
     end
   end
+  
+  class RetryProxy
+    def initialize(retries, object)
+      @inner = object
+      @retries_left = retries
+    end
+    
+    def method_missing(*args)
+      @inner.send(*args)
+    rescue
+      if @retries_left > 0
+        @retries_left -= 1
+        STDERR.puts "Retrying..."
+        method_missing(*args)
+      else
+        raise
+      end
+    end
+  end
 
   class ShardCommand < Command
     def self.make_service(global_options, log)
-      Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
+      RetryProxy.new global_options.retry.to_i, 
+        Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
     end
   end
 
   class JobCommand < Command
     def self.make_service(global_options, log)
-      Gizzard::Thrift::JobManager.new(global_options.host, global_options.port + 2, log, global_options.dry)
+      RetryProxy.new global_options.retry.to_i  ,
+        Gizzard::Thrift::JobManager.new(global_options.host, global_options.port + 2, log, global_options.dry)
     end
   end
 
@@ -233,6 +254,30 @@ module Gizzard
       shard_ids = @argv
       shard_ids.each do |shard_id|
         shard_info = service.get_shard(ShardId.parse(shard_id))
+        output shard_info.to_unix
+      end
+    end
+  end
+
+  class MarkbusyCommand < ShardCommand
+    def run
+      shard_ids = @argv
+      shard_ids.each do |shard_id|
+        id = ShardId.parse(shard_id)
+        service.mark_shard_busy(id, 1)
+        shard_info = service.get_shard(id)
+        output shard_info.to_unix
+      end
+    end
+  end
+
+  class MarkunbusyCommand < ShardCommand
+    def run
+      shard_ids = @argv
+      shard_ids.each do |shard_id|
+        id = ShardId.parse(shard_id)
+        service.mark_shard_busy(id, 0)
+        shard_info = service.get_shard(id)
         output shard_info.to_unix
       end
     end

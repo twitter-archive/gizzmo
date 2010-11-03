@@ -104,6 +104,14 @@ subcommands = {
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
     separators(opts, DOC_STRINGS["subtree"])
   end,
+  'markbusy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} markbusy SHARD_ID"
+    separators(opts, DOC_STRINGS["markbusy"])
+  end,
+  'markunbusy' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} markunbusy SHARD_ID"
+    separators(opts, DOC_STRINGS["markunbusy"])
+  end,
   'hosts' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} hosts"
     separators(opts, DOC_STRINGS["hosts"])
@@ -370,21 +378,9 @@ def custom_timeout(seconds)
   end
 end
 
-tries_left = global_options.retry.to_i + 1
-begin
-  while (tries_left -= 1) >= 0
-    begin
-      custom_timeout(global_options.timeout) do
-        Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
-      end
-      break
-    rescue
-      if tries_left > 0
-        STDERR.puts "Retrying..."
-      else
-        raise
-      end
-    end
+begin      
+  custom_timeout(global_options.timeout) do
+    Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
   end
 rescue HelpNeededError => e
   if e.class.name != e.message
