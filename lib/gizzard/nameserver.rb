@@ -15,15 +15,6 @@ module Gizzard
       @hosts = hosts.flatten
     end
 
-    def get_forwardings(table_id=nil)
-      forwardings = client.get_forwardings
-      if table_id
-        forwardings.select {|f| f.table_id == table_id }
-      else
-        forwardings
-      end
-    end
-
     def get_all_links(forwardings=nil)
       mutex         = Mutex.new
       all_links     = {}
@@ -77,8 +68,8 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
-    def manifest(table_id=0)
-      Manifest.new(self, table_id)
+    def manifest
+      Manifest.new(self)
     end
 
     private
@@ -106,59 +97,61 @@ module Gizzard
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end
-  end
 
-  Shard = Struct.new(:info, :children, :weight)
 
-  class Shard
-    def id; info.id; end
-  end
+    # manifest helper class
+    Shard = Struct.new(:info, :children, :weight)
 
-  class Manifest
-    attr_reader :forwardings, :links, :shard_infos, :trees, :template_map
-
-    def initialize(nameserver, table_id)
-      @forwardings = nameserver.get_forwardings(table_id)
-
-      @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
-        (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
-      end
-
-      @shard_infos = nameserver.get_all_shards.inject({}) do |h, shard|
-        h.update shard.id => shard
-      end
-
-      @trees = forwardings.inject({}) do |h, forwarding|
-        h.update forwarding => build_tree(forwarding.shard_id)
-      end
-
-      @template_map = @trees.inject({}) do |h, (forwarding, shard)|
-        (h[build_template(shard)] ||= []) << forwarding; h
-      end
+    class Shard
+      def id; info.id; end
     end
 
-    private
+    class Manifest
+      attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
-    def build_tree(shard_id, link_weight=ShardTemplate::DEFAULT_WEIGHT)
-      children = (links[shard_id] || []).map do |(child_id, child_weight)|
-        build_tree(child_id, child_weight)
+      def initialize(nameserver)
+        @forwardings = nameserver.get_forwardings
+
+        @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
+          (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
+        end
+
+        @shard_infos = nameserver.get_all_shards.inject({}) do |h, shard|
+          h.update shard.id => shard
+        end
+
+        @trees = forwardings.inject({}) do |h, forwarding|
+          h.update forwarding => build_tree(forwarding.shard_id)
+        end
+
+        @templates = @trees.inject({}) do |h, (forwarding, shard)|
+          (h[build_template(shard)] ||= []) << forwarding; h
+        end
       end
 
-      info = shard_infos[shard_id] or raise "shard info not found for: #{shard_id}"
-      Shard.new(info, children, link_weight)
-    end
+      private
 
-    def build_template(shard)
-      children = shard.children.map do |child|
-        build_template(child)
+      def build_tree(shard_id, link_weight=ShardTemplate::DEFAULT_WEIGHT)
+        children = (links[shard_id] || []).map do |(child_id, child_weight)|
+          build_tree(child_id, child_weight)
+        end
+
+        info = shard_infos[shard_id] or raise "shard info not found for: #{shard_id}"
+        Shard.new(info, children, link_weight)
       end
 
-      ShardTemplate.new(shard.info.class_name,
-                        shard.id.hostname,
-                        shard.weight,
-                        shard.info.source_type,
-                        shard.info.destination_type,
-                        children)
+      def build_template(shard)
+        children = shard.children.map do |child|
+          build_template(child)
+        end
+
+        ShardTemplate.new(shard.info.class_name,
+                          shard.id.hostname,
+                          shard.weight,
+                          shard.info.source_type,
+                          shard.info.destination_type,
+                          children)
+      end
     end
   end
 end
