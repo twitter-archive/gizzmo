@@ -93,7 +93,7 @@ module Gizzard
     def with_retry
       times ||= RETRIES
       yield
-    rescue ThriftClient::Simple::ThriftException
+    rescue ThriftClient::Simple::ThriftException, NoMethodError
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end

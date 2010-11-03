@@ -139,8 +139,7 @@ module Gizzard
     # Config
 
     def to_config
-      weight_def = (weight  == DEFAULT_WEIGHT) ? nil : weight
-      definition = [identifier, weight_def].compact.join(":")
+      definition = [identifier, weight].compact.join(":")
 
       if children.empty?
         definition
