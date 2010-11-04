@@ -201,7 +201,10 @@ module Gizzard
         upward_links = service.list_upward_links(shard_id)
         downward_links = service.list_downward_links(shard_id)
 
-        help! "Shard must not be a root or leaf" if upward_links.length == 0 or downward_links.length == 0
+        if upward_links.length == 0 or downward_links.length == 0
+          STDERR.puts "Shard #{shard_id_string} must not be a root or leaf" 
+          next
+        end
 
         upward_links.each do |uplink|
           downward_links.each do |downlink|
