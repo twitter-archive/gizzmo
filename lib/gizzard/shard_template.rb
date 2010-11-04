@@ -5,16 +5,20 @@ module Gizzard
     ABSTRACT_HOST = "localhost"
     DEFAULT_WEIGHT = 1
 
-    GIZZARD_SHARD_TYPES = [
+    VIRTUAL_SHARD_TYPES = [
+      "FailingOverShard",
       "ReplicatingShard",
       "ReadOnlyShard",
       "WriteOnlyShard",
       "BlockedShard",
     ]
 
+    REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
+
     INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
 
     SHARD_SUFFIXES = {
+      "FailingOverShard" => 'replicating',
       "ReplicatingShard" => 'replicating',
       "ReadOnlyShard" => 'read_only',
       "WriteOnlyShard" => 'write_only',
@@ -28,26 +32,26 @@ module Gizzard
         type, host, weight, source_type || '', dest_type || '', children
     end
 
+    def self.concrete?(type)
+      !VIRTUAL_SHARD_TYPES.include? type.split('.').last
+    end
+
     def concrete?
       self.class.concrete? type
     end
 
     def replicating?
-      short_type == 'ReplicatingShard'
-    end
-
-    def short_type
-      type.split(".").last
+      REPLICATING_SHARD_TYPES.include? type
     end
 
     def identifier
-      replicating? ? short_type.to_s : "#{short_type}:#{host}"
+      concrete? ? "#{type}:#{host}" : type.to_s
     end
 
     def host
       if concrete?
         @host
-      elsif !replicating?
+      elsif children.length == 1
         children.first.host
       else
         ABSTRACT_HOST
@@ -58,31 +62,6 @@ module Gizzard
       @children.sort { |a, b| b <=> a }
     end
 
-    def descendant_identifiers
-      ids = children.map { |c| c.descendant_identifiers }.flatten
-      ids << identifier if concrete?
-      ids.uniq.sort
-    end
-
-    def copy_sources(multiplier = 1.0)
-      return {} if INVALID_COPY_TYPES.include? short_type
-
-      if concrete?
-        { self => multiplier }
-      else
-        total_weight = children.map {|c| c.weight }.inject {|a,b| a+b }.to_f
-        children.inject({}) do |sources, child|
-          share = total_weight.zero? ? 0 : (child.weight / total_weight * multiplier)
-          sources.merge child.copy_sources(share)
-        end
-      end
-    end
-
-    def copy_source
-      return nil if copy_sources.empty?
-      copy_sources.to_a.sort {|a,b| a.last <=> b.last }.first.first
-    end
-
     def inspect
       weight_inspect = weight.nil? ? "" : " #{weight}"
       child_inspect = children.empty? ? "" : " #{children.inspect}"
@@ -90,45 +69,23 @@ module Gizzard
     end
 
 
-    # Materialization
-
-    def to_shard_id(table_name)
-      name = [table_name, SHARD_SUFFIXES[short_type]].compact.join("_")
-      Thrift::ShardId.new(host, name)
-    end
-
-    def to_shard_info(table_name)
-      Thrift::ShardInfo.new(to_shard_id(table_name), type, source_type || '', dest_type || '', 0)
-    end
-
-
     # Similarity/Equality
 
-    include Comparable
-
-    def similar?(other)
-      return false unless other.is_a? ShardTemplate
-      (self.descendant_identifiers & other.descendant_identifiers).length > 0
-    end
-
-    def <=>(other, deep = true, include_weight = true)
+    def <=>(other)
       raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
 
-      if (cmp = [host, type.to_s] <=> [other.host, other.type.to_s]) == 0
-        if (cmp = include_weight ? weight <=> other.weight : 0) == 0
-          # only sort children if necessary...
-          deep ? children <=> other.children : 0
-        else
-          cmp
-        end
+      to_a = lambda {|t| [t.host, t.type, t.source_type.to_s, t.dest_type.to_s, t.weight] }
+
+      if (cmp = to_a.call(self) <=> to_a.call(other)) == 0
+        children <=> other.children
       else
         cmp
       end
     end
 
-    def eql?(other, deep = true, include_weight = true)
+    def eql?(other)
       return false unless other.is_a? ShardTemplate
-      (self.<=>(other, deep, include_weight)).zero?
+      (self <=> other) == 0
     end
 
     def hash
@@ -153,15 +110,13 @@ module Gizzard
 
     # Class Methods
 
-    module Configuration
-      def concrete?(type)
-        !GIZZARD_SHARD_TYPES.include? type.split('.').last
-      end
-
+    class << self
       def from_config(config, conf_tree)
-        shard, children = parse_link_struct(conf_tree)
-        type, host, weight = parse_shard_definition(shard)
-        new(type, host, weight, config.source_type, config.destination_type, Array(children).map { |child| from_config(config, child) })
+        shard, child_configs = parse_link_struct(conf_tree)
+        type, host, weight   = parse_shard_definition(shard)
+        children             = Array(child_configs).map { |child| from_config(config, child) }
+
+        new(type, host, weight, config.source_type, config.destination_type, children)
       end
 
       private
@@ -195,7 +150,5 @@ module Gizzard
         [type, host, weight]
       end
     end
-
-    extend Configuration
   end
 end
