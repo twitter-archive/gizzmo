@@ -17,13 +17,6 @@ rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
 end
 
-require 'rake/testtask'
-Rake::TestTask.new(:test) do |test|
-  test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
-end
-
 Spec::Rake::SpecTask.new(:spec) do |t|
   spec_opts = File.expand_path('spec/spec.opts')
   if File.exist? spec_opts
