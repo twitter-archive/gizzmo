@@ -2,8 +2,8 @@ module Gizzard
   class Nameserver
 
     DEFAULT_PORT = 7917
-    RETRIES = 3
-    PARALLELISM = 20
+    RETRIES = 20
+    PARALLELISM = 10
 
     attr_reader :hosts, :logfile, :dryrun
     alias dryrun? dryrun
@@ -68,8 +68,8 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
-    def manifest
-      Manifest.new(self)
+    def manifest(table_id=nil)
+      Manifest.new(self, table_id)
     end
 
     private
@@ -95,7 +95,7 @@ module Gizzard
       yield
     rescue ThriftClient::Simple::ThriftException, NoMethodError
       times -= 1
-      (times < 0) ? raise : (sleep 0.1; retry)
+      (times < 0) ? raise : (sleep 2; retry)
     end
 
 
@@ -109,8 +109,10 @@ module Gizzard
     class Manifest
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
-      def initialize(nameserver)
+      def initialize(nameserver, table_id=nil)
         @forwardings = nameserver.get_forwardings
+
+        @forwardings.reject! {|f| f.table_id != table_id } if table_id
 
         @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
           (h[link.up_id] ||= []) << [link.down_id, link.weight]; h

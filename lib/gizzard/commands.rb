@@ -41,13 +41,13 @@ module Gizzard
       end
     end
   end
-  
+
   class RetryProxy
     def initialize(retries, object)
       @inner = object
       @retries_left = retries
     end
-    
+
     def method_missing(*args)
       @inner.send(*args)
     rescue
@@ -63,7 +63,7 @@ module Gizzard
 
   class ShardCommand < Command
     def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i, 
+      RetryProxy.new global_options.retry.to_i,
         Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
     end
   end
@@ -680,7 +680,7 @@ module Gizzard
     def run
       puts "querying nameserver..."
       table_id = (@argv.first || 0).to_i
-      templates = nameserver.manifest.templates.inject({}) do |h, (t, fs)|
+      templates = nameserver.manifest(table_id).templates.inject({}) do |h, (t, fs)|
         h.update t.to_config.inspect => fs
       end
 
