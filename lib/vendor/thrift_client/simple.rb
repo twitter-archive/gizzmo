@@ -87,8 +87,14 @@ class ThriftClient
         end
       end
 
-      def pack_request(method_name, arg_struct, request_id=0)
-        [ VERSION_1, CALL, method_name.to_s.size, method_name.to_s, request_id, arg_struct._pack ].pack("nnNa*Na*")
+      def pack_request(method_name, arg_struct, framed, request_id=0)
+        msg = [ VERSION_1, CALL, method_name.to_s.size, method_name.to_s, request_id, arg_struct._pack ].pack("nnNa*Na*")
+        if framed
+          frame = [ msg.length ].pack("N")
+          frame + msg
+        else
+          msg
+        end
       end
 
       def read_value(s, type)
@@ -169,8 +175,13 @@ class ThriftClient
           end
         end
       end
-      
-      def read_response(s, rv_class)
+
+      def read_response(s, rv_class, framed)
+        if framed
+          # unwrap frame size. dont use for now
+          framesize = s.read(4).unpack("N")
+        end
+
         version, message_type, method_name_len = s.read(8).unpack("nnN")
         method_name = s.read(method_name_len)
         seq_id = s.read(4).unpack("N").first
@@ -280,9 +291,10 @@ class ThriftClient
     UnknownStruct = make_struct(:Unknown)
 
     class ThriftService
-      def initialize(host, port)
+      def initialize(host, port, framed = false)
         @host = host
         @port = port
+        @framed = framed
       end
 
       def self._arg_structs
@@ -310,8 +322,8 @@ class ThriftClient
         arg_class, rv_class = cls._arg_structs[method_name.to_sym]
         arg_struct = arg_class.new(*args)
         sock = TCPSocket.new(@host, @port)
-        sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct))
-        rv = ThriftClient::Simple.read_response(sock, rv_class)
+        sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
+        rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
         sock.close
         rv[2]
       end
