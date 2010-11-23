@@ -1,0 +1,13 @@
+/dist/*
+*.log
+*.o
+gen-cpp/
+bin/
+target/
+.DS_Store
+/kestrel/*
+*.hprof.txt
+lib_managed/
+src_managed/
+/project/boot/
+/project/plugins/project/
