@@ -41,13 +41,13 @@ module Gizzard
       end
     end
   end
-  
+
   class RetryProxy
     def initialize(retries, object)
       @inner = object
       @retries_left = retries
     end
-    
+
     def method_missing(*args)
       @inner.send(*args)
     rescue
