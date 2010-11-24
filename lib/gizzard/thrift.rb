@@ -9,7 +9,7 @@ module Gizzard
       T::StructType.new(*args)
     end
 
-    ShardException = T.make_exception(:ShardException,
+    GizzardException = T.make_exception(:GizzardException,
       T::Field.new(:description, T::STRING, 1)
     )
 
@@ -72,11 +72,6 @@ module Gizzard
       end
     end
 
-    ShardMigration = T.make_struct(:ShardMigration,
-      T::Field.new(:source_id, struct(ShardId), 1),
-      T::Field.new(:destination_id, struct(ShardId), 2)
-    )
-
     Forwarding = T.make_struct(:Forwarding,
       T::Field.new(:table_id, T::I32, 1),
       T::Field.new(:base_id, T::I64, 2),
@@ -87,6 +82,25 @@ module Gizzard
       #FIXME table_id is not human-readable
       def inspect
         "[#{table_id}] #{base_id.to_s(16)} -> #{shard_id.inspect}"
+      end
+    end
+
+    module HostStatus
+      Normal  = 0
+      Offline = 1
+      Blocked = 2
+    end
+
+    Host = T.make_struct(:Host,
+      T::Field.new(:hostname, T::STRING, 1),
+      T::Field.new(:port, T::I32, 2),
+      T::Field.new(:cluster, T::STRING, 3),
+      T::Field.new(:status, T::I32, 4)
+    )
+
+    class Host
+      def inspect
+        "(#{hostname}:#{port} - #{cluster} (#{status})"
       end
     end
 
@@ -128,50 +142,80 @@ module Gizzard
       end
     end
 
-    class ShardManager < GizzmoService
-      thrift_method :create_shard, void, field(:shard, struct(ShardInfo), 1), :throws => exception(ShardException)
-      thrift_method :delete_shard, void, field(:id, struct(ShardId), 1), :throws => exception(ShardException)
-      thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1), :throws => exception(ShardException)
+    class Manager < GizzmoService
+      thrift_method :reload_config, void, :throws => exception(GizzardException)
+      thrift_method :rebuild_schema, void, :throws => exception(GizzardException)
 
-      thrift_method :add_link, void, field(:up_id, struct(ShardId), 1), field(:down_id, struct(ShardId), 2), field(:weight, i32, 3), :throws => exception(ShardException)
-      thrift_method :remove_link, void, field(:up_id, struct(ShardId), 1), field(:down_id, struct(ShardId), 2), :throws => exception(ShardException)
+      thrift_method :find_current_forwarding, struct(ShardInfo), field(:table_id, i32, 1), field(:id, i64, 2), :throws => exception(GizzardException)
 
-      thrift_method :list_upward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(ShardException)
-      thrift_method :list_downward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(ShardException)
 
-      thrift_method :get_child_shards_of_class, list(struct(ShardInfo)), field(:parent_id, struct(ShardId), 1), field(:class_name, string, 2), :throws => exception(ShardException)
+      # Shard Tree Management
 
-      thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(ShardException)
-      thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(ShardException)
+      thrift_method :create_shard, void, field(:shard, struct(ShardInfo), 1), :throws => exception(GizzardException)
+      thrift_method :delete_shard, void, field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
 
-      thrift_method :set_forwarding, void, field(:forwarding, struct(Forwarding), 1), :throws => exception(ShardException)
-      thrift_method :replace_forwarding, void, field(:old_id, struct(ShardId), 1), field(:new_id, struct(ShardId), 2), :throws => exception(ShardException)
-      thrift_method :remove_forwarding, void, field(:forwarding, struct(Forwarding), 1), :throws => exception(ShardException)
+      thrift_method :add_link, void, field(:up_id, struct(ShardId), 1), field(:down_id, struct(ShardId), 2), field(:weight, i32, 3), :throws => exception(GizzardException)
+      thrift_method :remove_link, void, field(:up_id, struct(ShardId), 1), field(:down_id, struct(ShardId), 2), :throws => exception(GizzardException)
 
-      thrift_method :get_forwarding, struct(Forwarding), field(:table_id, i32, 1), field(:base_id, i64, 2), :throws => exception(ShardException)
-      thrift_method :get_forwarding_for_shard, struct(Forwarding), field(:shard_id, struct(ShardId), 1), :throws => exception(ShardException)
+      thrift_method :set_forwarding, void, field(:forwarding, struct(Forwarding), 1), :throws => exception(GizzardException)
+      thrift_method :replace_forwarding, void, field(:old_id, struct(ShardId), 1), field(:new_id, struct(ShardId), 2), :throws => exception(GizzardException)
+      thrift_method :remove_forwarding, void, field(:forwarding, struct(Forwarding), 1), :throws => exception(GizzardException)
 
-      thrift_method :get_forwardings, list(struct(Forwarding)), :throws => exception(ShardException)
-      thrift_method :reload_forwardings, void, :throws => exception(ShardException)
+      thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
+      thrift_method :shards_for_hostname, list(struct(ShardInfo)), field(:hostname, string, 1), :throws => exception(GizzardException)
+      thrift_method :get_busy_shards, list(struct(ShardInfo)), :throws => exception(GizzardException)
 
-      thrift_method :find_current_forwarding, struct(ShardInfo), field(:table_id, i32, 1), field(:id, i64, 2), :throws => exception(ShardException)
+      thrift_method :list_upward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
+      thrift_method :list_downward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
+      thrift_method :get_forwarding, struct(Forwarding), field(:table_id, i32, 1), field(:base_id, i64, 2), :throws => exception(GizzardException)
+      thrift_method :get_forwarding_for_shard, struct(Forwarding), field(:shard_id, struct(ShardId), 1), :throws => exception(GizzardException)
+      thrift_method :get_forwardings, list(struct(Forwarding)), :throws => exception(GizzardException)
 
-      thrift_method :shards_for_hostname, list(struct(ShardInfo)), field(:hostname, string, 1), :throws => exception(ShardException)
-      thrift_method :get_busy_shards, list(struct(ShardInfo)), :throws => exception(ShardException)
-      thrift_method :list_hostnames, list(string), :throws => exception(ShardException)
+      thrift_method :list_hostnames, list(string), :throws => exception(GizzardException)
 
-      thrift_method :rebuild_schema, void, :throws => exception(ShardException)
-    end
+      thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(GizzardException)
+      thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(GizzardException)
 
-    class JobManager < GizzmoService
+
+      # Job Scheduler Management
+
       thrift_method :retry_errors, void
       thrift_method :stop_writes, void
       thrift_method :resume_writes, void
+
       thrift_method :retry_errors_for, void, field(:priority, i32, 1)
       thrift_method :stop_writes_for, void, field(:priority, i32, 1)
       thrift_method :resume_writes_for, void, field(:priority, i32, 1)
+
       thrift_method :is_writing, bool, field(:priority, i32, 1)
-      thrift_method :inject_job, void, field(:priority, i32, 1), field(:job, string, 2)
+
+
+      # Remote Host Cluster Management
+
+      thrift_method :add_remote_host, void, field(:host, struct(Host), 1)#, :throws => exception(GizzardException)
+      thrift_method :remove_remote_host, void, field(:hostname, string, 1), field(:port, i32, 2), :throws => exception(GizzardException)
+      thrift_method :set_remote_host_status, void, field(:hostname, string, 1), field(:port, i32, 2), field(:status, i32, 3), :throws => exception(GizzardException)
+      thrift_method :set_remote_cluster_status, void, field(:cluster, string, 1), field(:status, i32, 2), :throws => exception(GizzardException)
+
+      thrift_method :get_remote_host, struct(Host), field(:hostname, string, 1), field(:port, i32, 2), :throws => exception(GizzardException)
+      thrift_method :list_remote_clusters, list(string), :throws => exception(GizzardException)
+      thrift_method :list_remote_hosts, list(struct(Host)), :throws => exception(GizzardException)
+      thrift_method :list_remote_hosts_in_cluster, list(struct(Host)), field(:cluster, string, 1), :throws => exception(GizzardException)
+    end
+
+
+
+    Job = T.make_struct(:Job,
+      T::Field.new(:priority, T::I32, 1),
+      T::Field.new(:contents, T::STRING, 2)
+    )
+
+    JobException = T.make_exception(:JobException,
+      T::Field.new(:description, T::STRING, 1)
+    )
+
+    class JobInjector < GizzmoService
+      thrift_method :inject_jobs, void, field(:priority, list(struct(Job)), 1), :throws => exception(JobException)
     end
   end
 end

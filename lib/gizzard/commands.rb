@@ -41,13 +41,13 @@ module Gizzard
       end
     end
   end
-  
+
   class RetryProxy
     def initialize(retries, object)
       @inner = object
       @retries_left = retries
     end
-    
+
     def method_missing(*args)
       @inner.send(*args)
     rescue
@@ -63,15 +63,15 @@ module Gizzard
 
   class ShardCommand < Command
     def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i, 
-        Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
+      RetryProxy.new global_options.retry.to_i,
+        Gizzard::Thrift::Manager.new(global_options.host, global_options.port, log, global_options.dry)
     end
   end
 
   class JobCommand < Command
     def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i  ,
-        Gizzard::Thrift::JobManager.new(global_options.host, global_options.port + 2, log, global_options.dry)
+      RetryProxy.new global_options.retry.to_i,
+        Gizzard::Thrift::JobInjector.new(global_options.host, global_options.port + 2, log, global_options.dry)
     end
   end
 
@@ -103,7 +103,7 @@ module Gizzard
 
   class ForwardingsCommand < ShardCommand
     def run
-      service.get_forwardings().sort_by do |f|
+      service.get_forwardings.sort_by do |f|
         [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
       end.reject do |forwarding|
         @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
@@ -147,7 +147,7 @@ module Gizzard
   class ReloadCommand < ShardCommand
     def run
       if global_options.force || ask
-        service.reload_forwardings
+        service.reload_config
       else
         STDERR.puts "aborted"
       end
@@ -202,7 +202,7 @@ module Gizzard
         downward_links = service.list_downward_links(shard_id)
 
         if upward_links.length == 0 or downward_links.length == 0
-          STDERR.puts "Shard #{shard_id_string} must not be a root or leaf" 
+          STDERR.puts "Shard #{shard_id_string} must not be a root or leaf"
           next
         end
 
@@ -645,22 +645,25 @@ module Gizzard
 
   class InjectCommand < JobCommand
     def run
+      count     = 0
+      page_size = 20
       priority, *jobs = @argv
       help!("Requires priority") unless priority and jobs.size > 0
-      count = 0
-      jobs.each do |job|
-        service.inject_job(priority.to_i, job)
+
+      jobs.each_slice(page_size) do |js|
+        service.inject_jobs(js.map {|j| Gizzard::Thrift::Job.new(priority.to_i, j) })
+
         count += 1
         # FIXME add -q --quiet option
         STDERR.print "."
-        STDERR.print "#{count}" if count % 100 == 0
+        STDERR.print "#{count * page_size}" if count % 10 == 0
         STDERR.flush
       end
       STDERR.print "\n"
     end
   end
 
-  class FlushCommand < JobCommand
+  class FlushCommand < ShardCommand
     def run
       args = @argv[0]
       help!("Requires --all, or a job priority id.") unless args || command_options.flush_all
@@ -668,6 +671,38 @@ module Gizzard
         service.retry_errors()
       else
         service.retry_errors_for(args.to_i)
+      end
+    end
+  end
+
+
+  class AddHostCommand < ShardCommand
+    def run
+      hosts = @argv.map do |arg|
+        cluster, hostname, port = *arg.split(":")
+        help!("malformed host argument") unless [cluster, hostname, port].compact.length == 3
+
+        Gizzard::Thrift::Host.new(hostname, port.to_i, cluster, Gizzard::Thrift::HostStatus::Normal)
+      end
+
+      hosts.each {|h| service.add_remote_host(h) }
+    end
+  end
+
+  class RemoveHostCommand < ShardCommand
+    def run
+      host = @argv[0].split(":")
+      host.unshift nil if host.length == 2
+      cluster, hostname, port = *host
+
+      service.remove_remote_host(hostname, port.to_i)
+    end
+  end
+
+  class ListHostsCommand < ShardCommand
+    def run
+      service.list_remote_hosts.each do |host|
+        puts "#{[host.cluster, host.hostname, host.port].join(":")} #{host.status}"
       end
     end
   end

@@ -228,6 +228,18 @@ subcommands = {
     opts.on("--all", "Flush all error queues.") do
       subcommand_options.flush_all = true
     end
+  end,
+  'add-host' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} add-host HOSTS"
+    separators(opts, DOC_STRINGS["add-host"])
+  end,
+  'remove-host' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} remove-host HOST"
+    separators(opts, DOC_STRINGS["remove-host"])
+  end,
+  'list-hosts' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} list-hosts"
+    separators(opts, DOC_STRINGS["list-hosts"])
   end
 }
 
@@ -370,7 +382,7 @@ def custom_timeout(seconds)
   end
 end
 
-begin      
+begin
   custom_timeout(global_options.timeout) do
     Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
   end
@@ -382,7 +394,7 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException, Errno::ECONNREFUSED => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::GizzardException, Errno::ECONNREFUSED => e
   STDERR.puts e.message
   exit 1
 rescue Errno::EPIPE
