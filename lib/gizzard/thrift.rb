@@ -47,9 +47,9 @@ module Gizzard
         busy && busy > 0
       end
 
-      def inspect(short = false)
-        "#{id.inspect}" + (busy? ? " (BUSY)" : "")
-      end
+      # def inspect(short = false)
+      #   "#{id.inspect}" + (busy? ? " (BUSY)" : "")
+      # end
 
       def to_unix
         [id.to_unix, class_name, busy? ? "busy" : "unbusy"].join("\t")

@@ -2,7 +2,7 @@ require File.expand_path('../spec_helper.rb', __FILE__)
 
 describe "gizzmo cmd interface" do
   def gizzmo(cmd)
-    `cd #{ROOT_DIR} && ruby -rubygems -Ilib bin/gizzmo -H localhost -P #{MANAGER_PORT} #{cmd}`
+    `cd #{ROOT_DIR} && ruby -rubygems -Ilib bin/gizzmo -H localhost -P #{MANAGER_PORT} #{cmd} 2>&1`
   end
 
   def nameserver
@@ -10,7 +10,7 @@ describe "gizzmo cmd interface" do
   end
 
   before do
-    reset_database(NAMESERVER_DATABASE)
+    reset_nameserver
     @nameserver = nil
   end
 
@@ -22,28 +22,65 @@ describe "gizzmo cmd interface" do
 
   describe "create" do
     it "creates a single shard" do
-      gizzmo("create TestShard localhost/t0_0")
+      gizzmo "create TestShard localhost/t0_0"
 
       nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", "")]
     end
 
     it "creates multiple shards" do
-      gizzmo("create TestShard localhost/t0_0 localhost/t0_1")
+      gizzmo "create TestShard localhost/t0_0 localhost/t0_1"
 
       nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", ""),
                                      shard(id("localhost", "t0_1"), "TestShard", "", "")]
     end
 
     it "honors source and destination types" do
-      gizzmo("create TestShard -s int -d long localhost/t0_0")
-      gizzmo("create TestShard --source-type=int --destination-type=long localhost/t0_1")
+      gizzmo "create TestShard -s int -d long localhost/t0_0"
+      gizzmo "create TestShard --source-type=int --destination-type=long localhost/t0_1"
 
       nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "int", "long"),
                                      shard(id("localhost", "t0_1"), "TestShard", "int", "long")]
     end
   end
 
-  describe "wrap" do
+  describe "wrap/unwrap" do
+    before do
+      gizzmo "create TestShard localhost/t0_0"
+      gizzmo "create ReplicatingShard localhost/t0_0_replicating"
+      gizzmo "addlink localhost/t0_0_replicating localhost/t0_0 1"
+
+      gizzmo "wrap BlockedShard localhost/t0_0"
+    end
+
+    it "wrap wraps a shard" do
+      nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", ""),
+                                     shard(id("localhost", "t0_0_blocked"), "BlockedShard", "", ""),
+                                     shard(id("localhost", "t0_0_replicating"), "ReplicatingShard", "", "")]
+
+      nameserver[:links].should == [link(id("localhost", "t0_0_blocked"), id("localhost", "t0_0"), 1),
+                                    link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0_blocked"), 1)]
+    end
+
+    it "unwrap unwraps a shard" do
+      gizzmo "unwrap localhost/t0_0_blocked"
+
+      nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", ""),
+                                     shard(id("localhost", "t0_0_replicating"), "ReplicatingShard", "", "")]
+
+      nameserver[:links].should == [link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0"), 1)]
+    end
+
+    it "unwrap doesn't unwrap a top level shard or a leaf" do
+      gizzmo "unwrap localhost/t0_0"
+      gizzmo "unwrap localhost/t0_0_replicating"
+
+      nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", ""),
+                                     shard(id("localhost", "t0_0_blocked"), "BlockedShard", "", ""),
+                                     shard(id("localhost", "t0_0_replicating"), "ReplicatingShard", "", "")]
+
+      nameserver[:links].should == [link(id("localhost", "t0_0_blocked"), id("localhost", "t0_0"), 1),
+                                    link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0_blocked"), 1)]
+    end
   end
 
   describe "rebalance" do

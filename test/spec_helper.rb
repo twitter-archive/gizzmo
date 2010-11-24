@@ -25,29 +25,32 @@ Spec::Runner.configure do |c|
 
   c.before :all do
     setup_connection!("localhost", '', '')
-    reset_database(NAMESERVER_DATABASE, SERVICE_DATABASE)
+    reset_databases
     start_test_server!
   end
+end
 
-  c.after :all do
-    stop_test_server!
+at_exit { stop_test_server! }
+
+def test_server_pid
+  if pid = `ps axo pid,command`.split("\n").find {|l| l[SERVER_JAR] }
+    pid.split.first.to_i
   end
 end
 
 def start_test_server!(manager_p = MANAGER_PORT, job_p = JOB_PORT, service_p = SERVICE_PORT)
-  stop_test_server!
-  compile_test_server!
+  unless test_server_pid
+    fork do
+      exec("cd #{SERVER_ROOT} && exec java -jar #{SERVER_JAR} #{service_p} #{job_p} #{manager_p} > /dev/null 2>&1")
+    end
 
-  $test_server_pid = fork do
-    exec("cd #{SERVER_ROOT} && exec java -jar #{SERVER_JAR} #{service_p} #{job_p} #{manager_p} > /dev/null 2>&1")
+    sleep(3)
   end
-
-  sleep(3)
 end
 
 def stop_test_server!
-  if pid = `ps axo pid,command`.split("\n").find {|l| l[SERVER_JAR] }
-    Process.kill("KILL", pid.split.first.to_i)
+  if pid = test_server_pid
+    Process.kill("KILL", pid)
   end
 end
 
@@ -67,14 +70,26 @@ def create_database(*ds)
   ds.each {|d| $mysql.query("create database if not exists `#{d}`") }
 end
 
-def reset_database(*ds)
-  sleep(0.5)
-  drop_database(*ds); create_database(*ds)
+def reset_nameserver(db = NAMESERVER_DATABASE)
+  $mysql.query("delete from `#{db}`.shards")
+  $mysql.query("delete from `#{db}`.shard_children")
+  $mysql.query("delete from `#{db}`.forwardings")
+  $mysql.query("delete from `#{db}`.hosts")
+end
+
+def reset_databases
+  drop_database SERVICE_DATABASE
+  create_database NAMESERVER_DATABASE, SERVICE_DATABASE
 
   begin
-    m = Gizzard::Thrift::Manager.new("localhost", MANAGER_PORT, '/dev/null')
-    m.rebuild_schema
-  rescue Errno::ECONNREFUSED
+    reset_nameserver
+  rescue MysqlError
+
+    begin
+      m = Gizzard::Thrift::Manager.new("localhost", MANAGER_PORT, '/dev/null')
+      m.rebuild_schema
+    rescue Errno::ECONNREFUSED
+    end
   end
 end
 
