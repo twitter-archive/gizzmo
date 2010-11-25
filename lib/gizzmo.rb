@@ -390,7 +390,7 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::GizzardException, Errno::ECONNREFUSED => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::GizzardException, Errno::ECONNREFUSED => e
   STDERR.puts e.message
   exit 1
 rescue Errno::EPIPE

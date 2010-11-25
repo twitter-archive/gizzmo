@@ -2,7 +2,6 @@ require "pp"
 require "digest/md5"
 module Gizzard
   class Command
-    include Thrift
 
     attr_reader :buffer
 
@@ -64,14 +63,14 @@ module Gizzard
   class ShardCommand < Command
     def self.make_service(global_options, log)
       RetryProxy.new global_options.retry.to_i,
-        Gizzard::Thrift::Manager.new(global_options.host, global_options.port, log, global_options.dry)
+        Manager.new(global_options.host, global_options.port, log, global_options.dry)
     end
   end
 
   class JobCommand < Command
     def self.make_service(global_options, log)
       RetryProxy.new global_options.retry.to_i,
-        Gizzard::Thrift::JobInjector.new(global_options.host, global_options.port + 2, log, global_options.dry)
+        JobInjector.new(global_options.host, global_options.port + 2, log, global_options.dry)
     end
   end
 
@@ -651,7 +650,7 @@ module Gizzard
       help!("Requires priority") unless priority and jobs.size > 0
 
       jobs.each_slice(page_size) do |js|
-        service.inject_jobs(js.map {|j| Gizzard::Thrift::Job.new(priority.to_i, j) })
+        service.inject_jobs(js.map {|j| Job.new(priority.to_i, j) })
 
         count += 1
         # FIXME add -q --quiet option
@@ -682,7 +681,7 @@ module Gizzard
         cluster, hostname, port = *arg.split(":")
         help!("malformed host argument") unless [cluster, hostname, port].compact.length == 3
 
-        Gizzard::Thrift::Host.new(hostname, port.to_i, cluster, Gizzard::Thrift::HostStatus::Normal)
+        Host.new(hostname, port.to_i, cluster, HostStatus::Normal)
       end
 
       hosts.each {|h| service.add_remote_host(h) }

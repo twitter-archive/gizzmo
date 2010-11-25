@@ -78,7 +78,7 @@ def reset_databases!
   rescue MysqlError
 
     begin
-      m = Gizzard::Thrift::Manager.new("localhost", MANAGER_PORT, '/dev/null')
+      m = Gizzard::Manager.new("localhost", MANAGER_PORT, '/dev/null')
       m.rebuild_schema
     rescue Errno::ECONNREFUSED
     end
@@ -98,24 +98,24 @@ end
 
 def as_shard_id(h, prefix = nil)
   attrs = ['hostname', 'table_prefix'].map {|a| prefix ? [prefix, a].join('_') : a }
-  Gizzard::Thrift::ShardId.new(*h.values_at(*attrs))
+  Gizzard::ShardId.new(*h.values_at(*attrs))
 end
 
 def as_shard(h)
   attrs = h.values_at('class_name', 'source_type', 'destination_type') << h['busy'].to_i
-  Gizzard::Thrift::ShardInfo.new(as_shard_id(h), *attrs)
+  Gizzard::ShardInfo.new(as_shard_id(h), *attrs)
 end
 
 def as_link(h)
-  Gizzard::Thrift::LinkInfo.new(as_shard_id(h, 'parent'), as_shard_id(h, 'child'), h['weight'].to_i)
+  Gizzard::LinkInfo.new(as_shard_id(h, 'parent'), as_shard_id(h, 'child'), h['weight'].to_i)
 end
 
 def as_forwarding(h)
-  Gizzard::Thrift::Forwarding.new(h['table_id'].to_i, h['base_id'].to_i, as_shard_id(h, 'shard'))
+  Gizzard::Forwarding.new(h['table_id'].to_i, h['base_id'].to_i, as_shard_id(h, 'shard'))
 end
 
 def as_host(h)
-  Gizzard::Thrift::Host.new(h['hostname'], h['port'].to_i, h['cluster'], h['status'].to_i)
+  Gizzard::Host.new(h['hostname'], h['port'].to_i, h['cluster'], h['status'].to_i)
 end
 
 

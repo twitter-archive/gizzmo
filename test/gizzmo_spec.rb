@@ -14,11 +14,11 @@ describe "gizzmo (cli)" do
     @nameserver = nil
   end
 
-  def id(h,p); Gizzard::Thrift::ShardId.new(h,p) end
-  def shard(id,c,s = "",d = "",b = 0); Gizzard::Thrift::ShardInfo.new(id,c,s,d,b) end
-  def link(p,c,w); Gizzard::Thrift::LinkInfo.new(p,c,w) end
-  def forwarding(t,b,s); Gizzard::Thrift::Forwarding.new(t,b,s) end
-  def host(h,p,c,s = 0); Gizzard::Thrift::Host.new(h,p,c,s) end
+  def id(h,p); Gizzard::ShardId.new(h,p) end
+  def shard(id,c,s = "",d = "",b = 0); Gizzard::ShardInfo.new(id,c,s,d,b) end
+  def link(p,c,w); Gizzard::LinkInfo.new(p,c,w) end
+  def forwarding(t,b,s); Gizzard::Forwarding.new(t,b,s) end
+  def host(h,p,c,s = 0); Gizzard::Host.new(h,p,c,s) end
 
   describe "basic manipulation commands" do
     describe "create" do
