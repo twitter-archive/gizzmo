@@ -22,15 +22,7 @@ require 'gizzard'
 
 Spec::Runner.configure do |c|
   c.mock_with :rr
-
-  c.before :all do
-    setup_connection!("localhost", '', '')
-    reset_databases
-    start_test_server!
-  end
 end
-
-at_exit { stop_test_server! }
 
 def test_server_pid
   if pid = `ps axo pid,command`.split("\n").find {|l| l[SERVER_JAR] }
@@ -58,7 +50,7 @@ def compile_test_server!
   system "cd #{ROOT} && sbt package-dist" unless File.exist? SERVER_JAR
 end
 
-def setup_connection!(host, user, pass)
+def mysql_connect!(host, user, pass)
   $mysql = Mysql.new(host, user, pass)
 end
 
@@ -77,7 +69,7 @@ def reset_nameserver(db = NAMESERVER_DATABASE)
   $mysql.query("delete from `#{db}`.hosts")
 end
 
-def reset_databases
+def reset_databases!
   drop_database SERVICE_DATABASE
   create_database NAMESERVER_DATABASE, SERVICE_DATABASE
 
@@ -125,3 +117,12 @@ end
 def as_host(h)
   Gizzard::Thrift::Host.new(h['hostname'], h['port'].to_i, h['cluster'], h['status'].to_i)
 end
+
+
+# setup
+
+mysql_connect!("localhost", '', '')
+reset_databases!
+start_test_server!
+
+at_exit { stop_test_server! }
