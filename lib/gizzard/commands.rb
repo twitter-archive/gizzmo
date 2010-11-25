@@ -5,23 +5,41 @@ module Gizzard
 
     attr_reader :buffer
 
-    def self.run(command_name, global_options, argv, subcommand_options, log, service=nil)
-      command_class = Gizzard.const_get("#{classify(command_name)}Command")
-      service = command_class.make_service(global_options, log) if service.nil?
-      command = command_class.new(service, global_options, argv, subcommand_options)
-      command.run
-      if command.buffer && command_name = global_options.render.shift
-        run(command_name, global_options, command.buffer, OpenStruct.new, log, service)
+    class << self
+      def run(command_name, global_options, argv, subcommand_options, log)
+        command_class = Gizzard.const_get("#{classify(command_name)}Command")
+
+        @nameserver   ||= make_nameserver(global_options, log)
+        @job_injector ||= make_job_injector(global_options, log)
+
+        command = command_class.new(@nameserver, @job_injector, global_options, argv, subcommand_options)
+        command.run
+
+        if command.buffer && command_name = global_options.render.shift
+          run(command_name, global_options, command.buffer, OpenStruct.new, log)
+        end
+      end
+
+      def classify(string)
+        string.split(/\W+/).map{|s| s.capitalize }.join("")
+      end
+
+      def make_nameserver(global_options, log)
+        RetryProxy.new global_options.retry.to_i,
+          Manager.new(global_options.host, global_options.port, log, global_options.dry)
+      end
+
+      def make_job_injector(global_options, log)
+        RetryProxy.new global_options.retry.to_i,
+          JobInjector.new(global_options.host, global_options.port + 2, log, global_options.dry)
       end
     end
 
-    def self.classify(string)
-      string.split(/\W+/).map{|s| s.capitalize }.join("")
-    end
+    attr_reader :nameserver, :job_injector, :global_options, :argv, :command_options
 
-    attr_reader :service, :global_options, :argv, :command_options
-    def initialize(service, global_options, argv, command_options)
-      @service         = service
+    def initialize(nameserver, job_injector, global_options, argv, command_options)
+      @nameserver      = nameserver
+      @job_injector    = job_injector
       @global_options  = global_options
       @argv            = argv
       @command_options = command_options
@@ -60,49 +78,35 @@ module Gizzard
     end
   end
 
-  class ShardCommand < Command
-    def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i,
-        Manager.new(global_options.host, global_options.port, log, global_options.dry)
-    end
-  end
-
-  class JobCommand < Command
-    def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i,
-        JobInjector.new(global_options.host, global_options.port + 2, log, global_options.dry)
-    end
-  end
-
-  class AddforwardingCommand < ShardCommand
+  class AddforwardingCommand < Command
     def run
       help! if argv.length != 3
       table_id, base_id, shard_id_text = argv
       shard_id = ShardId.parse(shard_id_text)
-      service.set_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
+      nameserver.set_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
     end
   end
 
-  class DeleteforwardingCommand < ShardCommand
+  class DeleteforwardingCommand < Command
     def run
       help! if argv.length != 3
       table_id, base_id, shard_id_text = argv
       shard_id = ShardId.parse(shard_id_text)
-      service.remove_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
+      nameserver.remove_forwarding(Forwarding.new(table_id.to_i, base_id.to_i, shard_id))
     end
   end
 
-  class HostsCommand < ShardCommand
+  class HostsCommand < Command
     def run
-      service.list_hostnames.map do |host|
+      nameserver.list_hostnames.map do |host|
         puts host
       end
     end
   end
 
-  class ForwardingsCommand < ShardCommand
+  class ForwardingsCommand < Command
     def run
-      service.get_forwardings.sort_by do |f|
+      nameserver.get_forwardings.sort_by do |f|
         [ ((f.table_id.abs << 1) + (f.table_id < 0 ? 1 : 0)), f.base_id ]
       end.reject do |forwarding|
         @command_options.table_ids && !@command_options.table_ids.include?(forwarding.table_id)
@@ -112,7 +116,7 @@ module Gizzard
     end
   end
 
-  class SubtreeCommand < ShardCommand
+  class SubtreeCommand < Command
     def run
       @roots = []
       argv.each do |arg|
@@ -126,7 +130,7 @@ module Gizzard
     end
 
     def roots_of(id)
-      links = service.list_upward_links(id)
+      links = nameserver.list_upward_links(id)
       if links.empty?
         [id]
       else
@@ -135,7 +139,7 @@ module Gizzard
     end
 
     def down(id, depth = 0)
-      service.list_downward_links(id).map do |link|
+      nameserver.list_downward_links(id).map do |link|
         printable = "  " * depth + link.down_id.to_unix
         output printable
         down(link.down_id, depth + 1)
@@ -143,10 +147,10 @@ module Gizzard
     end
   end
 
-  class ReloadCommand < ShardCommand
+  class ReloadCommand < Command
     def run
       if global_options.force || ask
-        service.reload_config
+        nameserver.reload_config
       else
         STDERR.puts "aborted"
       end
@@ -158,17 +162,17 @@ module Gizzard
     end
   end
 
-  class DeleteCommand < ShardCommand
+  class DeleteCommand < Command
     def run
       argv.each do |arg|
         id  = ShardId.parse(arg)
-        service.delete_shard(id)
+        nameserver.delete_shard(id)
         output id.to_unix
       end
     end
   end
 
-  class AddlinkCommand < ShardCommand
+  class AddlinkCommand < Command
     def run
       up_id, down_id, weight = argv
       help! if argv.length != 3
@@ -176,29 +180,29 @@ module Gizzard
       up_id = ShardId.parse(up_id)
       down_id = ShardId.parse(down_id)
       link = LinkInfo.new(up_id, down_id, weight)
-      service.add_link(link.up_id, link.down_id, link.weight)
+      nameserver.add_link(link.up_id, link.down_id, link.weight)
       output link.to_unix
     end
   end
 
-  class UnlinkCommand < ShardCommand
+  class UnlinkCommand < Command
     def run
       up_id, down_id = argv
       up_id = ShardId.parse(up_id)
       down_id = ShardId.parse(down_id)
-      service.remove_link(up_id, down_id)
+      nameserver.remove_link(up_id, down_id)
     end
   end
 
-  class UnwrapCommand < ShardCommand
+  class UnwrapCommand < Command
     def run
       shard_ids = argv
       help! "No shards specified" if shard_ids.empty?
       shard_ids.each do |shard_id_string|
         shard_id = ShardId.parse(shard_id_string)
 
-        upward_links = service.list_upward_links(shard_id)
-        downward_links = service.list_downward_links(shard_id)
+        upward_links = nameserver.list_upward_links(shard_id)
+        downward_links = nameserver.list_downward_links(shard_id)
 
         if upward_links.length == 0 or downward_links.length == 0
           STDERR.puts "Shard #{shard_id_string} must not be a root or leaf"
@@ -207,19 +211,19 @@ module Gizzard
 
         upward_links.each do |uplink|
           downward_links.each do |downlink|
-            service.add_link(uplink.up_id, downlink.down_id, uplink.weight)
+            nameserver.add_link(uplink.up_id, downlink.down_id, uplink.weight)
             new_link = LinkInfo.new(uplink.up_id, downlink.down_id, uplink.weight)
-            service.remove_link(uplink.up_id, uplink.down_id)
-            service.remove_link(downlink.up_id, downlink.down_id)
+            nameserver.remove_link(uplink.up_id, uplink.down_id)
+            nameserver.remove_link(downlink.up_id, downlink.down_id)
             output new_link.to_unix
           end
         end
-        service.delete_shard shard_id
+        nameserver.delete_shard shard_id
       end
     end
   end
 
-  class CreateCommand < ShardCommand
+  class CreateCommand < Command
     def run
       help! if argv.length < 2
       class_name, *shard_ids = argv
@@ -228,64 +232,64 @@ module Gizzard
       destination_type = command_options.destination_type || ""
       shard_ids.each do |id|
         shard_id = ShardId.parse(id)
-        service.create_shard(ShardInfo.new(shard_id, class_name, source_type, destination_type, busy))
-        service.get_shard(shard_id)
+        nameserver.create_shard(ShardInfo.new(shard_id, class_name, source_type, destination_type, busy))
+        nameserver.get_shard(shard_id)
         output shard_id.to_unix
       end
     end
   end
 
-  class LinksCommand < ShardCommand
+  class LinksCommand < Command
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
         next if !shard_id
-        service.list_upward_links(shard_id).each do |link_info|
+        nameserver.list_upward_links(shard_id).each do |link_info|
           output link_info.to_unix
         end
-        service.list_downward_links(shard_id).each do |link_info|
+        nameserver.list_downward_links(shard_id).each do |link_info|
           output link_info.to_unix
         end
       end
     end
   end
 
-  class InfoCommand < ShardCommand
+  class InfoCommand < Command
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id|
-        shard_info = service.get_shard(ShardId.parse(shard_id))
+        shard_info = nameserver.get_shard(ShardId.parse(shard_id))
         output shard_info.to_unix
       end
     end
   end
 
-  class MarkbusyCommand < ShardCommand
+  class MarkbusyCommand < Command
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id|
         id = ShardId.parse(shard_id)
-        service.mark_shard_busy(id, 1)
-        shard_info = service.get_shard(id)
+        nameserver.mark_shard_busy(id, 1)
+        shard_info = nameserver.get_shard(id)
         output shard_info.to_unix
       end
     end
   end
 
-  class MarkunbusyCommand < ShardCommand
+  class MarkunbusyCommand < Command
     def run
       shard_ids = @argv
       shard_ids.each do |shard_id|
         id = ShardId.parse(shard_id)
-        service.mark_shard_busy(id, 0)
-        shard_info = service.get_shard(id)
+        nameserver.mark_shard_busy(id, 0)
+        shard_info = nameserver.get_shard(id)
         output shard_info.to_unix
       end
     end
   end
 
-  class RepairCommand < ShardCommand
+  class RepairCommand < Command
     def run
       args = @argv.dup.map{|a| a.split(/\s+/)}.flatten
       pairs = []
@@ -297,8 +301,8 @@ module Gizzard
       end
       pairs.each do |master, slave|
         puts "#{master} #{slave}"
-        mprefixes = service.shards_for_hostname(master).map{|s| s.id.table_prefix}
-        sprefixes = service.shards_for_hostname(slave).map{|s| s.id.table_prefix}
+        mprefixes = nameserver.shards_for_hostname(master).map{|s| s.id.table_prefix}
+        sprefixes = nameserver.shards_for_hostname(slave).map{|s| s.id.table_prefix}
         delta = mprefixes - sprefixes
         delta.each do |prefix|
           puts "gizzmo copy #{master}/#{prefix} #{slave}/#{prefix}"
@@ -307,7 +311,7 @@ module Gizzard
     end
   end
 
-  class WrapCommand < ShardCommand
+  class WrapCommand < Command
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
       suffix = "_" + wrapping_class_name.split(".").last.downcase.gsub("shard", "")
       ShardId.new("localhost", shard_info.id.table_prefix + suffix)
@@ -318,15 +322,15 @@ module Gizzard
       help! "No shards specified" if shard_ids.empty?
       shard_ids.each do |shard_id_string|
         shard_id   = ShardId.parse(shard_id_string)
-        shard_info = service.get_shard(shard_id)
-        service.create_shard(ShardInfo.new(wrapper_id = self.class.derive_wrapper_shard_id(shard_info, class_name), class_name, "", "", 0))
+        shard_info = nameserver.get_shard(shard_id)
+        nameserver.create_shard(ShardInfo.new(wrapper_id = self.class.derive_wrapper_shard_id(shard_info, class_name), class_name, "", "", 0))
 
-        existing_links = service.list_upward_links(shard_id)
+        existing_links = nameserver.list_upward_links(shard_id)
         unless existing_links.include?(LinkInfo.new(wrapper_id, shard_id, 1))
-          service.add_link(wrapper_id, shard_id, 1)
+          nameserver.add_link(wrapper_id, shard_id, 1)
           existing_links.each do |link_info|
-            service.add_link(link_info.up_id, wrapper_id, link_info.weight)
-            service.remove_link(link_info.up_id, link_info.down_id)
+            nameserver.add_link(link_info.up_id, wrapper_id, link_info.weight)
+            nameserver.remove_link(link_info.up_id, link_info.down_id)
           end
         end
         output wrapper_id.to_unix
@@ -334,7 +338,7 @@ module Gizzard
     end
   end
 
-  class RebalanceCommand < ShardCommand
+  class RebalanceCommand < Command
 
     class NamedArray < Array
       attr_reader :name
@@ -396,7 +400,7 @@ module Gizzard
         host = set.name
         set.each do |id|
           if id.hostname != host
-            shard_info ||= service.get_shard(id)
+            shard_info ||= nameserver.get_shard(id)
             old = id.to_unix
             id.hostname = host
             shards << [old, id.to_unix]
@@ -412,11 +416,11 @@ module Gizzard
     end
   end
 
-  class PairCommand < ShardCommand
+  class PairCommand < Command
     def run
       ids = []
       @argv.map do |host|
-        service.shards_for_hostname(host).each do |shard|
+        nameserver.shards_for_hostname(host).each do |shard|
           ids << shard.id
         end
       end
@@ -443,11 +447,11 @@ module Gizzard
       displayed = {}
       overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
-        id_a = ids_by_host[host_a].find{|id| service.list_upward_links(id).size > 0 }
-        id_b = ids_by_host[host_b].find{|id| service.list_upward_links(id).size > 0 }
+        id_a = ids_by_host[host_a].find{|id| nameserver.list_upward_links(id).size > 0 }
+        id_b = ids_by_host[host_b].find{|id| nameserver.list_upward_links(id).size > 0 }
         next unless id_a && id_b
-        weight_a = service.list_upward_links(id_a).first.weight
-        weight_b = service.list_upward_links(id_b).first.weight
+        weight_a = nameserver.list_upward_links(id_a).first.weight
+        weight_b = nameserver.list_upward_links(id_b).first.weight
         if weight_a > weight_b
           puts "#{host_a}\t#{host_b}"
         else
@@ -466,7 +470,7 @@ module Gizzard
     end
   end
 
-  class ReportCommand < ShardCommand
+  class ReportCommand < Command
     def run
 
       things = @argv.map do |shard|
@@ -516,7 +520,7 @@ module Gizzard
     end
 
     def down(id)
-      vals = service.list_downward_links(id).map do |link|
+      vals = nameserver.list_downward_links(id).map do |link|
         down(link.down_id)
       end
       {id.to_unix => vals}
@@ -534,11 +538,11 @@ module Gizzard
     end
   end
 
-  class FindCommand < ShardCommand
+  class FindCommand < Command
     def run
       hosts = @argv << command_options.shard_host
       hosts.compact.each do |host|
-        service.shards_for_hostname(host).each do |shard|
+        nameserver.shards_for_hostname(host).each do |shard|
           next if command_options.shard_type && shard.class_name !~ Regexp.new(command_options.shard_type)
           output shard.id.to_unix
         end
@@ -546,7 +550,7 @@ module Gizzard
     end
   end
 
-  class LookupCommand < ShardCommand
+  class LookupCommand < Command
     def run
       table_id, source = @argv
       help!("Requires table id and source") unless table_id && source
@@ -556,56 +560,56 @@ module Gizzard
       else
         source_id = source.to_i
       end
-      shard = service.find_current_forwarding(table_id.to_i, source_id)
+      shard = nameserver.find_current_forwarding(table_id.to_i, source_id)
       output shard.id.to_unix
     end
   end
 
-  class CopyCommand < ShardCommand
+  class CopyCommand < Command
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
-      service.copy_shard(from_shard_id, to_shard_id)
+      nameserver.copy_shard(from_shard_id, to_shard_id)
     end
   end
 
-  class BusyCommand < ShardCommand
+  class BusyCommand < Command
     def run
-      service.get_busy_shards().each { |shard_info| output shard_info.to_unix }
+      nameserver.get_busy_shards().each { |shard_info| output shard_info.to_unix }
     end
   end
 
-  class SetupMigrateCommand < ShardCommand
+  class SetupMigrateCommand < Command
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
 
-      if service.list_upward_links(to_shard_id).size > 0
+      if nameserver.list_upward_links(to_shard_id).size > 0
         STDERR.puts "Destination shard #{to_shard_id} has links to it."
         exit 1
       end
 
       write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_write_only")
       replica_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_migrate_replica")
-      service.create_shard(ShardInfo.new(write_only_shard_id, "com.twitter.gizzard.shards.WriteOnlyShard", "", "", 0))
-      service.create_shard(ShardInfo.new(replica_shard_id, "com.twitter.gizzard.shards.ReplicatingShard", "", "", 0))
-      service.add_link(write_only_shard_id, to_shard_id, 1)
-      service.list_upward_links(from_shard_id).each do |link|
-        service.remove_link(link.up_id, link.down_id)
-        service.add_link(link.up_id, replica_shard_id, link.weight)
+      nameserver.create_shard(ShardInfo.new(write_only_shard_id, "com.twitter.gizzard.shards.WriteOnlyShard", "", "", 0))
+      nameserver.create_shard(ShardInfo.new(replica_shard_id, "com.twitter.gizzard.shards.ReplicatingShard", "", "", 0))
+      nameserver.add_link(write_only_shard_id, to_shard_id, 1)
+      nameserver.list_upward_links(from_shard_id).each do |link|
+        nameserver.remove_link(link.up_id, link.down_id)
+        nameserver.add_link(link.up_id, replica_shard_id, link.weight)
       end
-      service.add_link(replica_shard_id, from_shard_id, 1)
-      service.add_link(replica_shard_id, write_only_shard_id, 0)
-      service.replace_forwarding(from_shard_id, replica_shard_id)
+      nameserver.add_link(replica_shard_id, from_shard_id, 1)
+      nameserver.add_link(replica_shard_id, write_only_shard_id, 0)
+      nameserver.replace_forwarding(from_shard_id, replica_shard_id)
       output replica_shard_id.to_unix
     end
   end
 
-  class FinishMigrateCommand < ShardCommand
+  class FinishMigrateCommand < Command
     def run
       from_shard_id_string, to_shard_id_string = @argv
       help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
@@ -617,32 +621,32 @@ module Gizzard
 
       # careful. need to validate some basic assumptions.
       unless global_options.force
-        if service.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
+        if nameserver.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
           STDERR.puts "Uplink from #{from_shard_id} is not a migration replica."
           exit 1
         end
-        if service.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
+        if nameserver.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
           STDERR.puts "Uplink from #{to_shard_id} is not a write-only barrier."
           exit 1
         end
-        if service.list_upward_links(write_only_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
+        if nameserver.list_upward_links(write_only_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
           STDERR.puts "Uplink from write-only barrier is not a migration replica."
           exit 1
         end
       end
 
-      service.remove_link(write_only_shard_id, to_shard_id)
-      service.list_upward_links(replica_shard_id).each do |link|
-        service.remove_link(link.up_id, link.down_id)
-        service.add_link(link.up_id, to_shard_id, link.weight)
+      nameserver.remove_link(write_only_shard_id, to_shard_id)
+      nameserver.list_upward_links(replica_shard_id).each do |link|
+        nameserver.remove_link(link.up_id, link.down_id)
+        nameserver.add_link(link.up_id, to_shard_id, link.weight)
       end
-      service.replace_forwarding(replica_shard_id, to_shard_id)
-      service.delete_shard(replica_shard_id)
-      service.delete_shard(write_only_shard_id)
+      nameserver.replace_forwarding(replica_shard_id, to_shard_id)
+      nameserver.delete_shard(replica_shard_id)
+      nameserver.delete_shard(write_only_shard_id)
     end
   end
 
-  class InjectCommand < JobCommand
+  class InjectCommand < Command
     def run
       count     = 0
       page_size = 20
@@ -650,7 +654,7 @@ module Gizzard
       help!("Requires priority") unless priority and jobs.size > 0
 
       jobs.each_slice(page_size) do |js|
-        service.inject_jobs(js.map {|j| Job.new(priority.to_i, j) })
+        job_injector.inject_jobs(js.map {|j| Job.new(priority.to_i, j) })
 
         count += 1
         # FIXME add -q --quiet option
@@ -662,20 +666,20 @@ module Gizzard
     end
   end
 
-  class FlushCommand < ShardCommand
+  class FlushCommand < Command
     def run
       args = @argv[0]
       help!("Requires --all, or a job priority id.") unless args || command_options.flush_all
       if command_options.flush_all
-        service.retry_errors()
+        nameserver.retry_errors()
       else
-        service.retry_errors_for(args.to_i)
+        nameserver.retry_errors_for(args.to_i)
       end
     end
   end
 
 
-  class AddHostCommand < ShardCommand
+  class AddHostCommand < Command
     def run
       hosts = @argv.map do |arg|
         cluster, hostname, port = *arg.split(":")
@@ -684,23 +688,23 @@ module Gizzard
         Host.new(hostname, port.to_i, cluster, HostStatus::Normal)
       end
 
-      hosts.each {|h| service.add_remote_host(h) }
+      hosts.each {|h| nameserver.add_remote_host(h) }
     end
   end
 
-  class RemoveHostCommand < ShardCommand
+  class RemoveHostCommand < Command
     def run
       host = @argv[0].split(":")
       host.unshift nil if host.length == 2
       cluster, hostname, port = *host
 
-      service.remove_remote_host(hostname, port.to_i)
+      nameserver.remove_remote_host(hostname, port.to_i)
     end
   end
 
-  class ListHostsCommand < ShardCommand
+  class ListHostsCommand < Command
     def run
-      service.list_remote_hosts.each do |host|
+      nameserver.list_remote_hosts.each do |host|
         puts "#{[host.cluster, host.hostname, host.port].join(":")} #{host.status}"
       end
     end
