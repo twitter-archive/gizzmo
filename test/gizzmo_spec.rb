@@ -209,23 +209,44 @@ describe "gizzmo (cli)" do
     end
 
     describe "forwardings" do
-      it "works"
-    end
-
-    describe "find" do
-      it "works"
+      it "lists forwardings and the root of the corresponding shard trees" do
+        gizzmo("forwardings").should == <<-EOF
+0\t0\tlocalhost/t0_0_replicating
+0\t1\tlocalhost/t0_1_replicating
+0\t2\tlocalhost/t0_2_replicating
+        EOF
+      end
     end
 
     describe "links" do
-      it "works"
+      it "lists links associated withe the given shards" do
+        gizzmo("links localhost/t0_0_a localhost/t0_1_a").should == <<-EOF
+localhost/t0_0_replicating\tlocalhost/t0_0_a\t1
+localhost/t0_1_replicating\tlocalhost/t0_1_a\t1
+        EOF
+      end
     end
 
     describe "info" do
-      it "works"
+      it "outputs shard info for the given shard ids" do
+        gizzmo("info localhost/t0_0_a 127.0.0.1/t0_1_b localhost/t0_2_replicating").should == <<-EOF
+localhost/t0_0_a\tTestShard\tunbusy
+127.0.0.1/t0_1_b\tTestShard\tunbusy
+localhost/t0_2_replicating\tReplicatingShard\tunbusy
+        EOF
+      end
     end
 
     describe "busy" do
-      it "works"
+      it "lists all busy shards" do
+        gizzmo "markbusy localhost/t0_0_a localhost/t0_1_a localhost/t0_2_a"
+
+        gizzmo("busy").should == <<-EOF
+localhost/t0_0_a\tTestShard\tbusy
+localhost/t0_1_a\tTestShard\tbusy
+localhost/t0_2_a\tTestShard\tbusy
+        EOF
+      end
     end
 
     describe "list-hosts" do
@@ -236,9 +257,13 @@ describe "gizzmo (cli)" do
 c1:c1host1:7777 0
 c2:c2host1:7777 0
 c2:c2host2:7777 0
-      EOF
+        EOF
+      end
     end
   end
+
+  describe "find" do
+    it "works"
   end
 
   describe "rebalance" do
