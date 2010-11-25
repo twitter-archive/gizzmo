@@ -128,10 +128,6 @@ subcommands = {
     opts.banner = "Usage: #{zero} addforwarding TABLE_ID BASE_ID SHARD_ID"
     separators(opts, DOC_STRINGS["addforwarding"])
   end,
-  'currentforwarding' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} currentforwarding SOURCE_ID [ANOTHER_SOURCE_ID...]"
-    separators(opts, DOC_STRINGS["addforwarding"])
-  end,
   'forwardings' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} forwardings [options]"
     separators(opts, DOC_STRINGS["forwardings"])

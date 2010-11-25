@@ -208,10 +208,6 @@ describe "gizzmo (cli)" do
       end
     end
 
-    describe "currentforwarding" do
-      it "works"
-    end
-
     describe "forwardings" do
       it "works"
     end
