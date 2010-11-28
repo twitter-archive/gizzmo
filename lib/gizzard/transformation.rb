@@ -16,7 +16,7 @@ module Gizzard
     def apply!(nameserver, config)
       @forwardings.each do |(base_id, table)|
         shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, '', '', []).to_shard_id(table)
-        forwarding = Thrift::Forwarding.new(table_id, base_id, shard_id)
+        forwarding = Forwarding.new(table_id, base_id, shard_id)
 
         nameserver.set_forwarding(forwarding)
       end
