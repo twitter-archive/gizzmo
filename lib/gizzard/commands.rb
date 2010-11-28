@@ -25,8 +25,8 @@ module Gizzard
       end
 
       def make_nameserver(global_options, log)
-        RetryProxy.new global_options.retry.to_i,
-          Manager.new(global_options.host, global_options.port, log, global_options.dry)
+        host = [global_options.host, global_options.port].join(":")
+        Nameserver.new(host, :retries => global_options.retry.to_i, :log => log, :dry_run => global_options.dry)
       end
 
       def make_job_injector(global_options, log)

@@ -1,8 +1,20 @@
 module Gizzard
+  Shard = Struct.new(:info, :children, :weight)
+
+  class Shard
+    def id; info.id end
+    def hostname; id.hostname end
+    def table_prefix; id.table_prefix end
+    def class_name; info.class_name end
+    def source_type; info.source_type end
+    def destination_type; info.destination_type end
+    def busy; info.busy end
+  end
+
   class Nameserver
 
     DEFAULT_PORT = 7917
-    RETRIES = 20
+    DEFAULT_RETRIES = 20
     PARALLELISM = 10
 
     attr_reader :hosts, :logfile, :dryrun
@@ -10,6 +22,7 @@ module Gizzard
 
     def initialize(*hosts)
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
+      @retries = options[:retries] || DEFAULT_RETRIES
       @logfile = options[:log] || "/tmp/gizzmo.log"
       @dryrun = options[:dry_run] || false
       @hosts = hosts.flatten
@@ -85,25 +98,17 @@ module Gizzard
     def create_client(host)
       host, port = host.split(":")
       port ||= DEFAULT_PORT
-      Gizzard::Thrift::ShardManager.new(host, port.to_i, logfile, dryrun)
+      Manager.new(host, port.to_i, logfile, dryrun)
     end
 
     private
 
     def with_retry
-      times ||= RETRIES
+      times ||= @retries
       yield
     rescue ThriftClient::Simple::ThriftException, NoMethodError
       times -= 1
       (times < 0) ? raise : (sleep 2; retry)
-    end
-
-
-    # manifest helper class
-    Shard = Struct.new(:info, :children, :weight)
-
-    class Shard
-      def id; info.id; end
     end
 
     class Manifest
