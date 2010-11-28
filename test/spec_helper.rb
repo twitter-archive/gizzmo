@@ -24,6 +24,11 @@ Spec::Runner.configure do |c|
   c.mock_with :rr
 end
 
+def make_shard_template(conf_tree)
+  config = Gizzard::MigratorConfig.new
+  Gizzard::ShardTemplate.from_config(config, conf_tree)
+end
+
 def test_server_pid
   if pid = `ps axo pid,command`.split("\n").find {|l| l[SERVER_JAR] }
     pid.split.first.to_i
