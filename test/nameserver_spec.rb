@@ -92,10 +92,10 @@ describe Gizzard::Nameserver::Manifest do
   end
 
   it "creates a trees hash in the form of forwarding => shard tree" do
-    child  = Gizzard::Nameserver::Shard.new(
+    child  = Gizzard::Shard.new(
       Gizzard::ShardInfo.new(Gizzard::ShardId.new("sqlhost", "tbl_001"), "SqlShard", "int", "int", 0),
       [], 1)
-    parent = Gizzard::Nameserver::Shard.new(
+    parent = Gizzard::Shard.new(
       Gizzard::ShardInfo.new(Gizzard::ShardId.new("localhost", "tbl_001_rep"), "ReplicatingShard", "", "", 0),
       [child], 1)
 
