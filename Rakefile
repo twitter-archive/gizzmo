@@ -14,13 +14,14 @@ begin
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError
-  $stderr.puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
+  puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
 end
+
 
 begin
   require 'spec/rake/spectask'
   Spec::Rake::SpecTask.new(:spec) do |t|
-    spec_opts = File.expand_path('spec/spec.opts', ROOT_DIR)
+    spec_opts = File.expand_path('test/spec.opts', ROOT_DIR)
     if File.exist? spec_opts
       t.spec_opts = ['--options', "\"#{spec_opts}\""]
     end
@@ -28,6 +29,15 @@ begin
   end
 rescue LoadError
   $stderr.puts "RSpec required to run tests."
+end
+
+task :test do
+  puts
+  puts "=" * 79
+  puts "You might want to read the README before running tests."
+  puts "=" * 79
+  sleep 2
+  exec File.join(File.dirname(__FILE__), "test", "test.sh")
 end
 
 task :default => :spec

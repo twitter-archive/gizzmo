@@ -236,6 +236,14 @@ subcommands = {
   'list-hosts' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} list-hosts"
     separators(opts, DOC_STRINGS["list-hosts"])
+  end,
+  'topology' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} topology [options] TABLE_ID"
+    separators(opts, DOC_STRINGS["topology"])
+
+    opts.on("--forwardings", "Show topology of forwardings instead of counts") do
+      subcommand_options.forwardings = true
+    end
   end
 }
 
@@ -294,7 +302,7 @@ global = OptionParser.new do |opts|
     global_options.render << "info"
   end
 
-  opts.on("-D", "--dry-run", "") do |port|
+  opts.on("-D", "--dry-run", "") do
     global_options.dry = true
   end
 

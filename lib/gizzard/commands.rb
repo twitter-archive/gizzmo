@@ -709,4 +709,26 @@ module Gizzard
       end
     end
   end
+
+  class TopologyCommand < Command
+    def run
+      puts "querying nameserver..."
+      table_id = (@argv.first || 0).to_i
+      templates = nameserver.manifest(table_id).templates.inject({}) do |h, (t, fs)|
+        h.update t.to_config.inspect => fs
+      end
+
+      if command_options.forwardings
+        templates.
+          inject([]) {|h, (t, fs)| fs.each {|f| h << [f.base_id, t] }; h }.
+          sort.
+          each {|a| puts "%25d\t%s" % a }
+      else
+        templates.
+          map {|(t, fs)| [fs.length, t] }.
+          sort.reverse.
+          each {|a| puts "%4d %s" % a }
+      end
+    end
+  end
 end

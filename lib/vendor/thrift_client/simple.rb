@@ -169,7 +169,7 @@ class ThriftClient
           end
         end
       end
-      
+
       def read_response(s, rv_class)
         version, message_type, method_name_len = s.read(8).unpack("nnN")
         method_name = s.read(method_name_len)
