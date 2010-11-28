@@ -103,8 +103,8 @@ module Gizzard
   end
 
   class GizzmoService < T::ThriftService
-    def initialize(host, port, log_path, dry_run = false)
-      super(host, port)
+    def initialize(host, port, log_path, framed, dry_run = false)
+      super(host, port, framed)
       @dry = dry_run
       begin
         @log = File.open(log_path, "a")

@@ -7,7 +7,12 @@ require "gizzard"
 require "yaml"
 
 DOC_STRINGS = {
+  "addforwarding" => "Add a forwarding from a graph_id / base_source_id to a given shard.",
+  "forwardings" => "Get a list of all forwardings",
+  "reload" => "Instruct an appserver to reload its nameserver state",
   "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
+  "addlink" => "Add a relationship link between two shards",
+  "markbusy" => "Mark a shard as busy.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
@@ -20,6 +25,7 @@ zero = File.basename($0)
 # Container for parsed options
 global_options     = OpenStruct.new
 global_options.render = []
+global_options.framed = false
 subcommand_options = OpenStruct.new
 
 # Leftover arguments
@@ -284,6 +290,10 @@ global = OptionParser.new do |opts|
 
   opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
     global_options.port = port.to_i
+  end
+
+  opts.on("-F", "--framed", "use the thrift framed transport") do |framed|
+    global_options.framed = true
   end
 
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
