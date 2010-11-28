@@ -14,33 +14,27 @@ describe "gizzmo (cli)" do
     @nameserver = nil
   end
 
-  def id(h,p); Gizzard::ShardId.new(h,p) end
-  def shard(id,c,s = "",d = "",b = 0); Gizzard::ShardInfo.new(id,c,s,d,b) end
-  def link(p,c,w); Gizzard::LinkInfo.new(p,c,w) end
-  def forwarding(t,b,s); Gizzard::Forwarding.new(t,b,s) end
-  def host(h,p,c,s = 0); Gizzard::Host.new(h,p,c,s) end
-
   describe "basic manipulation commands" do
     describe "create" do
       it "creates a single shard" do
         gizzmo "create TestShard localhost/t0_0"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard")]
       end
 
       it "creates multiple shards" do
         gizzmo "create TestShard localhost/t0_0 localhost/t0_1"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_1"), "TestShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_1", "TestShard")]
       end
 
       it "honors source and destination types" do
         gizzmo "create TestShard -s int -d long localhost/t0_0"
         gizzmo "create TestShard --source-type=int --destination-type=long localhost/t0_1"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "int", "long"),
-                                       shard(id("localhost", "t0_1"), "TestShard", "int", "long")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard", "int", "long"),
+                                       info("localhost", "t0_1", "TestShard", "int", "long")]
       end
     end
 
@@ -63,9 +57,9 @@ describe "gizzmo (cli)" do
       end
 
       it "wrap wraps a shard" do
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_0_blocked"), "BlockedShard"),
-                                       shard(id("localhost", "t0_0_replicating"), "ReplicatingShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_0_blocked", "BlockedShard"),
+                                       info("localhost", "t0_0_replicating", "ReplicatingShard")]
 
         nameserver[:links].should == [link(id("localhost", "t0_0_blocked"), id("localhost", "t0_0"), 1),
                                       link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0_blocked"), 1)]
@@ -74,8 +68,8 @@ describe "gizzmo (cli)" do
       it "unwrap unwraps a shard" do
         gizzmo "unwrap localhost/t0_0_blocked"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_0_replicating"), "ReplicatingShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_0_replicating", "ReplicatingShard")]
 
         nameserver[:links].should == [link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0"), 1)]
       end
@@ -84,9 +78,9 @@ describe "gizzmo (cli)" do
         gizzmo "unwrap localhost/t0_0"
         gizzmo "unwrap localhost/t0_0_replicating"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_0_blocked"), "BlockedShard"),
-                                       shard(id("localhost", "t0_0_replicating"), "ReplicatingShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_0_blocked", "BlockedShard"),
+                                       info("localhost", "t0_0_replicating", "ReplicatingShard")]
 
         nameserver[:links].should == [link(id("localhost", "t0_0_blocked"), id("localhost", "t0_0"), 1),
                                       link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0_blocked"), 1)]
@@ -98,7 +92,7 @@ describe "gizzmo (cli)" do
         gizzmo "create TestShard localhost/t0_0"
         gizzmo "markbusy localhost/t0_0"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", "", 1)]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard", "", "", 1)]
       end
     end
 
@@ -108,7 +102,7 @@ describe "gizzmo (cli)" do
         gizzmo "markbusy localhost/t0_0"
         gizzmo "markunbusy localhost/t0_0"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard", "", "", 0)]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard", "", "", 0)]
       end
     end
 
@@ -117,7 +111,7 @@ describe "gizzmo (cli)" do
         gizzmo "create TestShard localhost/t0_0"
         gizzmo "addforwarding 0 0 localhost/t0_0"
 
-        nameserver[:shards].should      == [shard(id("localhost", "t0_0"), "TestShard")]
+        nameserver[:shards].should      == [info("localhost", "t0_0", "TestShard")]
         nameserver[:forwardings].should == [forwarding(0, 0, id("localhost", "t0_0"))]
       end
     end
@@ -128,7 +122,7 @@ describe "gizzmo (cli)" do
         gizzmo "addforwarding 0 0 localhost/t0_0"
         gizzmo "deleteforwarding 0 0 localhost/t0_0"
 
-        nameserver[:shards].should      == [shard(id("localhost", "t0_0"), "TestShard")]
+        nameserver[:shards].should      == [info("localhost", "t0_0", "TestShard")]
         nameserver[:forwardings].should == []
       end
     end
@@ -139,8 +133,8 @@ describe "gizzmo (cli)" do
         gizzmo "create ReplicatingShard localhost/t0_0_replicating"
         gizzmo "addlink localhost/t0_0_replicating localhost/t0_0 1"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_0_replicating"), "ReplicatingShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_0_replicating", "ReplicatingShard")]
 
         nameserver[:links].should == [link(id("localhost", "t0_0_replicating"), id("localhost", "t0_0"), 1)]
       end
@@ -153,8 +147,8 @@ describe "gizzmo (cli)" do
         gizzmo "addlink localhost/t0_0_replicating localhost/t0_0 1"
         gizzmo "unlink localhost/t0_0_replicating localhost/t0_0"
 
-        nameserver[:shards].should == [shard(id("localhost", "t0_0"), "TestShard"),
-                                       shard(id("localhost", "t0_0_replicating"), "ReplicatingShard")]
+        nameserver[:shards].should == [info("localhost", "t0_0", "TestShard"),
+                                       info("localhost", "t0_0_replicating", "ReplicatingShard")]
 
         nameserver[:links].should == []
       end

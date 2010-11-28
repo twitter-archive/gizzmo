@@ -15,7 +15,6 @@ NAMESERVER_DATABASE = 'gizzmo_test_integration_ns'
 require 'rubygems'
 require 'spec'
 require 'mysql'
-require 'open3'
 
 $:.unshift File.expand_path('lib', ROOT_DIR)
 require 'gizzard'
@@ -23,6 +22,12 @@ require 'gizzard'
 Spec::Runner.configure do |c|
   c.mock_with :rr
 end
+
+def id(h,p); Gizzard::ShardId.new(h,p) end
+def info(h,p,c,s = "",d = "",b = 0); Gizzard::ShardInfo.new(id(h,p),c,s,d,b) end
+def link(p,c,w); Gizzard::LinkInfo.new(p,c,w) end
+def forwarding(t,b,s); Gizzard::Forwarding.new(t,b,s) end
+def host(h,p,c,s = 0); Gizzard::Host.new(h,p,c,s) end
 
 def make_shard_template(conf_tree)
   config = Gizzard::MigratorConfig.new
