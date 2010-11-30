@@ -29,9 +29,8 @@ def link(p,c,w); Gizzard::LinkInfo.new(p,c,w) end
 def forwarding(t,b,s); Gizzard::Forwarding.new(t,b,s) end
 def host(h,p,c,s = 0); Gizzard::Host.new(h,p,c,s) end
 
-def make_shard_template(conf_tree)
-  config = Gizzard::MigratorConfig.new
-  Gizzard::ShardTemplate.from_config(config, conf_tree)
+def make_shard_template(conf_tree, opts = {})
+  Gizzard::ShardTemplate.from_config(conf_tree, opts)
 end
 
 def test_server_pid
