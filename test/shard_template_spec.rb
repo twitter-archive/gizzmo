@@ -10,7 +10,7 @@ describe Gizzard::ShardTemplate do
 
   describe "concrete?" do
     it "is false when a virtual shard type" do
-      Gizzard::ShardTemplate::VIRTUAL_SHARD_TYPES.each do |type|
+      Gizzard::Shard::VIRTUAL_SHARD_TYPES.each do |type|
         t = Gizzard::ShardTemplate.new(type, "localhost", 1, "", "", [])
         t.should_not be_concrete
       end
@@ -36,20 +36,40 @@ describe Gizzard::ShardTemplate do
   end
 
   describe "children" do
-    it "returns a sorted list"
+    it "returns a sorted list" do
+      @replicating.children.should == [@blocked, @sql2].sort {|a, b| b <=> a }
+      @replicating.instance_variable_get("@children").reverse!
+      @replicating.children.should == [@blocked, @sql2].sort {|a, b| b <=> a }
+    end
   end
 
   describe "comparison methods" do
-    describe "similar?" do
+    describe "shared_host?" do
+      it "is true if self and the other template share a descendant concrete identifier" do
+        other = Gizzard::ShardTemplate.new("FailingOverShard", "", 1, "", "", [@sql2])
+
+        @sql2.shared_host?(other).should        be_true
+        @replicating.shared_host?(other).should be_true
+        @blocked.shared_host?(other).should     be_false
+      end
     end
 
     describe "<=>" do
+      it "raises if other is not a ShardTemplate" do
+        lambda { @sql <=> "foo" }.should raise_error(ArgumentError)
+      end
     end
 
     describe "eql?" do
+      it "returns false if other is not a ShardTemplate" do
+        @sql.eql?("foo").should be_false
+        (@sql == "foo").should be_false
+      end
+
       it "is structural equality" do
         other_replicating = Marshal.load(Marshal.dump(@replicating))
         @replicating.eql?(other_replicating).should be_true
+        (@replicating == other_replicating).should be_true
       end
     end
   end

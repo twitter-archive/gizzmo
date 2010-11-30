@@ -5,26 +5,6 @@ module Gizzard
     ABSTRACT_HOST = "localhost"
     DEFAULT_WEIGHT = 1
 
-    VIRTUAL_SHARD_TYPES = [
-      "FailingOverShard",
-      "ReplicatingShard",
-      "ReadOnlyShard",
-      "WriteOnlyShard",
-      "BlockedShard",
-    ]
-
-    REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
-
-    INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
-
-    SHARD_SUFFIXES = {
-      "FailingOverShard" => 'replicating',
-      "ReplicatingShard" => 'replicating',
-      "ReadOnlyShard" => 'read_only',
-      "WriteOnlyShard" => 'write_only',
-      "BlockedShard" => 'blocked'
-    }
-
     attr_reader :type, :weight, :source_type, :dest_type
 
     def initialize(type, host, weight, source_type, dest_type, children)
@@ -33,7 +13,7 @@ module Gizzard
     end
 
     def self.concrete?(type)
-      !VIRTUAL_SHARD_TYPES.include? type.split('.').last
+      !Shard::VIRTUAL_SHARD_TYPES.include? type.split('.').last
     end
 
     def concrete?
@@ -41,7 +21,7 @@ module Gizzard
     end
 
     def replicating?
-      REPLICATING_SHARD_TYPES.include? type.split('.').last
+      Shard::REPLICATING_SHARD_TYPES.include? type.split('.').last
     end
 
     def identifier
@@ -49,7 +29,7 @@ module Gizzard
     end
 
     def table_name_suffix
-      SHARD_SUFFIXES[type.split('.').last]
+      Shard::SHARD_SUFFIXES[type.split('.').last]
     end
 
     def host
@@ -64,6 +44,16 @@ module Gizzard
 
     def children
       @children.sort { |a, b| b <=> a }
+    end
+
+    def descendants
+      [self].concat children.map {|c| c.descendants }.flatten
+    end
+
+    alias flatten descendants
+
+    def concrete_descendants
+      descendants.select {|t| t.concrete? }
     end
 
     def inspect
@@ -104,6 +94,12 @@ module Gizzard
     def eql?(other)
       return false unless other.is_a? ShardTemplate
       (self <=> other) == 0
+    end
+
+    def shared_host?(other)
+      raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
+
+      (self.concrete_descendants & other.concrete_descendants).length > 0
     end
 
     def hash

@@ -2,6 +2,26 @@ module Gizzard
   Shard = Struct.new(:info, :children, :weight)
 
   class Shard
+    VIRTUAL_SHARD_TYPES = [
+      "FailingOverShard",
+      "ReplicatingShard",
+      "ReadOnlyShard",
+      "WriteOnlyShard",
+      "BlockedShard",
+    ]
+
+    REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
+
+    INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
+
+    SHARD_SUFFIXES = {
+      "FailingOverShard" => 'replicating',
+      "ReplicatingShard" => 'replicating',
+      "ReadOnlyShard" => 'read_only',
+      "WriteOnlyShard" => 'write_only',
+      "BlockedShard" => 'blocked'
+    }
+
     def id; info.id end
     def hostname; id.hostname end
     def table_prefix; id.table_prefix end
