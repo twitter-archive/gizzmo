@@ -8,24 +8,24 @@ describe Gizzard::Shard do
     end
   end
 
-  describe "canonical_table_prefix_map" do
+  describe "canonical_shard_id_map" do
     it "returns a map of canonical to actual shard table prefixes" do
       s = Gizzard::Shard.new(info("localhost", "t0_001_replicating", "ReplicatingShard"),
                              [Gizzard::Shard.new(info("localhost", "shard_0001", "SqlShard"), [], 1)],
                              1)
-      s.canonical_table_prefix_map.should == {
-        "shard_0001_replicating" => "t0_001_replicating",
-        "shard_0001" => "shard_0001"
+      s.canonical_shard_id_map.should == {
+        id("localhost", "shard_0001_replicating") => id("localhost", "t0_001_replicating"),
+        id("localhost", "shard_0001") => id("localhost", "shard_0001")
       }
 
-      s.canonical_table_prefix_map("edges", -2).should == {
-        "edges_n2_0001_replicating" => "t0_001_replicating",
-        "edges_n2_0001" => "shard_0001"
+      s.canonical_shard_id_map("edges", -2).should == {
+        id("localhost", "edges_n2_0001_replicating") => id("localhost", "t0_001_replicating"),
+        id("localhost", "edges_n2_0001") => id("localhost", "shard_0001")
       }
 
-      s.canonical_table_prefix_map("groups", 0, 3).should == {
-        "groups_0_0003_replicating" => "t0_001_replicating",
-        "groups_0_0003" => "shard_0001"
+      s.canonical_shard_id_map("groups", 0, 3).should == {
+        id("localhost", "groups_0_0003_replicating") => id("localhost", "t0_001_replicating"),
+        id("localhost", "groups_0_0003") => id("localhost", "shard_0001")
       }
     end
   end

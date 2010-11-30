@@ -24,6 +24,10 @@ module Gizzard
       Shard::REPLICATING_SHARD_TYPES.include? type.split('.').last
     end
 
+    def valid_copy_source?
+      !Shard::INVALID_COPY_TYPES.include? type.split('.').last
+    end
+
     def identifier
       concrete? ? "#{type}:#{host}" : type.to_s
     end
@@ -56,6 +60,11 @@ module Gizzard
       descendants.select {|t| t.concrete? }
     end
 
+    def copy_sources
+      return [] unless self.valid_copy_source?
+      self.concrete? ? [self] : children.inject([]) {|a, c| a.concat c.copy_sources }
+    end
+
     def inspect
       weight_inspect = weight.nil? ? "" : " #{weight}"
       child_inspect = children.empty? ? "" : " #{children.inspect}"
@@ -64,17 +73,20 @@ module Gizzard
 
     # Concretization
 
-    def to_shard_id(table_prefix)
+    def to_shard_id(table_prefix, translations = {})
       table_prefix = [table_prefix, table_name_suffix].compact.join('_')
-      ShardId.new(host, table_prefix)
+      shard_id     = ShardId.new(host, table_prefix)
+      translations[shard_id] || shard_id
     end
 
-    def to_shard_info(table_prefix)
-      ShardInfo.new(to_shard_id(table_prefix), type, source_type, dest_type, 0)
+    def to_shard_info(table_prefix, translations = {})
+      ShardInfo.new(to_shard_id(table_prefix, translations), type, source_type, dest_type, 0)
     end
 
-    def to_shard(table_prefix)
-      Shard.new(to_shard_info(table_prefix), children.map {|c| c.to_shard(table_prefix) }, weight)
+    def to_shard(table_prefix, translations = {})
+      Shard.new(to_shard_info(table_prefix, translations), children.map {|c|
+        c.to_shard(table_prefix, translations)
+      }, weight)
     end
 
     # Similarity/Equality
@@ -94,6 +106,20 @@ module Gizzard
     def eql?(other)
       return false unless other.is_a? ShardTemplate
       (self <=> other) == 0
+    end
+
+    def shard_eql?(other)
+      raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
+
+      to_a = lambda {|t| [t.host, t.type, t.source_type.to_s, t.dest_type.to_s] }
+      to_a.call(self) == to_a.call(other)
+    end
+
+    def link_eql?(other)
+      raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
+
+      to_a = lambda {|t| [t.host, t.type, t.source_type.to_s, t.dest_type.to_s, t.weight] }
+      to_a.call(self) == to_a.call(other)
     end
 
     def shared_host?(other)

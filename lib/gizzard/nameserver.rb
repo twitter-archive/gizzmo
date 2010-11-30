@@ -3,6 +3,12 @@ module Gizzard
 
   class Shard
     class << self
+      def canonical_table_prefix(enum, table_id = nil, base_prefix = "shard")
+        enum_s         = "%0.4i" % enum
+        table_id_s     = table_id.nil? ? nil : table_id < 0 ? "n#{table_id.abs}" : table_id.to_s
+        [base_prefix, table_id_s, enum_s].compact.join('_')
+      end
+
       def parse_enumeration(table_prefix)
         if match = table_prefix.match(/\d{3,}/)
           match[0].to_i
@@ -44,14 +50,15 @@ module Gizzard
       self.class.parse_enumeration(table_prefix)
     end
 
-    def canonical_table_prefix_map(base_prefix = "shard", table_id = nil, enum = nil)
-      enum_s         = "%0.4i" % (enum || self.enumeration)
+    def canonical_shard_id_map(base_prefix = "shard", table_id = nil, enum = nil)
+      enum         ||= self.enumeration
+      base           = Shard.canonical_table_prefix(enum, table_id, base_prefix)
       suffix         = SHARD_SUFFIXES[class_name.split('.').last]
-      table_id_s     = table_id.nil? ? nil : table_id < 0 ? "n#{table_id.abs}" : table_id.to_s
-      canonical_name = [base_prefix, table_id_s, enum_s, suffix].compact.join('_')
+      canonical_name = [base, suffix].compact.join('_')
+      canonical_id   = ShardId.new(self.hostname, canonical_name)
 
-      children.inject(canonical_name => table_prefix) do |m, c|
-        m.update c.canonical_table_prefix_map(base_prefix, table_id, enum)
+      children.inject(canonical_id => self.id) do |m, c|
+        m.update c.canonical_shard_id_map(base_prefix, table_id, enum)
       end
     end
   end
