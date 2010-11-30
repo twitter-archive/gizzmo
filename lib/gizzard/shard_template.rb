@@ -129,12 +129,14 @@ module Gizzard
     # Class Methods
 
     class << self
-      def from_config(config, conf_tree)
+      def from_config(conf_tree, opts = {})
+        source_type = opts[:source_type] || ""
+        dest_type   = opts[:dest_type]   || ""
         shard, child_configs = parse_link_struct(conf_tree)
         type, host, weight   = parse_shard_definition(shard)
-        children             = Array(child_configs).map { |child| from_config(config, child) }
+        children             = Array(child_configs).map { |child| from_config(child, opts) }
 
-        new(type, host, weight, config.source_type, config.destination_type, children)
+        new(type, host, weight, source_type, dest_type, children)
       end
 
       private

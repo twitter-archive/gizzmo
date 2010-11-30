@@ -71,6 +71,18 @@ describe Gizzard::ShardTemplate do
 
   describe "config class methods" do
     describe "from_config" do
+      it "builds a shard template tree" do
+        Gizzard::ShardTemplate.from_config("SqlShard:sqlhost:1").should ==
+          Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "", "", [])
+
+        opts = {:source_type => "int", :dest_type => "int"}
+        Gizzard::ShardTemplate.from_config("SqlShard:sqlhost:1", opts).should ==
+          Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "int", "int", [])
+
+        Gizzard::ShardTemplate.from_config(
+          "ReplicatingShard:1" => [ "SqlShard:sqlhost2:1", { "BlockedShard:1" => "SqlShard:sqlhost:1" } ]
+        ).should == @replicating
+      end
     end
   end
 end
