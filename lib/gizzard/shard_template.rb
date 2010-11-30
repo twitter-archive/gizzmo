@@ -41,11 +41,15 @@ module Gizzard
     end
 
     def replicating?
-      REPLICATING_SHARD_TYPES.include? type
+      REPLICATING_SHARD_TYPES.include? type.split('.').last
     end
 
     def identifier
       concrete? ? "#{type}:#{host}" : type.to_s
+    end
+
+    def table_name_suffix
+      SHARD_SUFFIXES[type.split('.').last]
     end
 
     def host
@@ -68,6 +72,20 @@ module Gizzard
       "(#{identifier}#{weight_inspect}#{child_inspect})"
     end
 
+    # Concretization
+
+    def to_shard_id(table_prefix)
+      table_prefix = [table_prefix, table_name_suffix].compact.join('_')
+      ShardId.new(host, table_prefix)
+    end
+
+    def to_shard_info(table_prefix)
+      ShardInfo.new(to_shard_id(table_prefix), type, source_type, dest_type, 0)
+    end
+
+    def to_shard(table_prefix)
+      Shard.new(to_shard_info(table_prefix), children.map {|c| c.to_shard(table_prefix) }, weight)
+    end
 
     # Similarity/Equality
 
