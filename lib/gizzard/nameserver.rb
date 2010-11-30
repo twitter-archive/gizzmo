@@ -2,6 +2,16 @@ module Gizzard
   Shard = Struct.new(:info, :children, :weight)
 
   class Shard
+    class << self
+      def parse_enumeration(table_prefix)
+        if match = table_prefix.match(/\d{3,}/)
+          match[0].to_i
+        else
+          raise "Cannot derive enumeration!"
+        end
+      end
+    end
+
     VIRTUAL_SHARD_TYPES = [
       "FailingOverShard",
       "ReplicatingShard",
@@ -29,6 +39,21 @@ module Gizzard
     def source_type; info.source_type end
     def destination_type; info.destination_type end
     def busy; info.busy end
+
+    def enumeration
+      self.class.parse_enumeration(table_prefix)
+    end
+
+    def canonical_table_prefix_map(base_prefix = "shard", table_id = nil, enum = nil)
+      enum_s         = "%0.4i" % (enum || self.enumeration)
+      suffix         = SHARD_SUFFIXES[class_name.split('.').last]
+      table_id_s     = table_id.nil? ? nil : table_id < 0 ? "n#{table_id.abs}" : table_id.to_s
+      canonical_name = [base_prefix, table_id_s, enum_s, suffix].compact.join('_')
+
+      children.inject(canonical_name => table_prefix) do |m, c|
+        m.update c.canonical_table_prefix_map(base_prefix, table_id, enum)
+      end
+    end
   end
 
   class Nameserver

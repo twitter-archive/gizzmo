@@ -1,5 +1,36 @@
 require File.expand_path('../spec_helper', __FILE__)
 
+describe Gizzard::Shard do
+  describe "parse_enumeration" do
+    it "parses correctly" do
+      Gizzard::Shard.parse_enumeration("edges_backwards_1_003_a").should == 3
+      Gizzard::Shard.parse_enumeration("status_0345").should == 345
+    end
+  end
+
+  describe "canonical_table_prefix_map" do
+    it "returns a map of canonical to actual shard table prefixes" do
+      s = Gizzard::Shard.new(info("localhost", "t0_001_replicating", "ReplicatingShard"),
+                             [Gizzard::Shard.new(info("localhost", "shard_0001", "SqlShard"), [], 1)],
+                             1)
+      s.canonical_table_prefix_map.should == {
+        "shard_0001_replicating" => "t0_001_replicating",
+        "shard_0001" => "shard_0001"
+      }
+
+      s.canonical_table_prefix_map("edges", -2).should == {
+        "edges_n2_0001_replicating" => "t0_001_replicating",
+        "edges_n2_0001" => "shard_0001"
+      }
+
+      s.canonical_table_prefix_map("groups", 0, 3).should == {
+        "groups_0_0003_replicating" => "t0_001_replicating",
+        "groups_0_0003" => "shard_0001"
+      }
+    end
+  end
+end
+
 describe Gizzard::Nameserver do
   before do
     @client = Object.new
