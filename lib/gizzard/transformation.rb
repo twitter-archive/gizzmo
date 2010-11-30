@@ -13,9 +13,8 @@ module Gizzard
       false
     end
 
-    def apply!(nameserver, config)
-      @forwardings.each do |(base_id, table)|
-        shard_id = ShardTemplate.new("com.twitter.gizzard.shards.ReplicatingShard", "localhost", 0, '', '', []).to_shard_id(table)
+    def apply!(nameserver)
+      @forwardings.each do |(base_id, shard_id)|
         forwarding = Forwarding.new(table_id, base_id, shard_id)
 
         nameserver.set_forwarding(forwarding)
@@ -36,106 +35,266 @@ module Gizzard
   end
 
   class Transformation
-    attr_reader :from, :to, :shards
-
-    DEFAULT_CONCURRENT_COPIES = 5
-
-    JOB_INVERSES = {
-      :add_link => :remove_link,
-      :remove_link => :add_link,
-      :create_shard => :delete_shard,
-      :delete_shard => :create_shard
-    }
-
-    JOB_PRIORITIES = {
-      :remove_link => 0,
-      :delete_shard =>1,
-      :create_shard => 2,
-      :add_link => 3,
-      :copy_shard => 4
-    }
-
-    def initialize(from_template, to_template, shards)
-      @from = from_template
-      @to = to_template
-      @shards = shards
-    end
-
-    def paginate(page_size = DEFAULT_CONCURRENT_COPIES)
-      if must_copy?
-        slices = shards.inject([[]]) do |slices, id|
-          slices.last << id
-          slices << [] if slices.last.length >= page_size
-          slices
+    module Op
+      class BaseOp
+        def apply_batch(nameserver, base_name, batch)
+          # this level of indirection is so copy can loop through
+          # items twice
+          each_batch_item(nameserver, base_name, batch) do |table_id, base_id, table_prefix, translations|
+            apply(nameserver, table_id, base_id, table_prefix, translations)
+          end
         end
 
-        slices.inject([]) do |pages,slice|
-          pages << self.class.new(from, to, slice) unless slice.empty?
-          pages
+        def inverse?(other)
+          Transformation::JOB_INVERSES[self.class] == other.class
         end
-      else
-        [self]
-      end
-    end
 
-    def apply!(nameserver, config)
-      raise "involves copies!" if must_copy?
+        def eql?(other)
+          self.class == other.class
+        end
 
-      prepare! nameserver, config
-      cleanup! nameserver, config
-    end
+        alias == eql?
 
-    def prepare!(nameserver, config)
-      operations[:prepare].each {|job| apply_job(job, nameserver, config) }
-    end
+        def inspect
+          templates = (is_a?(LinkOp) ? [from, to] : [template]).map {|t| t.identifier }.join(" -> ")
+          name      = Transformation::JOB_NAMES[self.class]
+          "#{name}(#{templates})"
+        end
 
-    def copy!(nameserver, config)
-      operations[:copy].each {|job| apply_job(job, nameserver, config) }
-    end
+        def <=>(other)
+          JOB_PRIORITIES[self.class] <=> JOB_PRIORITIES[other.class]
+        end
 
-    def must_copy?
-      !operations[:copy].empty?
-    end
+        private
 
-    def wait_for_copies(nameserver, config)
-      return if nameserver.dryrun?
+        def each_batch_item(nameserver, base_name, batch)
+          batch.each do |forwarding, shard|
+            table_id     = forwarding.table_id
+            base_id      = forwarding.base_id
+            enum         = shard.enumeration
+            table_prefix = Shard.canonical_table_prefix(enum, table_id, base_name)
+            translations = shard.canonical_table_prefix_map(base_name, table_id, enum)
 
-      operations[:copy].each do |(type, from, to)|
-        each_shard(config) do
-          if nameserver.get_shard(id(to)).busy?
-            sleep 1; redo
+            yield(table_id, base_id, table_prefix, translations)
           end
         end
       end
+
+      class CopyShard < BaseOp
+        attr_reader :from, :to
+        alias template to
+
+        def initialize(from, to)
+          @from = from
+          @to   = to
+        end
+
+        def expand(*args); { :copy => [self] } end
+
+        def apply_batch(nameserver, base_name, batch)
+          each_batch_item(nameserver, base_name, batch) do |table_id, base_id, table_prefix, translations|
+            from_shard_id = from.to_shard_id(table_prefix, translations)
+            to_shard_id   = to.to_shard_id(table_prefix, translations)
+
+            nameserver.copy_shard(from_shard_id, to_shard_id)
+          end
+
+          return if nameserver.dryrun
+
+          each_batch_item(nameserver, base_name, batch) do |table_id, base_id, table_prefix, translations|
+            sleep 5 while nameserver.get_shard(to.to_shard_id(table_prefix)).busy?
+          end
+        end
+      end
+
+      class LinkOp < BaseOp
+        attr_reader :from, :to
+        alias template to
+
+        def initialize(from, to)
+          @from = from
+          @to   = to
+        end
+
+        def inverse?(other)
+          super && self.from.link_eql?(other.from) && self.to.link_eql?(other.to)
+        end
+
+        def eql?(other)
+          super && self.from.link_eql?(other.from) && self.to.link_eql?(other.to)
+        end
+      end
+
+      class AddLink < LinkOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          if involved_in_copy
+            wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [to])
+            { :prepare => [AddLink.new(from, wrapper)],
+              :cleanup => [self, RemoveLink.new(from, wrapper)] }
+          else
+            { :prepare => [self] }
+          end
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          from_shard_id = from.to_shard_id(table_prefix, translations)
+          to_shard_id   = to.to_shard_id(table_prefix, translations)
+
+          nameserver.add_link(from_shard_id, to_shard_id)
+        end
+      end
+
+      class RemoveLink < LinkOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          { (involved_in_copy ? :cleanup : :prepare) => [self] }
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          from_shard_id = from.to_shard_id(table_prefix, translations)
+          to_shard_id   = to.to_shard_id(table_prefix, translations)
+
+          nameserver.remove_link(from_shard_id, to_shard_id)
+        end
+      end
+
+      class ShardOp < BaseOp
+        attr_reader :template
+
+        def initialize(template)
+          @template = template
+        end
+
+        def inverse?(other)
+          super && self.template.shard_eql?(other.template)
+        end
+
+        def eql?(other)
+          super && self.template.shard_eql?(other.template)
+        end
+      end
+
+      class CreateShard < ShardOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          if involved_in_copy
+            wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [template])
+            { :prepare => [self, CreateShard.new(wrapper), AddLink.new(wrapper, template)],
+              :cleanup => [RemoveLink.new(wrapper, template), DeleteShard.new(wrapper)],
+              :copy => [CopyShard.new(copy_source, template)] }
+          else
+            { :prepare => [self] }
+          end
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          nameserver.create_shard(template.to_shard_info(table_prefix, translations))
+        end
+      end
+
+      class DeleteShard < ShardOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          { (involved_in_copy ? :cleanup : :prepare) => [self] }
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          nameserver.delete_shard(template.to_shard_id(table_prefix, translations))
+        end
+      end
+
+      class SetForwarding < ShardOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          if involved_in_copy
+            wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [to])
+            { :prepare => [SetForwarding.new(template, wrapper)],
+              :cleanup => [self] }
+          else
+            { :prepare => [self] }
+          end
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          shard_id   = template.to_shard_id(table_prefix, translations)
+          forwarding = Forwarding.new(table_id, base_id, shard_id)
+          nameserver.set_forwarding(forwarding)
+        end
+      end
+
+
+      # XXX: A no-op, but needed for setup/teardown symmetry
+
+      class RemoveForwarding < ShardOp
+        def expand(copy_source, involved_in_copy, wrapper_type)
+          { (involved_in_copy ? :cleanup : :prepare) => [self] }
+        end
+
+        def apply(nameserver, table_id, base_id, table_prefix, translations)
+          # shard_id   = template.to_shard_id(table_prefix, translations)
+          # forwarding = Forwarding.new(table_id, base_id, shard_id)
+          # nameserver.remove_forwarding(forwarding)
+        end
+      end
     end
 
-    def cleanup!(nameserver, config)
-      operations[:cleanup].each {|job| apply_job(job, nameserver, config) }
+    JOB_NAMES = {
+      Op::RemoveForwarding => "remove_forwarding",
+      Op::RemoveLink       => "remove_link",
+      Op::DeleteShard      => "delete_shard",
+      Op::CreateShard      => "create_shard",
+      Op::AddLink          => "add_link",
+      Op::SetForwarding    => "set_forwarding",
+      Op::CopyShard        => "copy_shard"
+    }
+
+    JOB_INVERSES = {
+      Op::AddLink       => Op::RemoveLink,
+      Op::CreateShard   => Op::DeleteShard,
+      Op::SetForwarding => Op::RemoveForwarding
+    }
+
+    JOB_INVERSES.keys.each {|k| v = JOB_INVERSES[k]; JOB_INVERSES[v] = k }
+
+    JOB_PRIORITIES = {
+      Op::RemoveForwarding => 0,
+      Op::RemoveLink       => 1,
+      Op::DeleteShard      => 2,
+      Op::CreateShard      => 3,
+      Op::AddLink          => 4,
+      Op::SetForwarding    => 5,
+      Op::CopyShard        => 6
+    }
+
+    DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
+
+    attr_reader :from, :to
+
+    def initialize(from_template, to_template, copy_dest_wrapper = DEFAULT_DEST_WRAPPER)
+      @from = from_template
+      @to   = to_template
+      @copy_dest_wrapper = copy_dest_wrapper
     end
 
-    def inspect(with_shards = false)
+    def apply!(nameserver, base_name, batches)
+      raise ArgumentError unless batches.is_a? Hash
+
+      applier = lambda {|j| j.apply(nameserver, base_name, batches) }
+
+      operations[:prepare].each(&applier)
+      operations[:copy].each(&applier)
+      operations[:cleanup].each(&applier)
+    end
+
+    def inspect
       op_inspect = operations.inject({}) do |h, (phase, ops)|
-        h[phase] = ops.map do |(type, arg1, arg2)|
-          arg2id = arg2 ? ", #{arg2.identifier}" : ""
-          "    #{type}, #{arg1.identifier}#{arg2id}"
-        end.join("\n")
-        h
+        h[phase] = ops.map {|job| job.inspect }.join("\n")
       end
 
       prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
-      copy_inspect = op_inspect[:copy].empty? ? "" : "  COPY\n#{op_inspect[:copy]}\n"
+      copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
       cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
 
       op_inspect = [prepare_inspect, copy_inspect, cleanup_inspect].join
 
-      if with_shards
-        "[#{shards.length} SHARDS: #{shards.sort.map {|s| "%04d" % s }.join(', ') }\n\n #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
-      else
-        "[#{shards.length} SHARDS: #{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
-      end
+      "[#{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
     end
-
-
 
     def operations
       return @operations if @operations
@@ -147,200 +306,75 @@ module Gizzard
       # compact
       log = collapse_jobs(log)
 
-      @operations = log.inject({:prepare => [], :copy => [], :cleanup => []}) do |ops, job|
-        op =
-          case job.first # job type
-          when :add_link, :create_shard
-            expand_create_job(job)
-          when :remove_link, :delete_shard
-            expand_delete_job(job)
-          else
-            raise "Unknown job type, cannot expand"
-          end
-
-        ops.update(op) {|k,a,b| a.concat(b) }
-      end
-
-      # if there are no copies that need to take place, we can do all
-      # nameserver changes in one step
-      if @operations[:copy].empty?
-        @operations[:prepare].concat @operations[:cleanup]
-        @operations[:cleanup] = []
-      end
+      @operations = expand_jobs(log)
 
       @operations.each do |(phase, jobs)|
-        jobs.replace(sort_jobs(jobs))
+        jobs.sort!
       end
 
       @operations
     end
 
     def collapse_jobs(jobs)
-      jobs.reject do |(type_1, arg1_1, arg2_1)|
-        jobs.find do |(type_2, arg1_2, arg2_2)|
-          if JOB_INVERSES[type_1] == type_2
-            if arg2_1.nil? # shard creation. wieght doesn't matter.
-              arg1_1.eql?(arg1_2, false, false)
-            else
-              arg1_1.eql?(arg1_2, false, false) && arg2_1.eql?(arg2_2, false)
-            end
-          else
-            false
-          end
+      jobs.reject do |job1|
+        jobs.find do |job2|
+          job1.inverse? job2
         end
       end
     end
 
-    def expand_create_job(job)
-      type, arg1, arg2 = job
-      template = (type == :create_shard) ? arg1 : arg2
-
-      ops = {:prepare => [], :copy => [], :cleanup => []}
-
-      if copy_destination? template
-        write_only_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [template])
-
-        if type == :add_link
-          ops[:prepare] << add_link(arg1, write_only_wrapper)
-          ops[:cleanup] << job
-          ops[:cleanup] << remove_link(arg1, write_only_wrapper)
-        else
-          ops[:prepare] << job
-          ops[:prepare] << create_shard(write_only_wrapper)
-          ops[:prepare] << add_link(write_only_wrapper, arg1)
-
-          ops[:cleanup] << remove_link(write_only_wrapper, arg1)
-          ops[:cleanup] << delete_shard(write_only_wrapper)
-
-          ops[:copy] << copy_shard(copy_source, arg1)
-        end
-      else
-        ops[:prepare] << job
+    def expand_jobs(jobs)
+      expanded = jobs.inject({:prepare => [], :copy => [], :cleanup => []}) do |ops, job|
+        job.expand(self.copy_source, involved_in_copy?(job.template), @copy_dest_wrapper)
       end
 
-      ops
-    end
-
-    def expand_delete_job(job)
-      type, arg1, arg2 = job
-      template = (type == :delete_shard) ? arg1 : arg2
-
-      ops = {:prepare => [], :copy => [], :cleanup => []}
-
-      if copy_source? template
-        ops[:cleanup] << job
-      else
-        ops[:prepare] << job
+      # if there are no copies that need to take place, we can do all
+      # nameserver changes in one step
+      if expanded[:copy].empty?
+        expanded[:prepare].concat expanded[:cleanup]
+        expanded[:cleanup] = []
       end
 
-      ops
+      expanded
     end
 
-    def sort_jobs(jobs)
-      jobs.sort_by {|(type, _, _)| JOB_PRIORITIES[type] }
-    end
-
-    def apply_job(job, nameserver, config)
-      type, arg1, arg2 = job
-
-      case type
-      when :copy_shard
-        each_shard(config) { nameserver.copy_shard(id(arg1), id(arg2)) }
-      when :add_link
-        each_shard(config) { nameserver.add_link(id(arg1), id(arg2), arg2.weight) }
-      when :remove_link
-        each_shard(config) { nameserver.remove_link(id(arg1), id(arg2)) }
-      when :create_shard
-        each_shard(config) { nameserver.create_shard(info(arg1)) }
-      when :delete_shard
-        each_shard(config) { nameserver.delete_shard(id(arg1)) }
-      else
-        raise ArgumentError, "unknown job type #{type.inspect}"
-      end
-    end
-
-    def each_shard(config)
-      @current_config = config
-      shards.each do |shard|
-        @current_shard = shard
-        yield
-      end
-    ensure
-      @current_config = @current_shard = nil
-    end
-
-    def id(template)
-      @current_shard or raise "no current shard id!"
-      name = @current_config.shard_name(@current_shard)
-
-      canonical = template.to_shard_id(name)
-      @current_config.manifest.existing_shard_ids[canonical] || canonical
-    end
-
-    def info(template)
-      id = id(template)
-
-      info = template.to_shard_info(id.table_prefix)
-      info.id = id(template)
-      info
+    def involved_in_copy?(template)
+      copy_source?(job.template) || copy_destination?(job.template)
     end
 
     def copy_destination?(template)
-      template.concrete? && !from.nil? && !from.descendant_identifiers.include?(template.identifier)
+      template.concrete? && !from.nil? && !from.shared_host?(template)
     end
 
-
     def copy_source
-      from.copy_source if from
+      from.copy_sources.first if from
     end
 
     def copy_source?(template)
       return false unless copy_source
-      template.descendant_identifiers.include? copy_source.identifier
-    end
-
-    def add_link(from, to)
-      [:add_link, from, to]
-    end
-
-    def remove_link(from, to)
-      [:remove_link, from, to]
-    end
-
-    def create_shard(template)
-      [:create_shard, template]
-    end
-
-    def delete_shard(template)
-      [:delete_shard, template]
-    end
-
-    def copy_shard(from, to)
-      [:copy_shard, from, to]
+      !!from.copy_sources.find {|s| s.shard_eql? template }
     end
 
     def create_tree(root)
-      log = []
-
-      log << create_shard(root)
-      root.children.each do |child|
-        log.concat create_tree(child)
-        log << add_link(root, child)
+      jobs = visit_collect(root) do |parent, child|
+        [Op::CreateShard.new(child), Op::AddLink.new(parent, child)]
       end
-
-      log
+      [Op::CreateShard.new(root)].concat jobs << Op::SetForwarding.new(root)
     end
 
     def destroy_tree(root)
-      log = []
-
-      root.children.each do |child|
-        log << remove_link(root, child)
-        log.concat destroy_tree(child)
+      jobs = visit_collect(root) do |parent, child|
+        [Op::RemoveLink.new(parent, child), Op::DeleteShard.new(child)]
       end
-      log << delete_shard(root)
+      [Op::RemoveForwarding.new(root)].concat jobs << Op::DeleteShard.new(root)
+    end
 
-      log
+    private
+
+    def visit_collect(parent, &block)
+      parent.children.inject([]) do |acc, child|
+        visit_collect(child, &block).concat acc.concat block.call(parent, child)
+      end
     end
   end
 end
