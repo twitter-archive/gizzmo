@@ -11,6 +11,7 @@ DOC_STRINGS = {
   "addlink" => "Add a relationship link between two shards.",
   "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "drill" => "Show shard trees for replicas of a given structure signature (from 'report').",
+  "finish-replica" => "Remove the write-only barrier in front of a shard that's finished being copied after 'setup-replica'.",
   "flush" => "Flush error queue for a given priority.",
   "forwardings" => "Get a list of all forwardings.",
   "hosts" => "List hosts used in shard names in the forwarding table and replicas.",
@@ -21,6 +22,7 @@ DOC_STRINGS = {
   "markbusy" => "Mark a shard as busy.",
   "reload" => "Instruct an appserver to reload its nameserver state.",
   "report" => "Show each unique replica structure for a given list of shards.",
+  "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
 }
 
