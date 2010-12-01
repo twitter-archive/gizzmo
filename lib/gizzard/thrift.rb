@@ -50,7 +50,7 @@ module Gizzard
     end
 
     def to_unix
-      [id.to_unix, class_name, busy? ? "busy" : "unbusy"].join("\t")
+      [id.to_unix, class_name, busy? ? "busy" : "ok"].join("\t")
     end
   end
 
@@ -66,7 +66,7 @@ module Gizzard
     end
 
     def to_unix
-      [id.to_unix, class_name, busy? ? "busy" : "ok"].join("\t")
+      [up_id.to_unix, down_id.to_unix, weight].join("\t")
     end
   end
 
