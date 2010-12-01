@@ -65,13 +65,6 @@ describe Gizzard::Transformation do
     @host_2_template = mk_template 'SqlShard:host2'
     @host_3_template = mk_template 'SqlShard:host3'
 
-    @host_1_id = Gizzard::ShardId.new(@host_1_template.host, 'status_001')
-    @host_1_info = Gizzard::ShardInfo.new(@host_1_id, @host_1_template.type, "", "", 0)
-    @host_2_id = Gizzard::ShardId.new(@host_2_template.host, 'status_001')
-    @host_2_info = Gizzard::ShardInfo.new(@host_2_id, @host_2_template.type, "", "", 0)
-    @host_3_id = Gizzard::ShardId.new(@host_3_template.host, 'status_001')
-    @host_3_info = Gizzard::ShardInfo.new(@host_3_id, @host_3_template.type, "", "", 0)
-
     @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001))
   end
 
