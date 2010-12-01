@@ -1,5 +1,6 @@
 require "pp"
 require "digest/md5"
+
 module Gizzard
   class Command
 
@@ -153,7 +154,18 @@ module Gizzard
   class ReloadCommand < Command
     def run
       if global_options.force || ask
-        nameserver.reload_config
+        if @argv
+          # allow hosts to be given on the command line
+          @argv.each do |hostname|
+            output hostname
+            opts = global_options.dup
+            opts.host = hostname
+            s = self.class.make_service(opts, global_options.log || "./gizzmo.log")
+            s.reload_config
+          end
+        else
+          nameserver.reload_config
+        end
       else
         STDERR.puts "aborted"
       end
@@ -248,11 +260,15 @@ module Gizzard
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
         next if !shard_id
-        nameserver.list_upward_links(shard_id).each do |link_info|
-          output link_info.to_unix
+        unless command_options.down
+          nameserver.list_upward_links(shard_id).each do |link_info|
+            output command_options.ids ? link_info.up_id.to_unix : link_info.to_unix
+          end
         end
-        nameserver.list_downward_links(shard_id).each do |link_info|
-          output link_info.to_unix
+        unless command_options.up
+          nameserver.list_downward_links(shard_id).each do |link_info|
+            output command_options.ids ? link_info.down_id.to_unix : link_info.to_unix
+          end
         end
       end
     end
@@ -415,7 +431,7 @@ module Gizzard
 
       puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
       puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
-      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
+      shards.map { |(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
 
@@ -475,7 +491,6 @@ module Gizzard
 
   class ReportCommand < Command
     def run
-
       things = @argv.map do |shard|
         parse(down(ShardId.parse(shard))).join("\n")
       end
@@ -581,6 +596,60 @@ module Gizzard
   class BusyCommand < Command
     def run
       nameserver.get_busy_shards().each { |shard_info| output shard_info.to_unix }
+    end
+  end
+
+  class SetupReplicaCommand < Command
+    def run
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+
+      if nameserver.list_upward_links(to_shard_id).size > 0
+        STDERR.puts "Destination shard #{to_shard_id} has links to it."
+        exit 1
+      end
+
+      link = nameserver.list_upward_links(from_shard_id)[0]
+      replica_shard_id = link.up_id
+      weight = link.weight
+      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+      nameserver.create_shard(ShardInfo.new(write_only_shard_id, "WriteOnlyShard", "", "", 0))
+      nameserver.add_link(replica_shard_id, write_only_shard_id, weight)
+      nameserver.add_link(write_only_shard_id, to_shard_id, 1)
+      output to_shard_id.to_unix
+    end
+  end
+
+  class FinishReplicaCommand < Command
+    def run
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+
+      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+      link = nameserver.list_upward_links(write_only_shard_id)[0]
+      replica_shard_id = link.up_id
+      weight = link.weight
+
+      # careful. need to validate some basic assumptions.
+      unless global_options.force
+        if nameserver.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
+          STDERR.puts "Uplink from #{from_shard_id} is not a migration replica."
+          exit 1
+        end
+        if nameserver.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
+          STDERR.puts "Uplink from #{to_shard_id} is not a write-only barrier."
+          exit 1
+        end
+      end
+
+      nameserver.remove_link(write_only_shard_id, to_shard_id)
+      nameserver.remove_link(replica_shard_id, write_only_shard_id)
+      nameserver.add_link(replica_shard_id, to_shard_id, weight)
+      nameserver.delete_shard(write_only_shard_id)
     end
   end
 
