@@ -52,7 +52,7 @@ module Gizzard
       end
 
       def to_unix
-        [id.to_unix, class_name, busy? ? "busy" : "unbusy"].join("\t")
+        [id.to_unix, class_name, busy? ? "busy" : "ok"].join("\t")
       end
     end
 

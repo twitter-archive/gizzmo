@@ -7,11 +7,16 @@ require "gizzard"
 require "yaml"
 
 DOC_STRINGS = {
-  "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
+  "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
-  "flush" => "Flush error queue for a given priority."
+  "drill" => "Show shard trees for replicas of a given structure signature (from 'report').",
+  "flush" => "Flush error queue for a given priority.",
+  "hosts" => "List hosts used in shard names in the forwarding table and replicas.",
+  "info" => "Show id/class/busy for shards.",
+  "links" => "List parent & child links for shards.",
+  "report" => "Show each unique replica structure for a given list of shards.",
 }
 
 ORIGINAL_ARGV = ARGV.dup
@@ -59,6 +64,12 @@ def separators(opts, string)
     opts.separator(substr)
   end
   opts.separator("")
+end
+
+def load_config(options, filename)
+  YAML.load(File.open(filename)).each do |k, v|
+    options.send("#{k}=", v)
+  end
 end
 
 subcommands = {
@@ -163,6 +174,16 @@ subcommands = {
   'links' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} links SHARD_ID [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["links"])
+
+    opts.on("--ids", "Show shard ids only") do
+      subcommand_options.ids = true
+    end
+    opts.on("--up", "Show uplinks only") do
+      subcommand_options.up = true
+    end
+    opts.on("--down", "show downlinks only") do
+      subcommand_options.down = true
+    end
   end,
   'info' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} info SHARD_ID [MORE SHARD_IDS...]"
@@ -231,6 +252,10 @@ subcommands = {
   end
 }
 
+if ENV['GIZZMORC']
+  load_config(global_options, ENV['GIZZMORC'])
+end
+
 global = OptionParser.new do |opts|
   opts.banner = "Usage: #{zero} [global-options] SUBCOMMAND [subcommand-options]"
   opts.separator ""
@@ -243,7 +268,7 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator "You may find it useful to create a ~/.gizzmorc file, which is simply YAML"
   opts.separator "key/value pairs corresponding to options you want by default. A common .gizzmorc"
-  opts.separator "simply contain:"
+  opts.separator "simply contains:"
   opts.separator ""
   opts.separator "    host: localhost"
   opts.separator "    port: 7917"
@@ -290,10 +315,8 @@ global = OptionParser.new do |opts|
     global_options.dry = true
   end
 
-  opts.on("-C", "--config=YAML_FILE", "YAML_FILE of option key/values") do |file|
-    YAML.load(File.open(file)).each do |k, v|
-      global_options.send("#{k}=", v)
-    end
+  opts.on("-C", "--config=YAML_FILE", "YAML_FILE of option key/values") do |filename|
+    load_config(global_options, filename)
   end
 
   opts.on("-L", "--log=LOG_FILE", "Path to LOG_FILE") do |file|
@@ -370,7 +393,7 @@ def custom_timeout(seconds)
   end
 end
 
-begin      
+begin
   custom_timeout(global_options.timeout) do
     Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
   end

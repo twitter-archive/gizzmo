@@ -1,5 +1,6 @@
 require "pp"
 require "digest/md5"
+
 module Gizzard
   class Command
     include Thrift
@@ -17,7 +18,7 @@ module Gizzard
     end
 
     def self.classify(string)
-      string.split(/\W+/).map{|s| s.capitalize }.join("")
+      string.split(/\W+/).map { |s| s.capitalize }.join("")
     end
 
     attr_reader :service, :global_options, :argv, :command_options
@@ -41,13 +42,13 @@ module Gizzard
       end
     end
   end
-  
+
   class RetryProxy
     def initialize(retries, object)
       @inner = object
       @retries_left = retries
     end
-    
+
     def method_missing(*args)
       @inner.send(*args)
     rescue
@@ -63,7 +64,7 @@ module Gizzard
 
   class ShardCommand < Command
     def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i, 
+      RetryProxy.new global_options.retry.to_i,
         Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.dry)
     end
   end
@@ -147,7 +148,18 @@ module Gizzard
   class ReloadCommand < ShardCommand
     def run
       if global_options.force || ask
-        service.reload_forwardings
+        if @argv
+          # allow hosts to be given on the command line
+          @argv.each do |hostname|
+            output hostname
+            opts = global_options.dup
+            opts.host = hostname
+            s = self.class.make_service(opts, global_options.log || "./gizzmo.log")
+            s.reload_forwardings
+          end
+        else
+          service.reload_forwardings
+        end
       else
         STDERR.puts "aborted"
       end
@@ -202,7 +214,7 @@ module Gizzard
         downward_links = service.list_downward_links(shard_id)
 
         if upward_links.length == 0 or downward_links.length == 0
-          STDERR.puts "Shard #{shard_id_string} must not be a root or leaf" 
+          STDERR.puts "Shard #{shard_id_string} must not be a root or leaf"
           next
         end
 
@@ -242,11 +254,15 @@ module Gizzard
       shard_ids.each do |shard_id_text|
         shard_id = ShardId.parse(shard_id_text)
         next if !shard_id
-        service.list_upward_links(shard_id).each do |link_info|
-          output link_info.to_unix
+        unless command_options.down
+          service.list_upward_links(shard_id).each do |link_info|
+            output command_options.ids ? link_info.up_id.to_unix : link_info.to_unix
+          end
         end
-        service.list_downward_links(shard_id).each do |link_info|
-          output link_info.to_unix
+        unless command_options.up
+          service.list_downward_links(shard_id).each do |link_info|
+            output command_options.ids ? link_info.down_id.to_unix : link_info.to_unix
+          end
         end
       end
     end
@@ -409,7 +425,7 @@ module Gizzard
 
       puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
       puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
-      shards.map {|(old, new)| puts "gizzmo copy #{old} #{new}" }
+      shards.map { |(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
 
@@ -469,7 +485,6 @@ module Gizzard
 
   class ReportCommand < ShardCommand
     def run
-
       things = @argv.map do |shard|
         parse(down(ShardId.parse(shard))).join("\n")
       end
