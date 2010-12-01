@@ -224,9 +224,9 @@ localhost/t0_1_replicating\tlocalhost/t0_1_a\t1
     describe "info" do
       it "outputs shard info for the given shard ids" do
         gizzmo("info localhost/t0_0_a 127.0.0.1/t0_1_b localhost/t0_2_replicating").should == <<-EOF
-localhost/t0_0_a\tTestShard\tunbusy
-127.0.0.1/t0_1_b\tTestShard\tunbusy
-localhost/t0_2_replicating\tReplicatingShard\tunbusy
+localhost/t0_0_a\tTestShard\tok
+127.0.0.1/t0_1_b\tTestShard\tok
+localhost/t0_2_replicating\tReplicatingShard\tok
         EOF
       end
     end
