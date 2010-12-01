@@ -791,14 +791,14 @@ module Gizzard
 
       if command_options.forwardings
         templates.
-          inject([]) {|h, (t, fs)| fs.each {|f| h << [f.base_id, t] }; h }.
+          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.base_id, t] }; h }.
           sort.
-          each {|a| puts "%25d\t%s" % a }
+          each { |a| puts "%25d\t%s" % a }
       else
         templates.
-          map {|(t, fs)| [fs.length, t] }.
+          map { |(t, fs)| [fs.length, t] }.
           sort.reverse.
-          each {|a| puts "%4d %s" % a }
+          each { |a| puts "%4d %s" % a }
       end
     end
   end
@@ -807,7 +807,7 @@ module Gizzard
     def run
       template_s, shard_id_s = @argv
 
-      parse_opts = {:source_type => command_options.source_type, :dest_type => command_options.dest_type}
+      parse_opts = { :source_type => command_options.source_type, :dest_type => command_options.dest_type }
       template       = ShardTemplate.parse(template_s, parse_opts)
       shard_id       = ShardId.parse(shard_id_s)
       base_name      = shard_id.table_prefix.split('_').first
