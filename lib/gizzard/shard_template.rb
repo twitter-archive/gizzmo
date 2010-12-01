@@ -66,10 +66,9 @@ module Gizzard
     end
 
     def inspect
-      weight_inspect = weight.nil? ? "" : " #{weight}"
-      child_inspect = children.empty? ? "" : " #{children.inspect}"
-      "(#{identifier}#{weight_inspect}#{child_inspect})"
+      to_config.inspect
     end
+    alias to_s inspect
 
     # Concretization
 
@@ -159,6 +158,11 @@ module Gizzard
         children             = Array(child_configs).map { |child| from_config(child, opts) }
 
         new(type, host, weight, source_type, dest_type, children)
+      end
+
+      def parse(string, opts = {})
+        config = eval(string)
+        from_config(config, opts)
       end
 
       private

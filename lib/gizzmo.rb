@@ -250,6 +250,22 @@ subcommands = {
     opts.on("--forwardings", "Show topology of forwardings instead of counts") do
       subcommand_options.forwardings = true
     end
+  end,
+  'transform-tree' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} transform-tree [options] TEMPLATE ROOT_SHARD_ID"
+    separators(opts, DOC_STRINGS['transform-tree'])
+
+    opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
+
+    opts.on("-s", "--source-type=TYPE") do |s|
+      subcommand_options.source_type = s
+    end
+
+    opts.on("-d", "--destination-type=TYPE") do |s|
+      subcommand_options.dest_type = s
+    end
   end
 }
 

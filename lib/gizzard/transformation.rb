@@ -73,7 +73,7 @@ module Gizzard
             base_id      = forwarding.base_id
             enum         = shard.enumeration
             table_prefix = Shard.canonical_table_prefix(enum, table_id, base_name)
-            translations = shard.canonical_table_prefix_map(base_name, table_id, enum)
+            translations = shard.canonical_shard_id_map(base_name, table_id, enum)
 
             yield(table_id, base_id, table_prefix, translations)
           end
@@ -128,7 +128,7 @@ module Gizzard
       class AddLink < LinkOp
         def expand(copy_source, involved_in_copy, wrapper_type)
           if involved_in_copy
-            wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [to])
+            wrapper = ShardTemplate.new(wrapper_type, to.host, to.weight, '', '', [to])
             { :prepare => [AddLink.new(from, wrapper)],
               :cleanup => [self, RemoveLink.new(from, wrapper)] }
           else
@@ -140,7 +140,7 @@ module Gizzard
           from_shard_id = from.to_shard_id(table_prefix, translations)
           to_shard_id   = to.to_shard_id(table_prefix, translations)
 
-          nameserver.add_link(from_shard_id, to_shard_id)
+          nameserver.add_link(from_shard_id, to_shard_id, to.weight)
         end
       end
 
@@ -176,7 +176,7 @@ module Gizzard
       class CreateShard < ShardOp
         def expand(copy_source, involved_in_copy, wrapper_type)
           if involved_in_copy
-            wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [template])
+            wrapper = ShardTemplate.new(wrapper_type, template.host, template.weight, '', '', [template])
             { :prepare => [self, CreateShard.new(wrapper), AddLink.new(wrapper, template)],
               :cleanup => [RemoveLink.new(wrapper, template), DeleteShard.new(wrapper)],
               :copy => [CopyShard.new(copy_source, template)] }
@@ -276,10 +276,10 @@ module Gizzard
       end
     end
 
-    def apply!(nameserver, base_name, batches)
-      raise ArgumentError unless batches.is_a? Hash
+    def apply!(nameserver, base_name, batch)
+      raise ArgumentError unless batch.is_a? Hash
 
-      applier = lambda {|j| j.apply(nameserver, base_name, batches) }
+      applier = lambda {|j| j.apply_batch(nameserver, base_name, batch) }
 
       operations[:prepare].each(&applier)
       operations[:copy].each(&applier)
@@ -288,7 +288,7 @@ module Gizzard
 
     def inspect
       op_inspect = operations.inject({}) do |h, (phase, ops)|
-        h[phase] = ops.map {|job| job.inspect }.join("\n")
+        h.update phase => ops.map {|job| "    #{job.inspect}" }.join("\n")
       end
 
       prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
@@ -297,7 +297,7 @@ module Gizzard
 
       op_inspect = [prepare_inspect, copy_inspect, cleanup_inspect].join
 
-      "[#{from.inspect} => #{to.inspect} : \n#{op_inspect}\n]"
+      "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
     end
 
     def operations

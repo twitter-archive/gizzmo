@@ -75,11 +75,11 @@ describe Gizzard::Nameserver do
     it "works..."
   end
 
-  describe "reload_forwardings" do
-    it "reloads the forwardings on every app server" do
-      mock(@client).reload_forwardings
-      mock(@second_client).reload_forwardings
-      @nameserver.reload_forwardings
+  describe "reload_config" do
+    it "reloads config on every app server" do
+      mock(@client).reload_config
+      mock(@second_client).reload_config
+      @nameserver.reload_config
     end
   end
 end

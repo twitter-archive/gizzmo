@@ -46,6 +46,21 @@ module Gizzard
     def destination_type; info.destination_type end
     def busy; info.busy end
 
+    def template
+      child_templates = children.map {|c| c.template }
+
+      ShardTemplate.new(info.class_name,
+                        id.hostname,
+                        weight,
+                        info.source_type,
+                        info.destination_type,
+                        child_templates)
+    end
+
+    def transformation(to)
+      Transformation.new(template, to)
+    end
+
     def enumeration
       self.class.parse_enumeration(table_prefix)
     end
@@ -121,8 +136,12 @@ module Gizzard
       end
     end
 
-    def reload_forwardings
-      all_clients.each {|c| with_retry { c.reload_forwardings } }
+    def get_shards(ids)
+      ids.map {|id| with_retry { client.get_shard(id) } }
+    end
+
+    def reload_config
+      all_clients.each {|c| with_retry { c.reload_config } }
     end
 
     def respond_to?(method)
@@ -133,8 +152,8 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
-    def manifest(table_id=nil)
-      Manifest.new(self, table_id)
+    def manifest(filter = {})
+      Manifest.new(self, filter)
     end
 
     private
@@ -166,16 +185,28 @@ module Gizzard
     class Manifest
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
-      def initialize(nameserver, table_id=nil)
-        @forwardings = nameserver.get_forwardings
+      SUPPORTED_FILTERS = [:table_id, :forwardings]
 
-        @forwardings.reject! {|f| f.table_id != table_id } if table_id
+      def initialize(nameserver, filter = {})
+        unless (unsupported = filter.keys - SUPPORTED_FILTERS).empty?
+          raise ArgumentError, "unsupported filter: #{unsupported.first.inspect}"
+        end
+
+        @forwardings = get_filtered_forwardings(nameserver, filter)
 
         @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
           (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
         end
 
-        @shard_infos = nameserver.get_all_shards.inject({}) do |h, shard|
+        infos =
+          if filter[:forwardings]
+            ids = @links.inject([]) {|a,(u,ds)| (a << u).concat ds.map {|d| d[0] } }
+            nameserver.get_shards(ids)
+          else
+            nameserver.get_all_shards
+          end
+
+        @shard_infos = infos.inject({}) do |h, shard|
           h.update shard.id => shard
         end
 
@@ -184,11 +215,23 @@ module Gizzard
         end
 
         @templates = @trees.inject({}) do |h, (forwarding, shard)|
-          (h[build_template(shard)] ||= []) << forwarding; h
+          (h[shard.template] ||= []) << forwarding; h
         end
       end
 
       private
+
+      def get_filtered_forwardings(nameserver, filter)
+        return filter[:forwardings] if filter[:forwardings]
+
+        forwardings = nameserver.get_forwardings
+
+        if table_id = filter[:table_id]
+          forwardings.reject! {|f| f.table_id != table_id }
+        end
+
+        forwardings
+      end
 
       def build_tree(shard_id, link_weight=ShardTemplate::DEFAULT_WEIGHT)
         children = (links[shard_id] || []).map do |(child_id, child_weight)|
@@ -197,19 +240,6 @@ module Gizzard
 
         info = shard_infos[shard_id] or raise "shard info not found for: #{shard_id}"
         Shard.new(info, children, link_weight)
-      end
-
-      def build_template(shard)
-        children = shard.children.map do |child|
-          build_template(child)
-        end
-
-        ShardTemplate.new(shard.info.class_name,
-                          shard.id.hostname,
-                          shard.weight,
-                          shard.info.source_type,
-                          shard.info.destination_type,
-                          children)
       end
     end
   end

@@ -254,6 +254,22 @@ c2:c2host2:7777 0
         EOF
       end
     end
+
+    describe "topology" do
+      it "lists counts for each template" do
+        gizzmo("topology").should == <<-EOF
+   3 {"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+        EOF
+      end
+
+      it "shows the template for each forwarding" do
+        gizzmo("topology --forwardings").should == <<-EOF
+                        0	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+                        1	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+                        2	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+        EOF
+      end
+    end
   end
 
   describe "find" do
@@ -306,5 +322,40 @@ c2:c2host2:7777 0
 
   describe "flush" do
     it "works"
+  end
+
+  describe "transform-tree" do
+    it "works" do
+      gizzmo "create TestShard localhost/s_0_001_a"
+      #gizzmo "create TestShard 127.0.0.1/s_0_001_b"
+      gizzmo "create ReplicatingShard localhost/s_0_001_replicating"
+      gizzmo "addlink localhost/s_0_001_replicating localhost/s_0_001_a 1"
+      #gizzmo "addlink localhost/s_0_001_replicating 127.0.0.1/s_0_001_b 1"
+      gizzmo "addforwarding 0 1 localhost/s_0_001_replicating"
+      gizzmo "-f reload"
+
+      gizzmo('-f transform-tree "{\'ReplicatingShard\' => [\'TestShard:localhost\', \'TestShard:127.0.0.1\']}" localhost/s_0_001_replicating').should == <<-EOF
+{"ReplicatingShard:1"=>"TestShard:localhost:1"} => {"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]} :
+  PREPARE
+    create_shard(TestShard:127.0.0.1)
+    create_shard(WriteOnlyShard)
+    add_link(WriteOnlyShard -> TestShard:127.0.0.1)
+    add_link(ReplicatingShard -> WriteOnlyShard)
+  COPY
+    copy_shard(TestShard:127.0.0.1)
+  CLEANUP
+    add_link(ReplicatingShard -> TestShard:127.0.0.1)
+    remove_link(WriteOnlyShard -> TestShard:127.0.0.1)
+    remove_link(ReplicatingShard -> WriteOnlyShard)
+    delete_shard(WriteOnlyShard)
+      EOF
+
+      nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
+                                      info("localhost", "s_0_001_a", "TestShard"),
+                                      info("localhost", "s_0_001_replicating", "ReplicatingShard") ]
+
+      nameserver[:links].should == [ link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),
+                                     link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1) ]
+    end
   end
 end

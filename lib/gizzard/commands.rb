@@ -715,9 +715,8 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
-      puts "querying nameserver..."
       table_id = (@argv.first || 0).to_i
-      templates = nameserver.manifest(table_id).templates.inject({}) do |h, (t, fs)|
+      templates = nameserver.manifest(:table_id => table_id).templates.inject({}) do |h, (t, fs)|
         h.update t.to_config.inspect => fs
       end
 
@@ -732,6 +731,33 @@ module Gizzard
           sort.reverse.
           each {|a| puts "%4d %s" % a }
       end
+    end
+  end
+
+  class TransformTreeCommand < Command
+    def run
+      template_s, shard_id_s = @argv
+
+      parse_opts = {:source_type => command_options.source_type, :dest_type => command_options.dest_type}
+      template       = ShardTemplate.parse(template_s, parse_opts)
+      shard_id       = ShardId.parse(shard_id_s)
+      base_name      = shard_id.table_prefix.split('_').first
+      forwarding     = nameserver.get_forwarding_for_shard(shard_id)
+      manifest       = nameserver.manifest :forwardings => [forwarding]
+      shard          = manifest.trees[forwarding]
+      transformation = shard.transformation(template)
+
+      unless global_options.force && command_options.quiet
+        puts transformation.inspect
+      end
+
+      unless global_options.force
+        puts ""
+        puts "Continue? (y/n)"
+        exit unless $stdin.getc == "y"
+      end
+
+      transformation.apply!(nameserver, base_name, forwarding => shard)
     end
   end
 end
