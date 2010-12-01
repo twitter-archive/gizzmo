@@ -458,13 +458,13 @@ module Gizzard
 
       overlaps = {}
       ids_by_table.values.each do |arr|
-        key = arr.map{|id| id.hostname }.sort
+        key = arr.map { |id| id.hostname }.sort
         overlaps[key] ||= 0
-        overlaps[key]  += 1
+        overlaps[key] += 1
       end
 
       displayed = {}
-      overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
+      overlaps.sort_by { |hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
         id_a = ids_by_host[host_a].find{|id| nameserver.list_upward_links(id).size > 0 }
         id_b = ids_by_host[host_b].find{|id| nameserver.list_upward_links(id).size > 0 }
