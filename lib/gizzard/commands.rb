@@ -64,7 +64,7 @@ module Gizzard
 
   class ShardCommand < Command
     def self.make_service(global_options, log)
-      RetryProxy.new global_options.retry.to_i, 
+      RetryProxy.new global_options.retry.to_i,
         Gizzard::Thrift::ShardManager.new(global_options.host, global_options.port, log, global_options.framed, global_options.dry)
     end
   end

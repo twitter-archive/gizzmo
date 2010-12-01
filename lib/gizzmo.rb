@@ -7,23 +7,21 @@ require "gizzard"
 require "yaml"
 
 DOC_STRINGS = {
-  "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "addforwarding" => "Add a forwarding from a graph_id / base_source_id to a given shard.",
-  "forwardings" => "Get a list of all forwardings",
-  "reload" => "Instruct an appserver to reload its nameserver state",
-  "create" => "Create shard(s) of a given Java/Scala class.  If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
-  "addlink" => "Add a relationship link between two shards",
-  "markbusy" => "Mark a shard as busy.",
-  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
-  "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
-  "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
+  "addlink" => "Add a relationship link between two shards.",
+  "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "drill" => "Show shard trees for replicas of a given structure signature (from 'report').",
   "flush" => "Flush error queue for a given priority.",
+  "forwardings" => "Get a list of all forwardings.",
   "hosts" => "List hosts used in shard names in the forwarding table and replicas.",
   "info" => "Show id/class/busy for shards.",
+  "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "links" => "List parent & child links for shards.",
+  "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
+  "markbusy" => "Mark a shard as busy.",
+  "reload" => "Instruct an appserver to reload its nameserver state.",
   "report" => "Show each unique replica structure for a given list of shards.",
-  "flush" => "Flush error queue for a given priority."
+  "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
 }
 
 ORIGINAL_ARGV = ARGV.dup
