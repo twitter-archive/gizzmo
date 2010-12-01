@@ -253,13 +253,13 @@ module Gizzard
     JOB_INVERSES.keys.each {|k| v = JOB_INVERSES[k]; JOB_INVERSES[v] = k }
 
     JOB_PRIORITIES = {
-      Op::RemoveForwarding => 0,
-      Op::RemoveLink       => 1,
-      Op::DeleteShard      => 2,
-      Op::CreateShard      => 3,
-      Op::AddLink          => 4,
-      Op::SetForwarding    => 5,
-      Op::CopyShard        => 6
+      Op::CreateShard      => 1,
+      Op::AddLink          => 2,
+      Op::SetForwarding    => 3,
+      Op::RemoveForwarding => 4,
+      Op::RemoveLink       => 5,
+      Op::DeleteShard      => 6,
+      Op::CopyShard        => 7
     }
 
     DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
@@ -270,6 +270,10 @@ module Gizzard
       @from = from_template
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper
+
+      if copies_required? && copy_source.nil?
+        raise ArgumentError, "copy required without a valid copy source"
+      end
     end
 
     def apply!(nameserver, base_name, batches)
@@ -325,7 +329,8 @@ module Gizzard
 
     def expand_jobs(jobs)
       expanded = jobs.inject({:prepare => [], :copy => [], :cleanup => []}) do |ops, job|
-        job.expand(self.copy_source, involved_in_copy?(job.template), @copy_dest_wrapper)
+        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template), @copy_dest_wrapper)
+        ops.update(job_ops) {|k,a,b| a + b }
       end
 
       # if there are no copies that need to take place, we can do all
@@ -338,21 +343,26 @@ module Gizzard
       expanded
     end
 
+    def copies_required?
+      return @copies_required unless  @copies_required.nil?
+      @copies_required = !from.nil? &&
+        to.concrete_descendants.reject {|d| from.shared_host? d }.length > 0
+    end
+
     def involved_in_copy?(template)
-      copy_source?(job.template) || copy_destination?(job.template)
+      copy_source?(template) || copy_destination?(template)
     end
 
     def copy_destination?(template)
-      template.concrete? && !from.nil? && !from.shared_host?(template)
-    end
-
-    def copy_source
-      from.copy_sources.first if from
+      copies_required? && template.concrete? && !from.shared_host?(template)
     end
 
     def copy_source?(template)
-      return false unless copy_source
-      !!from.copy_sources.find {|s| s.shard_eql? template }
+      copies_required? && !!from.copy_sources.find {|s| s.shard_eql? template }
+    end
+
+    def copy_source
+      from.copy_sources.first if copies_required?
     end
 
     def create_tree(root)
