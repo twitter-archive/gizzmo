@@ -236,6 +236,14 @@ subcommands = {
     opts.banner = "Usage: #{zero} busy"
     separators(opts, DOC_STRINGS["busy"])
   end,
+  'setup-replica' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} setup-replica SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, DOC_STRINGS["setup-replica"])
+  end,
+  'finish-replica' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} finish-replica SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, DOC_STRINGS["finish-replica"])
+  end,
   'setup-migrate' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} setup-migrate SOURCE_SHARD_ID DESTINATION_SHARD_ID"
     separators(opts, DOC_STRINGS["setup-migrate"])

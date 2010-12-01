@@ -593,6 +593,60 @@ module Gizzard
     end
   end
 
+  class SetupReplicaCommand < ShardCommand
+    def run
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+
+      if service.list_upward_links(to_shard_id).size > 0
+        STDERR.puts "Destination shard #{to_shard_id} has links to it."
+        exit 1
+      end
+
+      link = service.list_upward_links(from_shard_id)[0]
+      replica_shard_id = link.up_id
+      weight = link.weight
+      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+      service.create_shard(ShardInfo.new(write_only_shard_id, "WriteOnlyShard", "", "", 0))
+      service.add_link(replica_shard_id, write_only_shard_id, weight)
+      service.add_link(write_only_shard_id, to_shard_id, 1)
+      output to_shard_id.to_unix
+    end
+  end
+
+  class FinishReplicaCommand < ShardCommand
+    def run
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source & destination shard id") unless from_shard_id_string && to_shard_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+
+      write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+      link = service.list_upward_links(write_only_shard_id)[0]
+      replica_shard_id = link.up_id
+      weight = link.weight
+
+      # careful. need to validate some basic assumptions.
+      unless global_options.force
+        if service.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
+          STDERR.puts "Uplink from #{from_shard_id} is not a migration replica."
+          exit 1
+        end
+        if service.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
+          STDERR.puts "Uplink from #{to_shard_id} is not a write-only barrier."
+          exit 1
+        end
+      end
+
+      service.remove_link(write_only_shard_id, to_shard_id)
+      service.remove_link(replica_shard_id, write_only_shard_id)
+      service.add_link(replica_shard_id, to_shard_id, weight)
+      service.delete_shard(write_only_shard_id)
+    end
+  end
+
   class SetupMigrateCommand < ShardCommand
     def run
       from_shard_id_string, to_shard_id_string = @argv
