@@ -800,7 +800,7 @@ module Gizzard
       end
 
       if to_copy.size == 0
-        return
+        return 0
       end
 
       reload(app_servers)
@@ -810,15 +810,8 @@ module Gizzard
       to_copy.each do |from_shard_id, to_shard_id|
         print "."
         STDOUT.flush
+        service.mark_shard_busy(to_shard_id, 1)
         service.copy_shard(from_shard_id, to_shard_id)
-      end
-      print "\n"
-
-      print "Waiting for copies to start "
-      while service.get_busy_shards().size == busy_count
-        print "."
-        STDOUT.flush
-        sleep 5
       end
       print "\n"
 
@@ -857,6 +850,7 @@ module Gizzard
 
       reload(app_servers)
       print "\n"
+      return to_copy.size
     end
 
     def run
@@ -868,9 +862,10 @@ module Gizzard
       puts "Total shards: #{shard_ids.size}"
       puts
       shard_ids.each_slice(command_options.group_by) do |ids|
-        do_burst(app_servers, ids)
-        puts "Sleeping..."
-        sleep 5
+        if do_burst(app_servers, ids) > 0
+          puts "Sleeping..."
+          sleep 5
+        end
       end
     end
   end
