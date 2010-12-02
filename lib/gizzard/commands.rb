@@ -1,5 +1,6 @@
 require "pp"
 require "digest/md5"
+require "enumerator"
 
 module Gizzard
   class Command
@@ -737,6 +738,137 @@ module Gizzard
         service.retry_errors()
       else
         service.retry_errors_for(args.to_i)
+      end
+    end
+  end
+
+  class ReplicateCommand < ShardCommand
+    def reload(app_servers)
+      print "Reloading nameservers: "
+      app_servers.each do |hostname|
+        retries = 5
+        success = false
+        while retries > 0 and !success
+          print "#{hostname} "
+          STDOUT.flush
+          opts = global_options.dup
+          opts.host = hostname
+          s = self.class.make_service(opts, global_options.log || "./gizzmo.log")
+          begin
+            s.reload_forwardings
+            success = true
+          rescue Exception => e
+            print "EXCEPTION(#{e}) "
+            STDOUT.flush
+            retries -= 1
+            if retries == 0
+              exit 1
+            end
+          end
+        end
+      end
+      print "\n"
+    end
+
+    def do_burst(app_servers, shard_ids)
+      to_copy = []
+
+      shard_ids.each do |id|
+        from_shard_id = ShardId.parse(id)
+        to_shard_id = ShardId.new(command_options.hostname, from_shard_id.table_prefix)
+        print "#{to_shard_id.inspect} ... "
+        service.create_shard(ShardInfo.new(to_shard_id, command_options.class_name, command_options.source_type, command_options.destination_type, 0))
+        link = service.list_upward_links(from_shard_id)[0]
+        replica_shard_id = link.up_id
+        weight = link.weight
+        existing_links = service.list_upward_links(to_shard_id)
+        if existing_links.size > 0
+          if replica_shard_id == existing_links[0].up_id
+            print "already done.\n"
+          else
+            print "MESSED UP: #{existing_links[0].up_id} != #{replica_shard_id}\n"
+            exit 1
+          end
+        else
+          write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+          service.create_shard(ShardInfo.new(write_only_shard_id, "WriteOnlyShard", "", "", 0))
+          service.add_link(replica_shard_id, write_only_shard_id, weight)
+          service.add_link(write_only_shard_id, to_shard_id, 1)
+          to_copy << [ from_shard_id, to_shard_id ]
+          print "copying.\n"
+        end
+      end
+
+      if to_copy.size == 0
+        return
+      end
+
+      reload(app_servers)
+
+      print "Starting copies "
+      busy_count = service.get_busy_shards().size
+      to_copy.each do |from_shard_id, to_shard_id|
+        print "."
+        STDOUT.flush
+        service.copy_shard(from_shard_id, to_shard_id)
+      end
+      print "\n"
+
+      print "Waiting for copies to start "
+      while service.get_busy_shards().size == busy_count
+        print "."
+        STDOUT.flush
+        sleep 5
+      end
+      print "\n"
+
+      print "Waiting for copies to finish "
+      while service.get_busy_shards().size > 0
+        print "."
+        STDOUT.flush
+        sleep 15
+      end
+      print "\n"
+
+      print "Cleaning up write-only barriers..."
+      STDOUT.flush
+      to_copy.each do |from_shard_id, to_shard_id|
+        write_only_shard_id = ShardId.new("localhost", "#{to_shard_id.table_prefix}_copy_write_only")
+        link = service.list_upward_links(write_only_shard_id)[0]
+        replica_shard_id = link.up_id
+        weight = link.weight
+
+        # careful. need to validate some basic assumptions.
+        if service.list_upward_links(from_shard_id).map { |link| link.up_id }.to_a != [ replica_shard_id ]
+          STDERR.puts "Uplink from #{from_shard_id} is not a migration replica."
+          exit 1
+        end
+        if service.list_upward_links(to_shard_id).map { |link| link.up_id }.to_a != [ write_only_shard_id ]
+          STDERR.puts "Uplink from #{to_shard_id} is not a write-only barrier."
+          exit 1
+        end
+
+        service.remove_link(write_only_shard_id, to_shard_id)
+        service.remove_link(replica_shard_id, write_only_shard_id)
+        service.add_link(replica_shard_id, to_shard_id, weight)
+        service.delete_shard(write_only_shard_id)
+      end
+      print "\n"
+
+      reload(app_servers)
+      print "\n"
+    end
+
+    def run
+      shard_ids = @argv
+      app_servers = []
+      File.open(command_options.app_servers_file) { |f| app_servers = f.readlines().map { |line| line.strip() } }
+      puts
+      puts "Total app servers: #{app_servers.size}"
+      puts "Total shards: #{shard_ids.size}"
+      puts
+      shard_ids.each_slice(command_options.group_by) do |ids|
+        do_burst(app_servers, ids)
       end
     end
   end

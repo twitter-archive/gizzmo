@@ -267,6 +267,29 @@ subcommands = {
     opts.on("--all", "Flush all error queues.") do
       subcommand_options.flush_all = true
     end
+  end,
+  'replicate' => OptionParser.new do |opts|
+    subcommand_options.group_by = 5
+
+    opts.banner = "Usage: #{zero} replicate [options] <shard_ids>"
+    opts.on("-g", "--group=N", "perform shard copies in groups of N (default: #{subcommand_options.group_by})") do |n|
+      subcommand_options.group_by = n.to_i
+    end
+    opts.on("-f", "--servers=FILENAME", "load app server list from FILENAME") do |filename|
+      subcommand_options.app_servers_file = filename
+    end
+    opts.on("-s", "--source-type=TYPE") do |s|
+      subcommand_options.source_type = s
+    end
+    opts.on("-d", "--destination-type=TYPE") do |s|
+      subcommand_options.destination_type = s
+    end
+    opts.on("-c", "--class-name=NAME") do |s|
+      subcommand_options.class_name = s
+    end
+    opts.on("-h", "--hostname=HOSTNAME", "new database hostname") do |s|
+      subcommand_options.hostname = s
+    end
   end
 }
 
