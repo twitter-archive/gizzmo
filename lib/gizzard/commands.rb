@@ -869,6 +869,8 @@ module Gizzard
       puts
       shard_ids.each_slice(command_options.group_by) do |ids|
         do_burst(app_servers, ids)
+        puts "Sleeping..."
+        sleep 5
       end
     end
   end
