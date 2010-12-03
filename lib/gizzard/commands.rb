@@ -743,6 +743,12 @@ module Gizzard
   end
 
   class ReplicateCommand < ShardCommand
+    def service_for(hostname)
+      opts = global_options.dup
+      opts.host = hostname
+      self.class.make_service(opts, global_options.log || "./gizzmo.log")
+    end
+
     def reload(app_servers)
       print "Reloading nameservers: "
       app_servers.each do |hostname|
@@ -751,9 +757,7 @@ module Gizzard
         while retries > 0 and !success
           print "#{hostname} "
           STDOUT.flush
-          opts = global_options.dup
-          opts.host = hostname
-          s = self.class.make_service(opts, global_options.log || "./gizzmo.log")
+          s = service_for(hostname)
           begin
             s.reload_forwardings
             success = true
@@ -807,11 +811,14 @@ module Gizzard
 
       print "Starting copies "
       busy_count = service.get_busy_shards().size
+      i = 0
       to_copy.each do |from_shard_id, to_shard_id|
         print "."
         STDOUT.flush
-        service.mark_shard_busy(to_shard_id, 1)
-        service.copy_shard(from_shard_id, to_shard_id)
+        s = service_for(app_servers[i])
+        s.mark_shard_busy(to_shard_id, 1)
+        s.copy_shard(from_shard_id, to_shard_id)
+        i = (i + 1) % app_servers.size
       end
       print "\n"
 

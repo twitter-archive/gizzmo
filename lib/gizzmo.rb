@@ -269,7 +269,7 @@ subcommands = {
     end
   end,
   'replicate' => OptionParser.new do |opts|
-    subcommand_options.group_by = 5
+    subcommand_options.group_by ||= 5
 
     opts.banner = "Usage: #{zero} replicate [options] <shard_ids>"
     opts.on("-g", "--group=N", "perform shard copies in groups of N (default: #{subcommand_options.group_by})") do |n|
