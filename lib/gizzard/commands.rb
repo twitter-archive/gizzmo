@@ -510,20 +510,20 @@ module Gizzard
         m[e] ||= []
         m[e] << e
         m
-      end.to_a.sort_by{|k, v| v.length}.reverse
+      end.to_a.sort_by { |k, v| v.length }.reverse
     end
 
     def parse(obj, id = nil, depth = 0, sub = true)
       case obj
       when Hash
         id, prefix = parse(obj.keys.first, id, depth, sub)
-        [prefix] + parse(obj.values.first, id, depth + 1, sub)
+        [ prefix ] + parse(obj.values.first, id, depth + 1, sub)
       when String
         host, prefix = obj.split("/")
         host = "db" if host != "localhost" && sub
         id ||= prefix[/(\w+ward_)?\d+_\d+(_\w+ward)?/]
         prefix = ("  " * depth) + host + "/" + ((sub && id) ? prefix.sub(id, "[ID]") : prefix)
-        [id, prefix]
+        [ id, prefix ]
       when Array
         obj.map do |e|
           parse e, id, depth, sub
@@ -535,7 +535,7 @@ module Gizzard
       vals = service.list_downward_links(id).map do |link|
         down(link.down_id)
       end
-      {id.to_unix => vals}
+      { id.to_unix => vals }
     end
   end
 
