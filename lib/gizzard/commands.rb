@@ -160,7 +160,7 @@ module Gizzard
             output hostname
             opts = global_options.dup
             opts.host = hostname
-            s = self.class.make_service(opts, global_options.log || "./gizzmo.log")
+            s = self.class.make_manager(opts, global_options.log || "./gizzmo.log")
             s.reload_config
           end
         else
@@ -458,16 +458,16 @@ module Gizzard
 
       overlaps = {}
       ids_by_table.values.each do |arr|
-        key = arr.map{|id| id.hostname }.sort
+        key = arr.map { |id| id.hostname }.sort
         overlaps[key] ||= 0
-        overlaps[key]  += 1
+        overlaps[key] += 1
       end
 
       displayed = {}
-      overlaps.sort_by{|hosts, count| count }.reverse.each do |(host_a, host_b), count|
+      overlaps.sort_by { |hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
-        id_a = ids_by_host[host_a].find{|id| manager.list_upward_links(id).size > 0 }
-        id_b = ids_by_host[host_b].find{|id| manager.list_upward_links(id).size > 0 }
+        id_a = ids_by_host[host_a].find { |id| manager.list_upward_links(id).size > 0 }
+        id_b = ids_by_host[host_b].find { |id| manager.list_upward_links(id).size > 0 }
         next unless id_a && id_b
         weight_a = manager.list_upward_links(id_a).first.weight
         weight_b = manager.list_upward_links(id_b).first.weight
@@ -516,20 +516,20 @@ module Gizzard
         m[e] ||= []
         m[e] << e
         m
-      end.to_a.sort_by{|k, v| v.length}.reverse
+      end.to_a.sort_by { |k, v| v.length }.reverse
     end
 
     def parse(obj, id = nil, depth = 0, sub = true)
       case obj
       when Hash
         id, prefix = parse(obj.keys.first, id, depth, sub)
-        [prefix] + parse(obj.values.first, id, depth + 1, sub)
+        [ prefix ] + parse(obj.values.first, id, depth + 1, sub)
       when String
         host, prefix = obj.split("/")
         host = "db" if host != "localhost" && sub
-        id ||= prefix[/(\w+ward_)?\d+_\d+(_\w+ward)?/]
+        id ||= prefix[/(\w+ward_)?n?\d+_\d+(_\w+ward)?/]
         prefix = ("  " * depth) + host + "/" + ((sub && id) ? prefix.sub(id, "[ID]") : prefix)
-        [id, prefix]
+        [ id, prefix ]
       when Array
         obj.map do |e|
           parse e, id, depth, sub
@@ -541,7 +541,7 @@ module Gizzard
       vals = manager.list_downward_links(id).map do |link|
         down(link.down_id)
       end
-      {id.to_unix => vals}
+      { id.to_unix => vals }
     end
   end
 
