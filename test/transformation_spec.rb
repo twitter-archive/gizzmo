@@ -57,13 +57,13 @@ describe Gizzard::Transformation do
 
     @config = Gizzard::MigratorConfig.new :prefix => "status", :table_id => 0
 
-    @from_template = mk_template 'ReplicatingShard' => [{'BlockedShard' => "SqlShard:host1"}, "SqlShard:host2"]
-    @to_template = mk_template 'ReplicatingShard' => %w(SqlShard:host2 SqlShard:host3)
+    @from_template = mk_template 'ReplicatingShard -> (BlockedShard -> SqlShard(host1), SqlShard(host2))'
+    @to_template   = mk_template 'ReplicatingShard -> (SqlShard(host2), SqlShard(host3))'
 
-    @blocked_template = mk_template 'BlockedShard' => "SqlShard:host1"
-    @host_1_template = mk_template 'SqlShard:host1'
-    @host_2_template = mk_template 'SqlShard:host2'
-    @host_3_template = mk_template 'SqlShard:host3'
+    @blocked_template = mk_template 'BlockedShard -> SqlShard(host1)'
+    @host_1_template  = mk_template 'SqlShard(host1)'
+    @host_2_template  = mk_template 'SqlShard(host2)'
+    @host_3_template  = mk_template 'SqlShard(host3)'
 
     @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001))
   end
@@ -72,64 +72,64 @@ describe Gizzard::Transformation do
 
   describe "operations" do
     it "does a basic replica addition" do
-      from = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2']
-      to   = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2', 'SqlShard:host3']
+      from = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
+      to   = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2), SqlShard(host3))'
 
       Gizzard::Transformation.new(from, to, 'BlockedShard').operations.should == {
-        :prepare => [ create_shard('SqlShard:host3'),
+        :prepare => [ create_shard('SqlShard(host3)'),
                       create_shard('BlockedShard'),
-                      add_link('BlockedShard', 'SqlShard:host3'),
+                      add_link('BlockedShard', 'SqlShard(host3)'),
                       add_link('ReplicatingShard', 'BlockedShard') ],
-        :copy =>    [ copy_shard('SqlShard:host1', 'SqlShard:host3') ],
-        :cleanup => [ add_link('ReplicatingShard', 'SqlShard:host3'),
+        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+        :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host3)'),
                       remove_link('ReplicatingShard', 'BlockedShard'),
-                      remove_link('BlockedShard', 'SqlShard:host3'),
+                      remove_link('BlockedShard', 'SqlShard(host3)'),
                       delete_shard('BlockedShard') ]
       }
     end
 
     it "does a partition migration" do
-      from = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2']
-      to   = mk_template 'ReplicatingShard' => ['SqlShard:host3', 'SqlShard:host4']
+      from = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
+      to   = mk_template 'ReplicatingShard -> (SqlShard(host3), SqlShard(host4))'
 
       Gizzard::Transformation.new(from, to).operations.should == {
-        :prepare => [ create_shard('SqlShard:host4'),
+        :prepare => [ create_shard('SqlShard(host4)'),
                       create_shard('WriteOnlyShard'),
                       create_shard('WriteOnlyShard'),
-                      create_shard('SqlShard:host3'),
+                      create_shard('SqlShard(host3)'),
                       add_link('ReplicatingShard', 'WriteOnlyShard'),
-                      add_link('WriteOnlyShard', 'SqlShard:host4'),
-                      add_link('WriteOnlyShard', 'SqlShard:host3'),
+                      add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                      add_link('WriteOnlyShard', 'SqlShard(host3)'),
                       add_link('ReplicatingShard', 'WriteOnlyShard') ],
-        :copy =>    [ copy_shard('SqlShard:host1', 'SqlShard:host4'),
-                      copy_shard('SqlShard:host1', 'SqlShard:host3') ],
-        :cleanup => [ add_link('ReplicatingShard', 'SqlShard:host4'),
-                      add_link('ReplicatingShard', 'SqlShard:host3'),
+        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
+                      copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+        :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host4)'),
+                      add_link('ReplicatingShard', 'SqlShard(host3)'),
                       remove_link('ReplicatingShard', 'WriteOnlyShard'),
                       remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                      remove_link('WriteOnlyShard', 'SqlShard:host3'),
-                      remove_link('ReplicatingShard', 'SqlShard:host1'),
-                      remove_link('ReplicatingShard', 'SqlShard:host2'),
-                      remove_link('WriteOnlyShard', 'SqlShard:host4'),
-                      delete_shard('SqlShard:host1'),
-                      delete_shard('SqlShard:host2'),
+                      remove_link('WriteOnlyShard', 'SqlShard(host3)'),
+                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                      remove_link('ReplicatingShard', 'SqlShard(host2)'),
+                      remove_link('WriteOnlyShard', 'SqlShard(host4)'),
+                      delete_shard('SqlShard(host1)'),
+                      delete_shard('SqlShard(host2)'),
                       delete_shard('WriteOnlyShard'),
                       delete_shard('WriteOnlyShard') ]
       }
     end
 
     it "migrates the top level shard" do
-      from = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2']
-      to   = mk_template 'FailingOverShard' => ['SqlShard:host1', 'SqlShard:host2']
+      from = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
+      to   = mk_template 'FailingOverShard -> (SqlShard(host1), SqlShard(host2))'
 
       Gizzard::Transformation.new(from, to).operations.should == {
         :prepare => [ create_shard('FailingOverShard'),
-                      add_link('FailingOverShard', 'SqlShard:host2'),
-                      add_link('FailingOverShard', 'SqlShard:host1'),
+                      add_link('FailingOverShard', 'SqlShard(host2)'),
+                      add_link('FailingOverShard', 'SqlShard(host1)'),
                       set_forwarding('FailingOverShard'),
                       remove_forwarding('ReplicatingShard'),
-                      remove_link('ReplicatingShard', 'SqlShard:host1'),
-                      remove_link('ReplicatingShard', 'SqlShard:host2'),
+                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                      remove_link('ReplicatingShard', 'SqlShard(host2)'),
                       delete_shard('ReplicatingShard') ],
         :copy =>    [],
         :cleanup => []
@@ -137,24 +137,24 @@ describe Gizzard::Transformation do
     end
 
     it "wraps a shard" do
-      from = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2']
-      to   = mk_template 'ReplicatingShard' => [{'ReadOnlyShard' => 'SqlShard:host1'}, 'SqlShard:host2']
+      from = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
+      to   = mk_template 'ReplicatingShard -> (ReadOnlyShard -> SqlShard(host1), SqlShard(host2))'
 
       Gizzard::Transformation.new(from, to).operations.should == {
         :prepare => [ create_shard('ReadOnlyShard'),
-                      add_link('ReadOnlyShard', 'SqlShard:host1'),
+                      add_link('ReadOnlyShard', 'SqlShard(host1)'),
                       add_link('ReplicatingShard', 'ReadOnlyShard'),
-                      remove_link('ReplicatingShard', 'SqlShard:host1') ],
+                      remove_link('ReplicatingShard', 'SqlShard(host1)') ],
         :copy =>    [],
         :cleanup => []
       }
     end
 
     it "raises an argument error if the transformation requires a copy without a valid source" do
-      to = mk_template 'ReplicatingShard' => ['SqlShard:host1', 'SqlShard:host2']
+      to = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
 
       Gizzard::Shard::INVALID_COPY_TYPES.each do |invalid_type|
-        from = mk_template 'ReplicatingShard' => [{invalid_type => 'SqlShard:host1'}]
+        from = mk_template "ReplicatingShard -> #{invalid_type} -> SqlShard(host1)"
         lambda { Gizzard::Transformation.new(from, to) }.should raise_error(ArgumentError)
       end
     end

@@ -383,7 +383,7 @@ module Gizzard
 
     def visit_collect(parent, &block)
       parent.children.inject([]) do |acc, child|
-        visit_collect(child, &block).concat(acc.concat, block.call(parent, child))
+        visit_collect(child, &block).concat(acc.concat(block.call(parent, child)))
       end
     end
   end

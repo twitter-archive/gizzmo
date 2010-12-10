@@ -76,31 +76,26 @@ describe Gizzard::ShardTemplate do
 
   describe "config methods" do
     describe "to_config" do
-      it "returns a ruby structure that coverts to human-readable yaml" do
-        @sql.to_config.should == "SqlShard:sqlhost:1"
-        @blocked.to_config.should == { "BlockedShard:1" => "SqlShard:sqlhost:1" }
-        @replicating.to_config.should == {
-          "ReplicatingShard:1" => [
-            "SqlShard:sqlhost2:1",
-            { "BlockedShard:1" => "SqlShard:sqlhost:1" }
-          ]
-        }
+      it "returns a human-readable string" do
+        @sql.to_config.should == "SqlShard(sqlhost)"
+        @blocked.to_config.should == 'BlockedShard -> SqlShard(sqlhost)'
+        @replicating.to_config.should ==
+          'ReplicatingShard -> (SqlShard(sqlhost2), BlockedShard -> SqlShard(sqlhost))'
       end
     end
   end
 
   describe "config class methods" do
-    describe "from_config" do
+    describe "parse" do
       it "builds a shard template tree" do
-        Gizzard::ShardTemplate.from_config("SqlShard:sqlhost:1").should ==
-          Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "", "", [])
+        Gizzard::ShardTemplate.parse("SqlShard(sqlhost,2)").should ==
+          Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 2, "", "", [])
 
-        opts = {:source_type => "int", :dest_type => "int"}
-        Gizzard::ShardTemplate.from_config("SqlShard:sqlhost:1", opts).should ==
+        Gizzard::ShardTemplate.parse("SqlShard(sqlhost,1,int,int)").should ==
           Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "int", "int", [])
 
-        Gizzard::ShardTemplate.from_config(
-          "ReplicatingShard:1" => [ "SqlShard:sqlhost2:1", { "BlockedShard:1" => "SqlShard:sqlhost:1" } ]
+        Gizzard::ShardTemplate.parse(
+          'ReplicatingShard -> (SqlShard(sqlhost2,1), BlockedShard -> SqlShard(sqlhost,1))'
         ).should == @replicating
       end
     end
