@@ -179,7 +179,7 @@ describe "gizzmo (cli)" do
   describe "basic read methods" do
     before do
       3.times do |i|
-        gizzmo "create TestShard localhost/t0_#{i}_a 127.0.0.1/t0_#{i}_b"
+        gizzmo "create TestShard -s Int -d Int localhost/t0_#{i}_a 127.0.0.1/t0_#{i}_b"
         gizzmo "create ReplicatingShard localhost/t0_#{i}_replicating"
         gizzmo "addlink localhost/t0_#{i}_replicating localhost/t0_#{i}_a 1"
         gizzmo "addlink localhost/t0_#{i}_replicating 127.0.0.1/t0_#{i}_b 1"
@@ -258,15 +258,15 @@ c2:c2host2:7777 0
     describe "topology" do
       it "lists counts for each template" do
         gizzmo("topology").should == <<-EOF
-   3 {"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+   3 ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
         EOF
       end
 
       it "shows the template for each forwarding" do
         gizzmo("topology --forwardings").should == <<-EOF
-                        0	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
-                        1	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
-                        2	{"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]}
+                        0	ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+                        1	ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+                        2	ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
         EOF
       end
     end
@@ -326,7 +326,7 @@ c2:c2host2:7777 0
 
   describe "transform-tree" do
     it "works" do
-      gizzmo "create TestShard localhost/s_0_001_a"
+      gizzmo "create -s Int -d Int TestShard localhost/s_0_001_a"
       #gizzmo "create TestShard 127.0.0.1/s_0_001_b"
       gizzmo "create ReplicatingShard localhost/s_0_001_replicating"
       gizzmo "addlink localhost/s_0_001_replicating localhost/s_0_001_a 1"
@@ -334,24 +334,24 @@ c2:c2host2:7777 0
       gizzmo "addforwarding 0 1 localhost/s_0_001_replicating"
       gizzmo "-f reload"
 
-      gizzmo('-f transform-tree "{\'ReplicatingShard\' => [\'TestShard:localhost\', \'TestShard:127.0.0.1\']}" localhost/s_0_001_replicating').should == <<-EOF
-{"ReplicatingShard:1"=>"TestShard:localhost:1"} => {"ReplicatingShard:1"=>["TestShard:localhost:1", "TestShard:127.0.0.1:1"]} :
+      gizzmo('-f transform-tree "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" localhost/s_0_001_replicating').should == <<-EOF
+ReplicatingShard -> TestShard(localhost,1,Int,Int) => ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1)) :
   PREPARE
-    create_shard(TestShard:127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard:127.0.0.1)
+    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
     add_link(ReplicatingShard -> WriteOnlyShard)
   COPY
-    copy_shard(TestShard:127.0.0.1)
+    copy_shard(TestShard/127.0.0.1)
   CLEANUP
-    add_link(ReplicatingShard -> TestShard:127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard:127.0.0.1)
+    add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> WriteOnlyShard)
     delete_shard(WriteOnlyShard)
       EOF
 
       nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
-                                      info("localhost", "s_0_001_a", "TestShard"),
+                                      info("localhost", "s_0_001_a", "TestShard", "Int", "Int"),
                                       info("localhost", "s_0_001_replicating", "ReplicatingShard") ]
 
       nameserver[:links].should == [ link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),

@@ -29,7 +29,7 @@ module Gizzard
     end
 
     def identifier
-      concrete? ? "#{type}:#{host}" : type.to_s
+      concrete? ? "#{type}/#{host}" : type.to_s
     end
 
     def table_name_suffix
@@ -66,7 +66,7 @@ module Gizzard
     end
 
     def inspect
-      to_config.inspect
+      to_config
     end
     alias to_s inspect
 
@@ -134,15 +134,35 @@ module Gizzard
 
     # Config
 
-    def to_config
-      definition = [identifier, weight].compact.join(":")
+    def config_definition
+      args = identifier.split("/")
+      args << weight unless weight == DEFAULT_WEIGHT && @source_type.empty? && @dest_type.empty?
+      args.concat [@source_type,@dest_type] unless [@source_type, @dest_type].reject {|s| s.empty? }.empty?
 
+      type = args.shift
+      args_s = args.empty? ? "" : "(#{args.join(",")})"
+
+      type + args_s
+    end
+
+    private :config_definition
+
+    def to_config_struct
       if children.empty?
-        definition
+        config_definition
+      else
+        child_defs = children.map {|c| c.to_config_struct }
+        { config_definition => (child_defs.length == 1 ? child_defs.first : child_defs) }
+      end
+    end
+
+    def to_config
+      if children.empty?
+        config_definition
       else
         child_defs = children.map {|c| c.to_config }
-        child_defs = child_defs.first if child_defs.length == 1
-        { definition => child_defs }
+        child_defs_s = child_defs.length == 1 ? child_defs.first : "(#{child_defs.join(", ")})"
+        "#{config_definition} -> #{child_defs_s}"
       end
     end
 
@@ -150,50 +170,82 @@ module Gizzard
     # Class Methods
 
     class << self
-      def from_config(conf_tree, opts = {})
-        source_type = opts[:source_type] || ""
-        dest_type   = opts[:dest_type]   || ""
-        shard, child_configs = parse_link_struct(conf_tree)
-        type, host, weight   = parse_shard_definition(shard)
-        children             = Array(child_configs).map { |child| from_config(child, opts) }
+      def parse(string)
+        definition_s, children_s = string.split(/\s*->\s*/, 2)
 
-        new(type, host, weight, source_type, dest_type, children)
-      end
+        children =
+        if children_s.nil?
+          []
+        else
+          list = parse_arg_list(children_s).map {|c| parse c }
+          raise ArgumentError, "invalid shard config. -> given, no children found" if list.empty?
+          list
+        end
 
-      def parse(string, opts = {})
-        config = eval(string)
-        from_config(config, opts)
+        template_args = parse_definition(definition_s) << children
+        ShardTemplate.new(*template_args)
       end
 
       private
 
-      def parse_link_struct(obj)
-        if obj.is_a? String
-          [obj, nil]
-        elsif obj.is_a? Hash and obj.length == 1
-          [obj.keys.first, obj.values.first]
-        else
-          raise ArgumentError, "invalid shard tree: #{obj.inspect}"
+      def parse_definition(definition_s)
+        type, arg_list = definition_s.split("(", 2)
+
+        host, weight, source_type, dest_type =
+          if arg_list.nil?
+            nil
+          else
+            args = parse_arg_list("(" + arg_list)
+            args.unshift nil unless concrete? type
+            args
+          end
+
+        validate_host_arg(host, definition_s) if concrete? type
+        validate_weight_arg(weight, definition_s)
+
+        weight = (weight || DEFAULT_WEIGHT).to_i
+        source_type ||= ""
+        dest_type   ||= ""
+
+        [type, host, weight, source_type, dest_type]
+      end
+
+      def parse_arg_list(string)
+        string = string.strip
+        if m = string.match(/\A\((.*)\)\Z/)
+          string = m[1]
+        end
+
+        depth = 0
+        results = [[]]
+
+        string.each_char do |c|
+          case c
+          when ","
+            if depth == 0
+              results << []
+              next
+            end
+          when "(" then depth += 1
+          when ")" then depth -= 1
+          end
+
+          results.last << c
+        end
+
+        results.map {|r| r.join.strip }
+      end
+
+      def validate_weight_arg(arg, definition)
+        if arg && YAML.load(arg.to_s).is_a?(String)
+          raise ArgumentError, "Invalid weight #{arg} for shard in: #{definition}"
         end
       end
 
-      def parse_shard_definition(definition)
-        type, arg1, arg2 = definition.split(":")
-
-        host, weight =
-          unless concrete? type
-            if arg2 or YAML.load(arg1.to_s).is_a? String
-              raise ArgumentError, "cannot specify a host for #{type} shard in: #{definition.inspect}"
-            end
-            [nil, (arg1 || DEFAULT_WEIGHT).to_i]
-          else
-            if arg1.nil? or YAML.load(arg1.to_s).is_a? Numeric
-              raise ArgumentError, "must specify a host for #{type} shard in: #{definition.inspect}"
-            end
-            [arg1, (arg2 || DEFAULT_WEIGHT).to_i]
-          end
-
-        [type, host, weight]
+      def validate_host_arg(arg, definition)
+        if arg.nil? || YAML.load(arg.to_s).is_a?(Numeric)
+          raise ArgumentError, "Invalid host #{arg} for shard in: #{definition}"
+        end
       end
     end
   end

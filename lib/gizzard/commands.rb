@@ -786,7 +786,7 @@ module Gizzard
     def run
       table_id = (@argv.first || 0).to_i
       templates = manager.manifest(:table_id => table_id).templates.inject({}) do |h, (t, fs)|
-        h.update t.to_config.inspect => fs
+        h.update t.to_config => fs
       end
 
       if command_options.forwardings
@@ -807,8 +807,7 @@ module Gizzard
     def run
       template_s, shard_id_s = @argv
 
-      parse_opts = {:source_type => command_options.source_type, :dest_type => command_options.dest_type}
-      template       = ShardTemplate.parse(template_s, parse_opts)
+      template       = ShardTemplate.parse(template_s)
       shard_id       = ShardId.parse(shard_id_s)
       base_name      = shard_id.table_prefix.split('_').first
       forwarding     = manager.get_forwarding_for_shard(shard_id)
