@@ -466,8 +466,8 @@ module Gizzard
       displayed = {}
       overlaps.sort_by { |hosts, count| count }.reverse.each do |(host_a, host_b), count|
         next if !host_a || !host_b || displayed[host_a] || displayed[host_b]
-        id_a = ids_by_host[host_a].find { |id| manager.list_upward_links(id).size > 0 }
-        id_b = ids_by_host[host_b].find { |id| manager.list_upward_links(id).size > 0 }
+        id_a = ids_by_host[host_a].find {|id| manager.list_upward_links(id).size > 0 }
+        id_b = ids_by_host[host_b].find {|id| manager.list_upward_links(id).size > 0 }
         next unless id_a && id_b
         weight_a = manager.list_upward_links(id_a).first.weight
         weight_b = manager.list_upward_links(id_b).first.weight
@@ -791,14 +791,14 @@ module Gizzard
 
       if command_options.forwardings
         templates.
-          inject([]) {|h, (t, fs)| fs.each {|f| h << [f.base_id, t] }; h }.
+          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.base_id, t] }; h }.
           sort.
-          each {|a| puts "%25d\t%s" % a }
+          each { |a| puts "%25d\t%s" % a }
       else
         templates.
-          map {|(t, fs)| [fs.length, t] }.
+          map { |(t, fs)| [fs.length, t] }.
           sort.reverse.
-          each {|a| puts "%4d %s" % a }
+          each { |a| puts "%4d %s" % a }
       end
     end
   end
