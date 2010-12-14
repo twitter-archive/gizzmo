@@ -317,6 +317,10 @@ class ThriftClient
         class_eval "def #{name}(#{arg_names}); _proxy(:#{name}#{args.size > 0 ? ', ' : ''}#{arg_names}); end"
       end
 
+      def reset
+        @connection = nil
+      end
+
       def connection
         @connection ||= TCPSocket.new(@host, @port)
       end

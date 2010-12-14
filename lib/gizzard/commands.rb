@@ -772,6 +772,7 @@ module Gizzard
         end
       end
       print "\n"
+      service.reset
     end
 
     def do_burst(app_servers, shard_ids)
@@ -810,6 +811,7 @@ module Gizzard
       reload(app_servers)
 
       print "Starting copies "
+      STDOUT.flush
       busy_count = service.get_busy_shards().size
       i = 0
       to_copy.each do |from_shard_id, to_shard_id|
