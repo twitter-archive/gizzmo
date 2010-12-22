@@ -291,6 +291,14 @@ subcommands = {
     opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
       subcommand_options.quiet = true
     end
+  end,
+  'transform' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
+    separators(opts, DOC_STRINGS['transform'])
+
+    opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
   end
 }
 

@@ -828,4 +828,31 @@ module Gizzard
       transformation.apply!(manager, base_name, forwarding => shard)
     end
   end
+
+  class TransformCommand < Command
+    def run
+      from_template_s, to_template_s = @argv
+
+      from, to              = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
+      manifest              = manager.manifest
+      forwardings           = manifest.templates[from]
+      transformation        = Transformation.new(from, to)
+      forwardings_to_shards = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
+      base_name             = forwardings_to_shards.values.first.id.table_prefix.split('_').first
+
+      unless global_options.force && command_options.quiet
+        puts transformation.inspect
+        puts "Applied to:"
+        forwardings.each {|f| puts "  #{f.inspect}" }
+      end
+
+      unless global_options.force
+        puts ""
+        puts "Continue? (y/n)"
+        exit unless $stdin.getc == "y"
+      end
+
+      transformation.apply!(manager, base_name, forwardings_to_shards)
+    end
+  end
 end

@@ -358,4 +358,49 @@ ReplicatingShard -> TestShard(localhost,1,Int,Int) => ReplicatingShard -> (TestS
                                      link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1) ]
     end
   end
+
+  describe "transform" do
+    it "works" do
+      1.upto(2) do |i|
+        gizzmo "create TestShard -s Int -d Int localhost/s_0_00#{i}_a"
+        #gizzmo "create TestShard -s Int -d Int 127.0.0.1/s_0_000#{i}_b"
+        gizzmo "create ReplicatingShard localhost/s_0_00#{i}_replicating"
+        gizzmo "addlink localhost/s_0_00#{i}_replicating localhost/s_0_00#{i}_a 1"
+        #gizzmo "addlink localhost/s_0_00#{i}_replicating 127.0.0.1/s_0_000#{i}_b 1"
+        gizzmo "addforwarding 0 #{i} localhost/s_0_00#{i}_replicating"
+      end
+      gizzmo "-f reload"
+
+      gizzmo('-f transform "ReplicatingShard -> TestShard(localhost,1,Int,Int)" "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
+ReplicatingShard -> TestShard(localhost,1,Int,Int) => ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1)) :
+  PREPARE
+    create_shard(TestShard/127.0.0.1)
+    create_shard(WriteOnlyShard)
+    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> WriteOnlyShard)
+  COPY
+    copy_shard(TestShard/127.0.0.1)
+  CLEANUP
+    add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> WriteOnlyShard)
+    delete_shard(WriteOnlyShard)
+Applied to:
+  [0] 2 -> localhost/s_0_002_replicating
+  [0] 1 -> localhost/s_0_001_replicating
+      EOF
+
+      nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
+                                      info("127.0.0.1", "s_0_0002", "TestShard"),
+                                      info("localhost", "s_0_001_a", "TestShard", "Int", "Int"),
+                                      info("localhost", "s_0_001_replicating", "ReplicatingShard"),
+                                      info("localhost", "s_0_002_a", "TestShard", "Int", "Int"),
+                                      info("localhost", "s_0_002_replicating", "ReplicatingShard") ]
+
+      nameserver[:links].should == [ link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),
+                                     link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1),
+                                     link(id("localhost", "s_0_002_replicating"), id("127.0.0.1", "s_0_0002"), 1),
+                                     link(id("localhost", "s_0_002_replicating"), id("localhost", "s_0_002_a"), 1) ]
+    end
+  end
 end
