@@ -784,8 +784,11 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
-      table_id = (@argv.first || 0).to_i
-      templates = manager.manifest(:table_id => table_id).templates.inject({}) do |h, (t, fs)|
+      usage!("wrong number of arguments") unless @argv.length == 1
+
+      table_id = @argv.first.to_i
+
+      templates = manager.manifest(table_id).templates.inject({}) do |h, (t, fs)|
         h.update t.to_config => fs
       end
 
@@ -805,13 +808,15 @@ module Gizzard
 
   class TransformTreeCommand < Command
     def run
-      template_s, shard_id_s = @argv
+      usage!("wrong number of arguments") unless @argv.length == 2
+
+      shard_id_s, template_s = @argv
 
       template       = ShardTemplate.parse(template_s)
       shard_id       = ShardId.parse(shard_id_s)
       base_name      = shard_id.table_prefix.split('_').first
       forwarding     = manager.get_forwarding_for_shard(shard_id)
-      manifest       = manager.manifest :forwardings => [forwarding]
+      manifest       = manager.manifest(forwarding.table_id)
       shard          = manifest.trees[forwarding]
       transformation = shard.transformation(template)
 
@@ -831,10 +836,12 @@ module Gizzard
 
   class TransformCommand < Command
     def run
-      from_template_s, to_template_s = @argv
+      usage!("wrong number of arguments") unless @argv.length == 3
+
+      table_id_s, from_template_s, to_template_s = @argv
 
       from, to              = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-      manifest              = manager.manifest
+      manifest              = manager.manifest(table_id_s.to_i)
       forwardings           = manifest.templates[from]
       transformation        = Transformation.new(from, to)
       forwardings_to_shards = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }

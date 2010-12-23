@@ -152,8 +152,8 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
-    def manifest(filter = {})
-      Manifest.new(self, filter)
+    def manifest(table_id)
+      Manifest.new(self, table_id)
     end
 
     private
@@ -185,28 +185,17 @@ module Gizzard
     class Manifest
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
-      SUPPORTED_FILTERS = [:table_id, :forwardings]
 
-      def initialize(nameserver, filter = {})
-        unless (unsupported = filter.keys - SUPPORTED_FILTERS).empty?
-          raise ArgumentError, "unsupported filter: #{unsupported.first.inspect}"
-        end
+      def initialize(nameserver, table_id)
+        state = nameserver.dump_nameserver(table_id)
 
-        @forwardings = get_filtered_forwardings(nameserver, filter)
+        @forwardings = state.forwardings
 
-        @links = nameserver.get_all_links(forwardings).inject({}) do |h, link|
+        @links = state.links.inject({}) do |h, link|
           (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
         end
 
-        infos =
-          if filter[:forwardings]
-            ids = @links.inject([]) {|a,(u,ds)| (a << u).concat ds.map {|d| d[0] } }
-            nameserver.get_shards(ids)
-          else
-            nameserver.get_all_shards
-          end
-
-        @shard_infos = infos.inject({}) do |h, shard|
+        @shard_infos = state.shards.inject({}) do |h, shard|
           h.update shard.id => shard
         end
 

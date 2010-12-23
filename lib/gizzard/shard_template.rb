@@ -136,7 +136,7 @@ module Gizzard
 
     def config_definition
       args = identifier.split("/")
-      args << weight unless weight == DEFAULT_WEIGHT && @source_type.empty? && @dest_type.empty?
+      args << weight
       args.concat [@source_type,@dest_type] unless [@source_type, @dest_type].reject {|s| s.empty? }.empty?
 
       type = args.shift

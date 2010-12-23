@@ -7,6 +7,10 @@ module Gizzard
     T::StructType.new(*args)
   end
 
+  def self.list(*args)
+    T::ListType.new(*args)
+  end
+
   GizzardException = T.make_exception(:GizzardException,
     T::Field.new(:description, T::STRING, 1)
   )
@@ -82,6 +86,14 @@ module Gizzard
       "[#{table_id}] #{base_id.to_s(16)} -> #{shard_id.inspect}"
     end
   end
+
+  NameServerState = T.make_struct(:NameserverState,
+    T::Field.new(:shards, list(struct(ShardInfo)), 1),
+    T::Field.new(:links, list(struct(LinkInfo)), 2),
+    T::Field.new(:forwardings, list(struct(Forwarding)), 3),
+    T::Field.new(:table_id, T::I32, 4)
+  )
+
 
   module HostStatus
     Normal  = 0
@@ -173,6 +185,8 @@ module Gizzard
 
     thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(GizzardException)
     thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(GizzardException)
+
+    thrift_method :dump_nameserver, struct(NameServerState), field(:table_id, i32, 1), :throws => exception(GizzardException)
 
 
     # Job Scheduler Management

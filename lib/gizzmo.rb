@@ -285,7 +285,7 @@ subcommands = {
     end
   end,
   'transform-tree' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform-tree [options] TEMPLATE ROOT_SHARD_ID"
+    opts.banner = "Usage: #{zero} transform-tree [options] ROOT_SHARD_ID TEMPLATE"
     separators(opts, DOC_STRINGS['transform-tree'])
 
     opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
@@ -293,7 +293,7 @@ subcommands = {
     end
   end,
   'transform' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
+    opts.banner = "Usage: #{zero} transform [options] TABLE_ID FROM_TEMPLATE TO_TEMPLATE"
     separators(opts, DOC_STRINGS['transform'])
 
     opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
