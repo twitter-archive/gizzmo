@@ -9,11 +9,10 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-11-23}
-  s.default_executable = %q{gizzmo}
+  s.date = %q{2010-12-23}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
-  s.executables = ["gizzmo"]
+  s.executables = ["gizzmo", "setup_shards"]
   s.extra_rdoc_files = [
     "LICENSE",
      "README.rdoc"
@@ -26,11 +25,16 @@ Gem::Specification.new do |s|
      "Rakefile",
      "VERSION",
      "bin/gizzmo",
+     "bin/setup_shards",
      "gizzmo.gemspec",
      "lib/gizzard.rb",
      "lib/gizzard/commands.rb",
      "lib/gizzard/digest.rb",
+     "lib/gizzard/migrator.rb",
+     "lib/gizzard/nameserver.rb",
+     "lib/gizzard/shard_template.rb",
      "lib/gizzard/thrift.rb",
+     "lib/gizzard/transformation.rb",
      "lib/gizzmo.rb",
      "lib/vendor/thrift_client/simple.rb",
      "test/config.yaml",
@@ -50,9 +54,24 @@ Gem::Specification.new do |s|
      "test/expected/unwrapped-replicating_table_b_0.txt",
      "test/expected/unwrapped-table_b_0.txt",
      "test/expected/wrap-table_b_0.txt",
+     "test/gizzmo_spec.rb",
      "test/helper.rb",
+     "test/nameserver_spec.rb",
      "test/recreate.sql",
-     "test/test.sh"
+     "test/shard_template_spec.rb",
+     "test/spec.opts",
+     "test/spec_helper.rb",
+     "test/test.sh",
+     "test/test_server/.gitignore",
+     "test/test_server/project/build.properties",
+     "test/test_server/project/build/Project.scala",
+     "test/test_server/project/plugins/Plugins.scala",
+     "test/test_server/src/main/scala/Config.scala",
+     "test/test_server/src/main/scala/Jobs.scala",
+     "test/test_server/src/main/scala/Shards.scala",
+     "test/test_server/src/main/scala/TestServer.scala",
+     "test/test_server/src/main/thrift/TestServer.thrift",
+     "test/transformation_spec.rb"
   ]
   s.homepage = %q{http://github.com/twitter/gizzmo}
   s.rdoc_options = ["--charset=UTF-8"]
@@ -60,7 +79,15 @@ Gem::Specification.new do |s|
   s.rubygems_version = %q{1.3.7}
   s.summary = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.test_files = [
-    "test/helper.rb"
+    "test/gizzmo_spec.rb",
+     "test/helper.rb",
+     "test/nameserver_spec.rb",
+     "test/shard_template_spec.rb",
+     "test/spec_helper.rb",
+     "test/test_server/target/gen-rb/test_server.rb",
+     "test/test_server/target/gen-rb/test_server_constants.rb",
+     "test/test_server/target/gen-rb/test_server_types.rb",
+     "test/transformation_spec.rb"
   ]
 
   if s.respond_to? :specification_version then
