@@ -81,6 +81,8 @@ module Gizzard
       end
 
       class CopyShard < BaseOp
+        BUSY = 1
+
         attr_reader :from, :to
         alias template to
 
@@ -96,6 +98,7 @@ module Gizzard
             from_shard_id = from.to_shard_id(table_prefix, translations)
             to_shard_id   = to.to_shard_id(table_prefix, translations)
 
+            nameserver.mark_shard_busy(to_shard_id, BUSY)
             nameserver.copy_shard(from_shard_id, to_shard_id)
           end
 
