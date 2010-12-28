@@ -44,10 +44,10 @@ def start_test_server!(manager_p = MANAGER_PORT, job_p = JOB_PORT, service_p = S
     compile_test_server!
 
     fork do
-      exec("cd #{SERVER_ROOT} && exec java -jar #{SERVER_JAR} #{service_p} #{job_p} #{manager_p} > /dev/null 2>&1")
+      exec "cd #{SERVER_ROOT} && exec java -jar #{SERVER_JAR} #{service_p} #{job_p} #{manager_p} > /dev/null 2>&1"
     end
 
-    sleep(3)
+    sleep 3
   end
 end
 

@@ -95,47 +95,6 @@ module Gizzard
       @hosts = hosts.flatten
     end
 
-    def get_all_links(forwardings=nil)
-      mutex         = Mutex.new
-      all_links     = {}
-      forwardings ||= client.get_forwardings
-      forwardings   = forwardings.dup
-
-      Thread.abort_on_exception = true
-
-      threads = (0..(PARALLELISM - 1)).map do |i|
-        Thread.new do
-          done   = {}
-          client = create_client(hosts.first)
-
-          while f = mutex.synchronize { forwardings.pop }
-            pending = [f.shard_id]
-
-            until pending.empty?
-              id = pending.pop
-
-              unless done[id]
-                links = with_retry { client.list_downward_links id }
-                links.each {|l| pending << l.down_id }
-                mutex.synchronize { links.each {|l| all_links[l] = true } }
-                done[id] = true
-              end
-            end
-          end
-        end
-      end
-
-      threads.each {|t| t.join }
-
-      all_links.keys
-    end
-
-    def get_all_shards
-      client.list_hostnames.inject([]) do |a, hostname|
-        a.concat client.shards_for_hostname(hostname)
-      end
-    end
-
     def get_shards(ids)
       ids.map {|id| with_retry { client.get_shard(id) } }
     end
@@ -199,7 +158,7 @@ module Gizzard
           h.update shard.id => shard
         end
 
-        @trees = forwardings.inject({}) do |h, forwarding|
+        @trees = @forwardings.inject({}) do |h, forwarding|
           h.update forwarding => build_tree(forwarding.shard_id)
         end
 

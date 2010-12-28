@@ -45,9 +45,9 @@ module Gizzard
 
     def apply!
       loop do
-        @busy_shards = nameserver.get_busy_shards
+        reload_busy_shards
         cleanup_jobs
-        schedule_jobs(max_copies - @busy_shards.length)
+        schedule_jobs(max_copies - busy_shards.length)
 
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
         sleep @poll_interval
@@ -88,11 +88,28 @@ module Gizzard
     end
 
     def jobs_completed
-      @jobs_in_progress.select {|j| (@busy_shards & j.involved_shards).empty? }
+      @jobs_in_progress.select {|j| (busy_shards & j.involved_shards).empty? }
+    end
+
+    def reload_busy_shards
+      @busy_shards = nil
+    end
+
+    def busy_shards
+      @busy_shards ||=
+        if nameserver.dryrun?
+          []
+        else
+          nameserver.get_busy_shards.map {|s| s.id }
+        end
     end
 
     def busy_hosts
-      @busy_shards.map {|s| s.hostname }
+      copies_count_map = busy_shards.inject({}) do |h, shard|
+        h.update(shard.hostname => 1) {|_,a,b| a + b }
+      end
+
+      copies_count_map.select {|_, count| count >= @max_copies }.map {|(shard, _)| shard }
     end
   end
 end

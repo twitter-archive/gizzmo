@@ -94,9 +94,12 @@ describe Gizzard::Nameserver::Manifest do
     @forwardings = [forwarding(0, 0, id("localhost", "tbl_001_rep"))]
 
     @nameserver = Gizzard::Nameserver.new("localhost:1234")
-    mock(@nameserver).get_forwardings { @forwardings }
-    mock(@nameserver).get_all_links(@forwardings) { @links }
-    mock(@nameserver).get_all_shards { @shardinfos }
+    @state = Object.new
+
+    mock(@nameserver).dump_nameserver(0) { @state }
+    mock(@state).forwardings { @forwardings }
+    mock(@state).links { @links }
+    mock(@state).shards { @shardinfos }
   end
 
   it "memoizes the forwardings list" do
@@ -129,7 +132,7 @@ describe Gizzard::Nameserver::Manifest do
     child  = Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "int", "int", [])
     parent = Gizzard::ShardTemplate.new("ReplicatingShard", "localhost", 1, "", "", [child])
 
-    @nameserver.manifest(0).templates.should == {
+     @nameserver.manifest(0).templates.should == {
       parent => [forwarding(0, 0, id("localhost", "tbl_001_rep"))]
     }
   end
