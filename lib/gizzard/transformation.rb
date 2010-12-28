@@ -1,7 +1,7 @@
 module Gizzard
   class Transformation
-    include 'gizzard/transformation_op'
-    include 'gizzard/transformation_scheduler'
+    require 'gizzard/transformation_op'
+    require 'gizzard/transformation_scheduler'
 
     OP_NAMES = {
       Op::RemoveForwarding => "remove_forwarding",
