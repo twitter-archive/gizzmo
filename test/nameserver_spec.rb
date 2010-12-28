@@ -100,17 +100,17 @@ describe Gizzard::Nameserver::Manifest do
   end
 
   it "memoizes the forwardings list" do
-    @nameserver.manifest.forwardings.should == @forwardings
+    @nameserver.manifest(0).forwardings.should == @forwardings
   end
 
   it "creates a links hash in the form of up_id => [[down_id, weight]]" do
-    @nameserver.manifest.links.should == {
+    @nameserver.manifest(0).links.should == {
       id("localhost", "tbl_001_rep") => [[id("sqlhost", "tbl_001"), 1]]
     }
   end
 
   it "creates a shard_infos hash in the form of shard_id => shard_info" do
-    @nameserver.manifest.shard_infos.should == {
+    @nameserver.manifest(0).shard_infos.should == {
       id("localhost", "tbl_001_rep") => info("localhost", "tbl_001_rep", "ReplicatingShard", "", "", 0),
       id("sqlhost", "tbl_001")       => info("sqlhost", "tbl_001", "SqlShard", "int", "int", 0)
     }
@@ -120,7 +120,7 @@ describe Gizzard::Nameserver::Manifest do
     child  = Gizzard::Shard.new(info("sqlhost", "tbl_001", "SqlShard", "int", "int", 0), [], 1)
     parent = Gizzard::Shard.new(info("localhost", "tbl_001_rep", "ReplicatingShard", "", "", 0), [child], 1)
 
-    @nameserver.manifest.trees.should == {
+    @nameserver.manifest(0).trees.should == {
       forwarding(0, 0, id("localhost", "tbl_001_rep")) => parent
     }
   end
@@ -129,7 +129,7 @@ describe Gizzard::Nameserver::Manifest do
     child  = Gizzard::ShardTemplate.new("SqlShard", "sqlhost", 1, "int", "int", [])
     parent = Gizzard::ShardTemplate.new("ReplicatingShard", "localhost", 1, "", "", [child])
 
-    @nameserver.manifest.templates.should == {
+    @nameserver.manifest(0).templates.should == {
       parent => [forwarding(0, 0, id("localhost", "tbl_001_rep"))]
     }
   end

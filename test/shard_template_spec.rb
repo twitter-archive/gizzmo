@@ -77,10 +77,10 @@ describe Gizzard::ShardTemplate do
   describe "config methods" do
     describe "to_config" do
       it "returns a human-readable string" do
-        @sql.to_config.should == "SqlShard(sqlhost)"
-        @blocked.to_config.should == 'BlockedShard -> SqlShard(sqlhost)'
+        @sql.to_config.should == "SqlShard(sqlhost,1)"
+        @blocked.to_config.should == 'BlockedShard(1) -> SqlShard(sqlhost,1)'
         @replicating.to_config.should ==
-          'ReplicatingShard -> (SqlShard(sqlhost2), BlockedShard -> SqlShard(sqlhost))'
+          'ReplicatingShard(1) -> (SqlShard(sqlhost2,1), BlockedShard(1) -> SqlShard(sqlhost,1))'
       end
     end
   end

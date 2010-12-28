@@ -1,45 +1,5 @@
 require File.expand_path('../spec_helper', __FILE__)
 
-describe Gizzard::ForwardingTransformation do
-  before do
-    @nameserver = stub!.subject
-    @forwardings = {
-      -100 => id('localhost', 'status_001_replicating'),
-      0 => id('localhost', 'status_002_replicating'),
-      100 => id('localhost', 'status_003_replicating')
-    }
-    @trans = Gizzard::ForwardingTransformation.new(1, @forwardings)
-  end
-
-  describe "apply!" do
-    it "creates forwardings with the nameserver" do
-      trans = Gizzard::ForwardingTransformation.new(1, @forwardings)
-
-      mock(@nameserver).set_forwarding(anything).times(3) do |forwarding|
-        shard_id = @forwardings.delete(forwarding.base_id)
-        shard_id.should_not be_nil
-
-        forwarding.table_id.should == 1
-        forwarding.shard_id.should == shard_id
-      end
-
-      trans.apply!(@nameserver)
-    end
-
-    it "uses a table id of 0 if passed nil" do
-      trans = Gizzard::ForwardingTransformation.new(nil, @forwardings)
-
-      mock(@nameserver).set_forwarding(anything).times(3) do |forwarding|
-        shard_id = @forwardings.delete(forwarding.base_id)
-        forwarding.table_id.should == 0
-      end
-
-      trans.apply!(@nameserver)
-    end
-  end
-end
-
-
 describe Gizzard::Transformation do
   Op = Gizzard::Transformation::Op
 
