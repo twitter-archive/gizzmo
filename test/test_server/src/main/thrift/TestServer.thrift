@@ -1,4 +1,4 @@
-namespace java com.twitter.gizzmo.thrift
+namespace java com.twitter.gizzard.testserver.thrift
 
 struct TestResult {
   1: i32 key

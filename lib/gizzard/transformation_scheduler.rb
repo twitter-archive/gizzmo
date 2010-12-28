@@ -1,15 +1,26 @@
 module Gizzard
+  def self.schedule!(*args)
+    Transformation::Scheduler.new(*args).apply!
+  end
+
   class Transformation::Scheduler
 
     attr_reader :nameserver, :transformations
     attr_reader :max_copies, :copies_per_host
 
-    def initialize(nameserver, transformations, base_name, max_copies, copies_per_host, poll_interval)
+    DEFAULT_OPTIONS = {
+      :max_copies => 20,
+      :copies_per_host => 4,
+      :poll_interval => 5
+    }.freeze
+
+    def initialize(nameserver, base_name, transformations, options = {})
+      options = DEFAULT_OPTIONS.merge(options)
       @nameserver      = nameserver
-      @max_copies      = max_copies
-      @copies_per_host = copies_per_host
       @transformations = transformations
-      @poll_interval   = poll_interval
+      @max_copies      = options[:max_copies]
+      @copies_per_host = options[:copies_per_host]
+      @poll_interval   = options[:poll_interval]
 
       @jobs_in_progress = []
       @jobs_finished    = []
@@ -48,7 +59,7 @@ module Gizzard
     def schedule_jobs(num_to_schedule)
       jobs = (1..num_to_schedule).map do
         job = @jobs_pending.find do |j|
-          (busy_hosts & job.involved_hosts).empty?
+          (busy_hosts & j.involved_hosts).empty?
         end
 
         @jobs_pending.delete(job)

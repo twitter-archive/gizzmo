@@ -8,8 +8,8 @@ SERVER_JAR     = File.expand_path("dist/gizzmotestserver/gizzmotestserver-#{SERV
 SERVICE_PORT = 7919
 MANAGER_PORT = 7920
 JOB_PORT     = 7921
-SERVICE_DATABASE    = 'gizzmo_test_integration'
-NAMESERVER_DATABASE = 'gizzmo_test_integration_ns'
+SERVICE_DATABASE    = 'gizzard_test_integration'
+NAMESERVER_DATABASE = 'gizzard_test_integration_ns'
 
 
 require 'rubygems'
@@ -41,6 +41,8 @@ end
 
 def start_test_server!(manager_p = MANAGER_PORT, job_p = JOB_PORT, service_p = SERVICE_PORT)
   unless test_server_pid
+    compile_test_server!
+
     fork do
       exec("cd #{SERVER_ROOT} && exec java -jar #{SERVER_JAR} #{service_p} #{job_p} #{manager_p} > /dev/null 2>&1")
     end
@@ -56,7 +58,7 @@ def stop_test_server!
 end
 
 def compile_test_server!
-  system "cd #{ROOT} && sbt package-dist" unless File.exist? SERVER_JAR
+  system "cd #{SERVER_ROOT} && sbt update package-dist" unless File.exist? SERVER_JAR
 end
 
 def mysql_connect!(host, user, pass)
@@ -87,7 +89,7 @@ def reset_databases!
   rescue MysqlError
 
     begin
-      m = Gizzard::Manager.new("localhost", MANAGER_PORT, '/dev/null')
+      m = Gizzard::Manager.new("localhost", MANAGER_PORT, '/dev/null', false)
       m.rebuild_schema
     rescue Errno::ECONNREFUSED
     end

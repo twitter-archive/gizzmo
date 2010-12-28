@@ -168,8 +168,8 @@ module Gizzard
       @table_id       = forwarding.table_id
       @base_id        = forwarding.base_id
       @enum           = shard.enumeration
-      @table_prefix   = Shard.canonical_table_prefix(enum, table_id, base_name)
-      @translations   = shard.canonical_shard_id_map(base_name, table_id, enum)
+      @table_prefix   = Shard.canonical_table_prefix(@enum, @table_id, base_name)
+      @translations   = shard.canonical_shard_id_map(base_name, @table_id, @enum)
     end
 
     def prepare!(nameserver)
@@ -185,8 +185,8 @@ module Gizzard
     end
 
     def involved_shards(phase = :copy)
-      transformations.operations[phase].map do |op|
-        op.involved_shards(@table_prefix, translations)
+      transformation.operations[phase].map do |op|
+        op.involved_shards(@table_prefix, @translations)
       end.flatten.compact.uniq
     end
 

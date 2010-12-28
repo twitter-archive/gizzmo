@@ -784,7 +784,7 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
-      usage!("wrong number of arguments") unless @argv.length == 1
+      help!("wrong number of arguments") unless @argv.length == 1
 
       table_id = @argv.first.to_i
 
@@ -808,9 +808,9 @@ module Gizzard
 
   class TransformTreeCommand < Command
     def run
-      usage!("wrong number of arguments") unless @argv.length == 2
+      help!("wrong number of arguments") unless @argv.length == 2
 
-      shard_id_s, template_s = @argv
+      template_s, shard_id_s = @argv
 
       template       = ShardTemplate.parse(template_s)
       shard_id       = ShardId.parse(shard_id_s)
@@ -830,13 +830,13 @@ module Gizzard
         exit unless $stdin.getc == "y"
       end
 
-      transformation.apply!(manager, base_name, forwarding => shard)
+      Gizzard.schedule! manager, base_name, transformation => { forwarding => shard }
     end
   end
 
   class TransformCommand < Command
     def run
-      usage!("wrong number of arguments") unless @argv.length == 3
+      help!("wrong number of arguments") unless @argv.length == 3
 
       table_id_s, from_template_s, to_template_s = @argv
 
@@ -859,7 +859,7 @@ module Gizzard
         exit unless $stdin.getc == "y"
       end
 
-      transformation.apply!(manager, base_name, forwardings_to_shards)
+      Gizzard.schedule! manager, base_name, transformation => forwardings_to_shards
     end
   end
 end
