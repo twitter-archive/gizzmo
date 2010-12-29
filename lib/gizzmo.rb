@@ -110,7 +110,7 @@ subcommands = {
     opts.on("-w", "--write-only=CLASS") do |w|
       subcommand_options.write_only_shard = w
     end
-    opts.on("-h", "--hosts=list") do |h|
+    opts.on("-h", "--shard-hosts=list") do |h|
       subcommand_options.hosts = h
     end
     opts.on("-x", "--exclude-hosts=list") do |x|
@@ -177,7 +177,7 @@ subcommands = {
       subcommand_options.shard_type = shard_type
     end
 
-    opts.on("-H", "--host=HOST", "HOST of shard") do |shard_host|
+    opts.on("-h", "--shard-host=HOST", "HOST of shard") do |shard_host|
       subcommand_options.shard_host = shard_host
     end
   end,
@@ -341,7 +341,7 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator ""
   opts.separator "Global options:"
-  opts.on("-H", "--host=HOSTNAME[,HOSTNAME,...]", "HOSTNAMES of application servers") do |hosts|
+  opts.on("-H", "--hosts=HOST[,HOST,...]", "HOSTS of application servers") do |hosts|
     global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
 
