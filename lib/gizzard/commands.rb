@@ -813,7 +813,7 @@ module Gizzard
 
       unless global_options.force
         puts "Continue? (y/n)"
-        exit unless $stdin.getc == "y"
+        exit unless $stdin.getc == "y"[0]
         puts ""
       end
 
@@ -846,7 +846,7 @@ module Gizzard
 
       unless global_options.force
         puts "Continue? (y/n)"
-        exit unless $stdin.getc == "y"
+        exit unless $stdin.getc == "y"[0]
         puts ""
       end
 

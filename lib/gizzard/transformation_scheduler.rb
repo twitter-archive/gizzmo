@@ -51,7 +51,7 @@ module Gizzard
         schedule_jobs(max_copies - busy_shards.length)
 
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
-        sleep @poll_interval
+        sleep @poll_interval unless nameserver.dryrun?
       end
 
       nameserver.reload_config

@@ -84,7 +84,7 @@ module Gizzard
     DEFAULT_RETRIES = 20
     PARALLELISM     = 10
 
-    attr_reader :hosts, :logfile, :dryrun
+    attr_reader :hosts, :logfile, :dryrun, :framed
     alias dryrun? dryrun
 
     def initialize(*hosts)

@@ -39,10 +39,10 @@ module Gizzard
     def host
       if concrete?
         @host
-      elsif children.length == 1
-        children.first.host
-      else
+      elsif replicating?
         ABSTRACT_HOST
+      else
+        children.first.host
       end
     end
 
