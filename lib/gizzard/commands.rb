@@ -155,18 +155,7 @@ module Gizzard
   class ReloadCommand < Command
     def run
       if global_options.force || ask
-        if !@argv.empty?
-          # allow hosts to be given on the command line
-          @argv.each do |hostname|
-            output hostname
-            opts = global_options.dup
-            opts.host = hostname
-            s = self.class.make_manager(opts, global_options.log || "./gizzmo.log")
-            s.reload_config
-          end
-        else
-          manager.reload_config
-        end
+        manager.reload_config
       else
         STDERR.puts "aborted"
       end
