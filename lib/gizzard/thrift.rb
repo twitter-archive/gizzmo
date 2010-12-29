@@ -81,7 +81,10 @@ module Gizzard
   )
 
   class Forwarding
-    #FIXME table_id is not human-readable
+    def <=>(o)
+      [self.table_id, self.base_id] <=> [o.table_id, o.base_id]
+    end
+
     def inspect
       "[#{table_id}] #{base_id.to_s(16)} -> #{shard_id.inspect}"
     end

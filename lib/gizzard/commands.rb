@@ -850,7 +850,7 @@ module Gizzard
       unless global_options.force && command_options.quiet
         puts transformation.inspect
         puts "Applied to:"
-        forwardings.each {|f| puts "  #{f.inspect}" }
+        forwardings.sort.each {|f| puts "  #{f.inspect}" }
       end
 
       unless global_options.force
