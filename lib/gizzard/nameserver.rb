@@ -80,9 +80,9 @@ module Gizzard
 
   class Nameserver
 
-    DEFAULT_PORT = 7917
+    DEFAULT_PORT    = 7917
     DEFAULT_RETRIES = 20
-    PARALLELISM = 10
+    PARALLELISM     = 10
 
     attr_reader :hosts, :logfile, :dryrun
     alias dryrun? dryrun
@@ -90,9 +90,10 @@ module Gizzard
     def initialize(*hosts)
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
       @retries = options[:retries] || DEFAULT_RETRIES
-      @logfile = options[:log] || "/tmp/gizzmo.log"
-      @dryrun = options[:dry_run] || false
-      @hosts = hosts.flatten
+      @logfile = options[:log]     || "/tmp/gizzmo.log"
+      @dryrun  = options[:dry_run] || false
+      @framed  = options[:framed]  || false
+      @hosts   = hosts.flatten
     end
 
     def get_shards(ids)
@@ -108,7 +109,11 @@ module Gizzard
     end
 
     def method_missing(method, *args, &block)
-      client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
+      if client.respond_to?(method)
+        with_retry { client.send(method, *args, &block) }
+      else
+        super
+      end
     end
 
     def manifest(*table_ids)
@@ -128,7 +133,7 @@ module Gizzard
     def create_client(host)
       host, port = host.split(":")
       port ||= DEFAULT_PORT
-      Manager.new(host, port.to_i, logfile, dryrun)
+      Manager.new(host, port.to_i, logfile, framed, dryrun)
     end
 
     private

@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-12-23}
+  s.date = %q{2010-12-29}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
   s.executables = ["gizzmo", "setup_shards"]
@@ -35,6 +35,8 @@ Gem::Specification.new do |s|
      "lib/gizzard/shard_template.rb",
      "lib/gizzard/thrift.rb",
      "lib/gizzard/transformation.rb",
+     "lib/gizzard/transformation_op.rb",
+     "lib/gizzard/transformation_scheduler.rb",
      "lib/gizzmo.rb",
      "lib/vendor/thrift_client/simple.rb",
      "test/config.yaml",
@@ -66,9 +68,7 @@ Gem::Specification.new do |s|
      "test/test_server/project/build.properties",
      "test/test_server/project/build/Project.scala",
      "test/test_server/project/plugins/Plugins.scala",
-     "test/test_server/src/main/scala/Config.scala",
-     "test/test_server/src/main/scala/Jobs.scala",
-     "test/test_server/src/main/scala/Shards.scala",
+     "test/test_server/src/main/scala/Main.scala",
      "test/test_server/src/main/scala/TestServer.scala",
      "test/test_server/src/main/thrift/TestServer.thrift",
      "test/transformation_spec.rb"
