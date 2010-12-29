@@ -155,7 +155,7 @@ module Gizzard
   class ReloadCommand < Command
     def run
       if global_options.force || ask
-        if @argv
+        if !@argv.empty?
           # allow hosts to be given on the command line
           @argv.each do |hostname|
             output hostname
