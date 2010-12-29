@@ -32,9 +32,12 @@ ORIGINAL_ARGV = ARGV.dup
 zero = File.basename($0)
 
 # Container for parsed options
-global_options     = OpenStruct.new
-global_options.render = []
-global_options.framed = false
+global_options = OpenStruct.new
+global_options.port          = 7920
+global_options.injector_port = 7921
+global_options.render        = []
+global_options.framed        = false
+
 subcommand_options = OpenStruct.new
 
 # Leftover arguments
@@ -78,6 +81,7 @@ end
 
 def load_config(options, filename)
   YAML.load(File.open(filename)).each do |k, v|
+    v = v.split(",").map {|h| h.strip } if k == "hosts"
     options.send("#{k}=", v)
   end
 end
@@ -320,7 +324,7 @@ global = OptionParser.new do |opts|
   opts.separator "key/value pairs corresponding to options you want by default. A common .gizzmorc"
   opts.separator "simply contains:"
   opts.separator ""
-  opts.separator "    host: localhost"
+  opts.separator "    hosts: localhost"
   opts.separator "    port: 7917"
   opts.separator ""
   opts.separator "Subcommands:"
@@ -337,12 +341,16 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator ""
   opts.separator "Global options:"
-  opts.on("-H", "--host=HOSTNAME", "HOSTNAME of remote thrift service") do |host|
-    global_options.host = host
+  opts.on("-H", "--host=HOSTNAME[,HOSTNAME,...]", "HOSTNAMES of application servers") do |hosts|
+    global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
 
-  opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
+  opts.on("-P", "--port=PORT", "PORT of remote manager service. default 7920") do |port|
     global_options.port = port.to_i
+  end
+
+  opts.on("-I", "--injector=PORT", "PORT of remote job injector service. default 7921") do |port|
+    global_options.injector_port = port.to_i
   end
 
   opts.on("-F", "--framed", "use the thrift framed transport") do |framed|
@@ -350,11 +358,11 @@ global = OptionParser.new do |opts|
   end
 
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
-    global_options.retry = r
+    global_options.retry = r.to_i
   end
 
   opts.on("-t", "--timeout=SECONDS", "SECONDS to let the command run") do |r|
-    global_options.timeout = r
+    global_options.timeout = r.to_i
   end
 
   opts.on("--subtree", "Render in subtree mode") do
@@ -433,12 +441,12 @@ def custom_timeout(seconds)
     begin
       require "rubygems"
       require "system_timer"
-      SystemTimer.timeout_after(seconds.to_i) do
+      SystemTimer.timeout_after(seconds) do
         yield
       end
     rescue LoadError
       require "timeout"
-      Timeout.timeout(seconds.to_i) do
+      Timeout.timeout(seconds) do
         yield
       end
     end

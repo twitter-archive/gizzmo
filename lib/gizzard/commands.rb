@@ -10,7 +10,7 @@ module Gizzard
       def run(command_name, global_options, argv, subcommand_options, log)
         command_class = Gizzard.const_get("#{classify(command_name)}Command")
 
-        @manager   ||= make_manager(global_options, log)
+        @manager      ||= make_manager(global_options, log)
         @job_injector ||= make_job_injector(global_options, log)
 
         command = command_class.new(@manager, @job_injector, global_options, argv, subcommand_options)
@@ -26,16 +26,17 @@ module Gizzard
       end
 
       def make_manager(global_options, log)
-        host = [global_options.host, global_options.port].join(":")
-        Nameserver.new(host, :retries => global_options.retry.to_i,
-                             :log => log,
-                             :framed => global_options.framed,
-                             :dry_run => global_options.dry)
+        hosts = global_options.hosts.map {|h| [h, global_options.port].join(":") }
+
+        Nameserver.new(hosts, :retries => global_options.retry,
+                              :log     => log,
+                              :framed  => global_options.framed,
+                              :dry_run => global_options.dry)
       end
 
       def make_job_injector(global_options, log)
-        RetryProxy.new global_options.retry.to_i,
-          JobInjector.new(global_options.host, global_options.port + 2, log, global_options.framed, global_options.dry)
+        RetryProxy.new global_options.retry,
+          JobInjector.new(global_options.hosts.first, global_options.injector_port, log, true, global_options.dry)
       end
     end
 
