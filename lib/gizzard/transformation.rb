@@ -159,6 +159,9 @@ module Gizzard
   class BoundTransformation
     attr_reader :transformation, :base_name, :forwarding, :shard
 
+    def from; transformation.from end
+    def to;   transformation.to   end
+
     def initialize(transformation, base_name, forwarding, shard)
       @transformation = transformation
       @base_name      = base_name
@@ -174,6 +177,10 @@ module Gizzard
 
     def prepare!(nameserver)
       apply_ops(nameserver, transformation.operations[:prepare])
+    end
+
+    def copy_required?
+      !transformation.operations[:copy].empty?
     end
 
     def copy!(nameserver)
@@ -192,6 +199,30 @@ module Gizzard
 
     def involved_hosts(phase = :copy)
       involved_shards(phase).map {|s| s.hostname }.uniq
+    end
+
+    def inspect(phase = nil)
+      base       = "#{@forwarding.inspect}: #{from.inspect} => #{to.inspect}"
+      op_inspect = transformation.operations.inject({}) do |h, (p, ops)|
+        h.update p => ops.map {|job| "    #{job.inspect}" }.join("\n")
+      end
+
+      prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
+      copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
+      cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
+
+      case phase
+      when :all
+        [base, "\n", prepare_inspect, copy_inspect, cleanup_inspect].join
+      when :prepare
+        [base, "\n", prepare_inspect].join
+      when :copy
+        [base, "\n", copy_inspect].join
+      when :cleanup
+        [base, "\n", cleanup_inspect].join
+      else
+        base
+      end
     end
 
     private

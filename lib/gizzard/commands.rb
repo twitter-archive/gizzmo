@@ -774,11 +774,7 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
-      help!("wrong number of arguments") unless @argv.length == 1
-
-      table_id = @argv.first.to_i
-
-      templates = manager.manifest(table_id).templates.inject({}) do |h, (t, fs)|
+      templates = manager.manifest(*global_options.tables).templates.inject({}) do |h, (t, fs)|
         h.update t.to_config => fs
       end
 
@@ -812,44 +808,52 @@ module Gizzard
 
       unless global_options.force && command_options.quiet
         puts transformation.inspect
+        puts ""
       end
 
       unless global_options.force
-        puts ""
         puts "Continue? (y/n)"
         exit unless $stdin.getc == "y"
+        puts ""
       end
 
-      Gizzard.schedule! manager, base_name, transformation => { forwarding => shard }
+      Gizzard.schedule! manager,
+                        base_name,
+                        { transformation => { forwarding => shard } },
+                        command_options.scheduler_options
     end
   end
 
   class TransformCommand < Command
     def run
-      help!("wrong number of arguments") unless @argv.length == 3
+      help!("wrong number of arguments") unless @argv.length == 2
 
-      table_id_s, from_template_s, to_template_s = @argv
+      from_template_s, to_template_s = @argv
 
-      from, to              = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-      manifest              = manager.manifest(table_id_s.to_i)
-      forwardings           = manifest.templates[from]
-      transformation        = Transformation.new(from, to)
-      forwardings_to_shards = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
-      base_name             = forwardings_to_shards.values.first.id.table_prefix.split('_').first
+      from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
+      manifest       = manager.manifest(*global_options.tables)
+      forwardings    = manifest.templates[from]
+      transformation = Transformation.new(from, to)
+      trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
+      base_name      = trees.values.first.id.table_prefix.split('_').first
 
       unless global_options.force && command_options.quiet
         puts transformation.inspect
         puts "Applied to:"
         forwardings.sort.each {|f| puts "  #{f.inspect}" }
+        puts ""
       end
 
       unless global_options.force
-        puts ""
         puts "Continue? (y/n)"
         exit unless $stdin.getc == "y"
+        puts ""
       end
 
-      Gizzard.schedule! manager, base_name, transformation => forwardings_to_shards
+      Gizzard.schedule! manager,
+                        base_name,
+                        { transformation => trees },
+                        command_options.scheduler_options
     end
   end
 end

@@ -111,8 +111,8 @@ module Gizzard
       client.respond_to?(method) ? with_retry { client.send(method, *args, &block) } : super
     end
 
-    def manifest(table_id)
-      Manifest.new(self, table_id)
+    def manifest(*table_ids)
+      Manifest.new(self, table_ids)
     end
 
     private
@@ -145,16 +145,16 @@ module Gizzard
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
 
-      def initialize(nameserver, table_id)
-        state = nameserver.dump_nameserver(table_id)
+      def initialize(nameserver, table_ids)
+        states = table_ids.map {|id| nameserver.dump_nameserver(id) }
 
-        @forwardings = state.forwardings
+        @forwardings = states.map {|s| s.forwardings }.flatten
 
-        @links = state.links.inject({}) do |h, link|
+        @links = states.map {|s| s.links }.flatten.inject({}) do |h, link|
           (h[link.up_id] ||= []) << [link.down_id, link.weight]; h
         end
 
-        @shard_infos = state.shards.inject({}) do |h, shard|
+        @shard_infos = states.map {|s| s.shards }.flatten.inject({}) do |h, shard|
           h.update shard.id => shard
         end
 

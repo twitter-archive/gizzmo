@@ -141,12 +141,6 @@ module Gizzard
         @log.puts printable(method_name, args, true)
         super(method_name, *args)
       end
-    rescue ThriftClient::Simple::ThriftException
-      if @dry
-        puts "Skipped reading: #{printable(method_name, args)}"
-      else
-        raise
-      end
     end
 
     def printable(method_name, args, timestamp = false)

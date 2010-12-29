@@ -86,6 +86,20 @@ def load_config(options, filename)
   end
 end
 
+def add_scheduler_opts(opts)
+  hash = {}
+  opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT.") do |c|
+    hash[:max_copies] = c.to_i
+  end
+  opts.on("--copies-per-host=COUNT", "Limit max copies per individual destination host to COUNT") do |c|
+    hash[:copies_per_host] = c.to_i
+  end
+  opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
+    hash[:poll_interval] = c.to_i
+  end
+  hash
+end
+
 subcommands = {
   'create' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} create [options] CLASS_NAME SHARD_ID [MORE SHARD_IDS...]"
@@ -281,7 +295,7 @@ subcommands = {
     separators(opts, DOC_STRINGS["list-hosts"])
   end,
   'topology' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} topology [options] TABLE_ID"
+    opts.banner = "Usage: #{zero} topology [options]"
     separators(opts, DOC_STRINGS["topology"])
 
     opts.on("--forwardings", "Show topology of forwardings instead of counts") do
@@ -292,13 +306,17 @@ subcommands = {
     opts.banner = "Usage: #{zero} transform-tree [options] ROOT_SHARD_ID TEMPLATE"
     separators(opts, DOC_STRINGS['transform-tree'])
 
+    subcommand_options.scheduler_options = add_scheduler_opts(opts)
+
     opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
       subcommand_options.quiet = true
     end
   end,
   'transform' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform [options] TABLE_ID FROM_TEMPLATE TO_TEMPLATE"
+    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
     separators(opts, DOC_STRINGS['transform'])
+
+    subcommand_options.scheduler_options = add_scheduler_opts(opts)
 
     opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
       subcommand_options.quiet = true
@@ -351,6 +369,10 @@ global = OptionParser.new do |opts|
 
   opts.on("-I", "--injector=PORT", "PORT of remote job injector service. default 7921") do |port|
     global_options.injector_port = port.to_i
+  end
+
+  opts.on("-T", "--tables=TABLE[,TABLE,...]", "TABLE ids of forwardings to affect") do |tables|
+    global_options.tables = tables.split(",").map {|t| t.to_i }
   end
 
   opts.on("-F", "--framed", "use the thrift framed transport") do |framed|

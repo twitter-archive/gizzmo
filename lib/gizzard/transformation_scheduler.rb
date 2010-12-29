@@ -47,6 +47,7 @@ module Gizzard
       loop do
         reload_busy_shards
         cleanup_jobs
+        put "Copies in progress: #{@jobs_in_progress.length}" unless @jobs_in_progress.empty?
         schedule_jobs(max_copies - busy_shards.length)
 
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
@@ -54,6 +55,8 @@ module Gizzard
       end
 
       nameserver.reload_config
+
+      puts "All transformations applied. Have a nice day!"
     end
 
     def schedule_jobs(num_to_schedule)
@@ -68,11 +71,23 @@ module Gizzard
       end.compact
 
       unless jobs.empty?
+        puts "Jobs starting:"
+        jobs.each {|j| puts "  #{j.inspect(:prepare)}" }
+
         jobs.each {|j| j.prepare!(nameserver) }
 
+        puts "Reloading nameserver configuration."
         nameserver.reload_config
 
-        jobs.each {|j| j.copy!(nameserver) }
+        copy_jobs = jobs.select {|j| j.copy_required? }
+
+        unless copy_jobs.empty?
+          puts "Scheduling copies:"
+          copy_jobs.each do |j|
+            puts "  #{j.inspect(:copy)}"
+            j.copy!(nameserver)
+          end
+        end
 
         @jobs_in_progress.concat(jobs)
       end
@@ -81,6 +96,11 @@ module Gizzard
     def cleanup_jobs
       jobs = jobs_completed
       @jobs_in_progress -= jobs
+
+      unless jobs.empty?
+        puts "Jobs finishing:"
+        jobs.each {|j| puts "  #{j.inspect(:cleanup)}" }
+      end
 
       jobs.each {|j| j.cleanup!(nameserver) }
 
