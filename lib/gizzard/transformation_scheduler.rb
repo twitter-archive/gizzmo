@@ -104,6 +104,8 @@ module Gizzard
             j.copy_descs.each {|d| log "  #{d}" }
             j.copy!(nameserver)
           end
+
+          reload_busy_shards
         end
 
         @jobs_in_progress.concat(jobs)
@@ -177,15 +179,24 @@ module Gizzard
     def put_copy_progress
       @i ||= 0
       @i  += 1
-      spinner = ['-', '\\', '|', '/'][@i % 4]
 
-      unless @jobs_in_progress.empty? || @busy_shards.empty?
+      unless @jobs_in_progress.empty? || busy_shards.empty?
+        spinner         = ['-', '\\', '|', '/'][@i % 4]
+        elapsed_txt     = "Time elapsed: #{time_elapsed}"
+        pending_txt     = "Pending: #{@jobs_pending.length}"
+        finished_txt    = "Finished: #{@jobs_finished.length}"
+        in_progress_txt =
+          if busy_shards.length != @jobs_in_progress.length
+            "In progress: #{@jobs_in_progress.length} (Copies: #{busy_shards.length})"
+          else
+            "In progress: #{@jobs_in_progress.length}"
+          end
+
         if @progress_string
-          print "\r"
-          print " " * (@progress_string.length + 10)
-          print "\r"
+          print "\r" + (" " * (@progress_string.length + 10)) + "\r"
         end
-        @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length} Time elapsed: #{time_elapsed}"
+
+        @progress_string = "#{spinner} #{in_progress_txt} #{pending_txt} #{finished_txt} #{elapsed_txt}"
         print @progress_string; $stdout.flush
       end
     end
