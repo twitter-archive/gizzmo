@@ -166,7 +166,7 @@ module Gizzard
 
     def clear_progress_string
       if @progress_string
-        #print "\r" + (" " * (@progress_string.length + 10)) + "\r"
+        print "\r" + (" " * (@progress_string.length + 10)) + "\r"
         @progress_string = nil
       end
     end
