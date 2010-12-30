@@ -104,6 +104,11 @@ module Gizzard
       all_clients.each {|c| with_retry { c.reload_config } }
     end
 
+    def copy_shard(from_shard_id, to_shard_id)
+      c = random_client
+      with_retry { c.copy_shard(from_shard_id, to_shard_id) }
+    end
+
     def respond_to?(method)
       client.respond_to? method or super
     end
@@ -128,6 +133,10 @@ module Gizzard
 
     def all_clients
       @all_clients ||= hosts.map {|host| create_client(host) }
+    end
+
+    def random_client
+      all_clients[rand(all_clients.length)]
     end
 
     def create_client(host)
