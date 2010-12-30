@@ -9,8 +9,8 @@ module Gizzard
     attr_reader :max_copies, :copies_per_host
 
     DEFAULT_OPTIONS = {
-      :max_copies => 20,
-      :copies_per_host => 4,
+      :max_copies => 30,
+      :copies_per_host => 8,
       :poll_interval => 5
     }.freeze
 
@@ -52,8 +52,8 @@ module Gizzard
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
 
         unless nameserver.dryrun?
-          4.times do
-            sleep(@poll_interval / 4.0)
+          6.times do
+            sleep(@poll_interval / 6.0)
             put_copy_progress
           end
         end
