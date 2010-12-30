@@ -805,9 +805,12 @@ module Gizzard
       manifest       = manager.manifest(forwarding.table_id)
       shard          = manifest.trees[forwarding]
       copy_wrapper   = command_options.scheduler_options[:copy_wrapper]
+      be_quiet       = global_options.force && command_options.quiet
       transformation = Transformation.new(shard.template, to_template, copy_wrapper)
 
-      unless global_options.force && command_options.quiet
+      command_options.scheduler_options[:quiet] = be_quiet
+
+      unless be_quiet
         puts transformation.inspect
         puts ""
       end
@@ -831,7 +834,10 @@ module Gizzard
 
       manifest        = manager.manifest(*global_options.tables)
       copy_wrapper    = command_options.scheduler_options[:copy_wrapper]
+      be_quiet        = global_options.force && command_options.quiet
       transformations = {}
+
+      command_options.scheduler_options[:quiet] = be_quiet
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
@@ -844,7 +850,7 @@ module Gizzard
 
       base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
 
-      unless global_options.force && command_options.quiet
+      unless be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
           puts "Applied to:"

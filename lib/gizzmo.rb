@@ -86,21 +86,22 @@ def load_config(options, filename)
   end
 end
 
-def add_scheduler_opts(opts)
-  hash = {}
+def add_scheduler_opts(subcommand_options, opts)
   opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT.") do |c|
-    hash[:max_copies] = c.to_i
+    (subcommand_options.scheduler_options ||= {})[:max_copies] = c.to_i
   end
   opts.on("--copies-per-host=COUNT", "Limit max copies per individual destination host to COUNT") do |c|
-    hash[:copies_per_host] = c.to_i
+    (subcommand_options.scheduler_options ||= {})[:copies_per_host] = c.to_i
   end
   opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
-    hash[:poll_interval] = c.to_i
+    (subcommand_options.scheduler_options ||= {})[:poll_interval] = c.to_i
   end
-  opts.on("--copy-wrapper=TYPE", "wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
-    hash[:copy_wrapper] = t
+  opts.on("--copy-wrapper=TYPE", "Wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
+    (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
   end
-  hash
+  opts.on("--no-progress", "Do not show progress bar at bottom.") do
+    (subcommand_options.scheduler_options ||= {})[:no_progress] = true
+  end
 end
 
 subcommands = {
@@ -309,9 +310,9 @@ subcommands = {
     opts.banner = "Usage: #{zero} transform-tree [options] ROOT_SHARD_ID TEMPLATE"
     separators(opts, DOC_STRINGS['transform-tree'])
 
-    subcommand_options.scheduler_options = add_scheduler_opts(opts)
+    add_scheduler_opts subcommand_options, opts
 
-    opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
   end,
@@ -319,9 +320,9 @@ subcommands = {
     opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
     separators(opts, DOC_STRINGS['transform'])
 
-    subcommand_options.scheduler_options = add_scheduler_opts(opts)
+    add_scheduler_opts subcommand_options, opts
 
-    opts.on("-q", "--quiet", "Do not display transformation preview (only valid with --force)") do
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
   end

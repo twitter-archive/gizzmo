@@ -16,11 +16,13 @@ module Gizzard
 
     def initialize(nameserver, base_name, transformations, options = {})
       options = DEFAULT_OPTIONS.merge(options)
-      @nameserver      = nameserver
-      @transformations = transformations
-      @max_copies      = options[:max_copies]
-      @copies_per_host = options[:copies_per_host]
-      @poll_interval   = options[:poll_interval]
+      @nameserver         = nameserver
+      @transformations    = transformations
+      @max_copies         = options[:max_copies]
+      @copies_per_host    = options[:copies_per_host]
+      @poll_interval      = options[:poll_interval]
+      @be_quiet           = options[:quiet]
+      @dont_show_progress = options[:no_progress] || @be_quiet
 
       @jobs_in_progress = []
       @jobs_finished    = []
@@ -60,9 +62,10 @@ module Gizzard
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
 
         unless nameserver.dryrun?
-          12.times do
-            sleep(@poll_interval / 12.0)
-            put_copy_progress
+          if @dont_show_progress
+            sleep(@poll_interval)
+          else
+            sleep_with_progress(@poll_interval)
           end
         end
       end
@@ -153,27 +156,26 @@ module Gizzard
       copies_count_map.select {|_, count| count >= @copies_per_host }.map {|(host, _)| host }
     end
 
-    def reset_progress_string
-      if @progress_string
-        @progress_string = nil
-        puts ""
+    def sleep_with_progress(interval)
+      start = Time.now
+      while (Time.now - start) < interval
+        put_copy_progress
+        sleep 0.2
       end
     end
 
-    def time_elapsed
-      s = (Time.now - @start_time).to_i
-
-      days    = s / (60 * 60 * 24)               if s >= 60 * 60 * 24
-      hours   = (s % (60 * 60 * 24)) / (60 * 60) if s >= 60 * 60
-      minutes = (s % (60 * 60)) / 60             if s >= 60
-      seconds = s % 60
-
-      [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
+    def clear_progress_string
+      if @progress_string
+        #print "\r" + (" " * (@progress_string.length + 10)) + "\r"
+        @progress_string = nil
+      end
     end
 
     def log(*args)
-      reset_progress_string
-      puts *args
+      unless @be_quiet
+        clear_progress_string
+        puts *args
+      end
     end
 
     def put_copy_progress
@@ -192,13 +194,22 @@ module Gizzard
             "In progress: #{@jobs_in_progress.length}"
           end
 
-        if @progress_string
-          print "\r" + (" " * (@progress_string.length + 10)) + "\r"
-        end
+        clear_progress_string
 
         @progress_string = "#{spinner} #{in_progress_txt} #{pending_txt} #{finished_txt} #{elapsed_txt}"
         print @progress_string; $stdout.flush
       end
+    end
+
+    def time_elapsed
+      s = (Time.now - @start_time).to_i
+
+      days    = s / (60 * 60 * 24)               if s >= 60 * 60 * 24
+      hours   = (s % (60 * 60 * 24)) / (60 * 60) if s >= 60 * 60
+      minutes = (s % (60 * 60)) / 60             if s >= 60
+      seconds = s % 60
+
+      [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
     end
   end
 end
