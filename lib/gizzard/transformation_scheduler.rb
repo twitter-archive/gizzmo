@@ -47,16 +47,21 @@ module Gizzard
       loop do
         reload_busy_shards
         cleanup_jobs
-        put "Copies in progress: #{@jobs_in_progress.length}" unless @jobs_in_progress.empty?
         schedule_jobs(max_copies - busy_shards.length)
 
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
-        sleep @poll_interval unless nameserver.dryrun?
+
+        unless nameserver.dryrun?
+          4.times do
+            sleep(@poll_interval / 4.0)
+            put_copy_progress
+          end
+        end
       end
 
       nameserver.reload_config
 
-      puts "All transformations applied. Have a nice day!"
+      log "All transformations applied. Have a nice day!"
     end
 
     def schedule_jobs(num_to_schedule)
@@ -71,20 +76,20 @@ module Gizzard
       end.compact
 
       unless jobs.empty?
-        puts "Jobs starting:"
-        jobs.each {|j| puts "  #{j.inspect(:prepare)}" }
+        log "Jobs starting:"
+        jobs.each {|j| log "  #{j.inspect(:prepare)}" }
 
         jobs.each {|j| j.prepare!(nameserver) }
 
-        puts "Reloading nameserver configuration."
+        log "Reloading nameserver configuration."
         nameserver.reload_config
 
         copy_jobs = jobs.select {|j| j.copy_required? }
 
         unless copy_jobs.empty?
-          puts "Scheduling copies:"
+          log "Scheduling copies:"
           copy_jobs.each do |j|
-            puts "  #{j.inspect(:copy)}"
+            log "  #{j.inspect(:copy)}"
             j.copy!(nameserver)
           end
         end
@@ -98,8 +103,8 @@ module Gizzard
       @jobs_in_progress -= jobs
 
       unless jobs.empty?
-        puts "Jobs finishing:"
-        jobs.each {|j| puts "  #{j.inspect(:cleanup)}" }
+        log "Jobs finishing:"
+        jobs.each {|j| log "  #{j.inspect(:cleanup)}" }
       end
 
       jobs.each {|j| j.cleanup!(nameserver) }
@@ -130,6 +135,30 @@ module Gizzard
       end
 
       copies_count_map.select {|_, count| count >= @max_copies }.map {|(shard, _)| shard }
+    end
+
+    def reset_progress_string
+      if @progress_string
+        @progress_string = nil
+        puts ""
+      end
+    end
+
+    def log(*args)
+      reset_progress_string
+      puts *args
+    end
+
+    def put_copy_progress
+      @i ||= 0
+      @i  += 1
+      spinner = %w(- \ | /)[@i % 4]
+
+      unless @jobs_in_progress.empty? || @busy_shards.empty?
+        print "" * @progress_string.length if @progress_string
+        @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length}"
+        print @progress_string
+      end
     end
   end
 end
