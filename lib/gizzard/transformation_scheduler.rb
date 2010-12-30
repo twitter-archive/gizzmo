@@ -9,8 +9,8 @@ module Gizzard
     attr_reader :max_copies, :copies_per_host
 
     DEFAULT_OPTIONS = {
-      :max_copies => 20,
-      :copies_per_host => 4,
+      :max_copies => 30,
+      :copies_per_host => 8,
       :poll_interval => 5
     }.freeze
 
@@ -65,12 +65,17 @@ module Gizzard
     end
 
     def schedule_jobs(num_to_schedule)
+      to_be_busy_hosts = []
+
       jobs = (1..num_to_schedule).map do
         job = @jobs_pending.find do |j|
-          (busy_hosts & j.involved_hosts).empty?
+          (busy_hosts(to_be_busy_hosts) & j.involved_hosts).empty?
         end
 
-        @jobs_pending.delete(job)
+        if job
+          to_be_busy_hosts.concat job.involved_hosts
+          @jobs_pending.delete(job)
+        end
 
         job
       end.compact
@@ -129,12 +134,14 @@ module Gizzard
         end
     end
 
-    def busy_hosts
-      copies_count_map = busy_shards.inject({}) do |h, shard|
-        h.update(shard.hostname => 1) {|_,a,b| a + b }
+    def busy_hosts(extra_hosts = [])
+      hosts = extra_hosts + busy_shards.map {|s| s.hostname }
+
+      copies_count_map = hosts.inject({}) do |h, host|
+        h.update(host => 1) {|_,a,b| a + b }
       end
 
-      copies_count_map.select {|_, count| count >= @max_copies }.map {|(shard, _)| shard }
+      copies_count_map.select {|_, count| count >= @max_copies }.map {|(host, _)| host }
     end
 
     def reset_progress_string
@@ -155,7 +162,11 @@ module Gizzard
       spinner = ['-', '\\', '|', '/'][@i % 4]
 
       unless @jobs_in_progress.empty? || @busy_shards.empty?
-        print "" * @progress_string.length if @progress_string
+        if @progress_string
+          print "\r"
+          print " " * @progress_string.length + 10
+          print "\r"
+        end
         @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length}"
         print @progress_string; $stdout.flush
       end
