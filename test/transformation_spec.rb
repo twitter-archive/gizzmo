@@ -25,7 +25,18 @@ describe Gizzard::Transformation do
     @host_2_template  = mk_template 'SqlShard(host2)'
     @host_3_template  = mk_template 'SqlShard(host3)'
 
-    @trans = Gizzard::Transformation.new(@from_template, @to_template, %w(status_001))
+    @trans = Gizzard::Transformation.new(@from_template, @to_template)
+  end
+
+  describe "initialization" do
+    it "allows an optional copy wrapper type" do
+      Gizzard::Transformation.new(@from_template, @to_template)
+      Gizzard::Transformation.new(@from_template, @to_template, 'WriteOnlyShard')
+      Gizzard::Transformation.new(@from_template, @to_template, 'BlockedShard')
+      lambda do
+        Gizzard::Transformation.new(@from_template, @to_template, 'InvalidWrapperShard')
+      end.should raise_error(ArgumentError)
+    end
   end
 
   # internal method tests

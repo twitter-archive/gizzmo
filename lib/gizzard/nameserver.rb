@@ -57,10 +57,6 @@ module Gizzard
                         child_templates)
     end
 
-    def transformation(to)
-      Transformation.new(template, to)
-    end
-
     def enumeration
       self.class.parse_enumeration(table_prefix)
     end

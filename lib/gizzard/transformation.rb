@@ -35,7 +35,13 @@ module Gizzard
 
     attr_reader :from, :to
 
-    def initialize(from_template, to_template, copy_dest_wrapper = DEFAULT_DEST_WRAPPER)
+    def initialize(from_template, to_template, copy_dest_wrapper = nil)
+      copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
+
+      unless Shard::VIRTUAL_SHARD_TYPES.include? copy_dest_wrapper
+        raise ArgumentError, "#{copy_dest_wrapper} is not a valid virtual shard type."
+      end
+
       @from = from_template
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper

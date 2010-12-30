@@ -97,6 +97,9 @@ def add_scheduler_opts(opts)
   opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
     hash[:poll_interval] = c.to_i
   end
+  opts.on("--copy-wrapper=TYPE", "wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
+    hash[:copy_wrapper] = t
+  end
   hash
 end
 

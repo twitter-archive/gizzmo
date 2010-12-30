@@ -798,13 +798,14 @@ module Gizzard
 
       template_s, shard_id_s = @argv
 
-      template       = ShardTemplate.parse(template_s)
+      to_template    = ShardTemplate.parse(template_s)
       shard_id       = ShardId.parse(shard_id_s)
       base_name      = shard_id.table_prefix.split('_').first
       forwarding     = manager.get_forwarding_for_shard(shard_id)
       manifest       = manager.manifest(forwarding.table_id)
       shard          = manifest.trees[forwarding]
-      transformation = shard.transformation(template)
+      copy_wrapper   = command_options.scheduler_options[:copy_wrapper]
+      transformation = Transformation.new(shard.template, to_template, copy_wrapper)
 
       unless global_options.force && command_options.quiet
         puts transformation.inspect
@@ -829,11 +830,12 @@ module Gizzard
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
 
       manifest        = manager.manifest(*global_options.tables)
+      copy_wrapper    = command_options.scheduler_options[:copy_wrapper]
       transformations = {}
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to)
+        transformation = Transformation.new(from, to, copy_wrapper)
         forwardings    = manifest.templates[from]
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
