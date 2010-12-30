@@ -86,7 +86,7 @@ module Gizzard
     end
 
     def inspect
-      "[#{table_id}] #{base_id.to_s(16)} -> #{shard_id.inspect}"
+      "[#{table_id}] #{base_id.to_s(16)} = #{shard_id.inspect}"
     end
   end
 

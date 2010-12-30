@@ -201,27 +201,15 @@ module Gizzard
       involved_shards(phase).map {|s| s.hostname }.uniq
     end
 
-    def inspect(phase = nil)
-      base       = "#{@forwarding.inspect}: #{from.inspect} => #{to.inspect}"
-      op_inspect = transformation.operations.inject({}) do |h, (p, ops)|
-        h.update p => ops.map {|job| "    #{job.inspect}" }.join("\n")
-      end
+    def inspect
+      "#{@forwarding.inspect}: #{from.inspect} => #{to.inspect}"
+    end
 
-      prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
-      copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
-      cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
-
-      case phase
-      when :all
-        [base, "\n", prepare_inspect, copy_inspect, cleanup_inspect].join
-      when :prepare
-        [base, "\n", prepare_inspect].join
-      when :copy
-        [base, "\n", copy_inspect].join
-      when :cleanup
-        [base, "\n", cleanup_inspect].join
-      else
-        base
+    def copy_descs
+      transformation.operations[:copy].map do |copy|
+        from_id = copy.from.to_shard_id(@table_prefix, @translations)
+        to_id   = copy.to.to_shard_id(@table_prefix, @translations)
+        "#{from_id.inspect} -> #{to_id.inspect}"
       end
     end
 

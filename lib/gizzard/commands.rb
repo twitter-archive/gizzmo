@@ -812,7 +812,7 @@ module Gizzard
       end
 
       unless global_options.force
-        puts "Continue? (y/n)"
+        print "Continue? (y/n) "; $stdout.flush
         exit unless $stdin.gets.chomp == "y"
         puts ""
       end
@@ -826,33 +826,40 @@ module Gizzard
 
   class TransformCommand < Command
     def run
-      help!("wrong number of arguments") unless @argv.length == 2
+      help!("must have an even number of arguments") unless @argv.length % 2 == 0
 
-      from_template_s, to_template_s = @argv
+      manifest        = manager.manifest(*global_options.tables)
+      transformations = {}
 
-      from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-      manifest       = manager.manifest(*global_options.tables)
-      forwardings    = manifest.templates[from]
-      transformation = Transformation.new(from, to)
-      trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
-      base_name      = trees.values.first.id.table_prefix.split('_').first
+      @argv.each_slice(2) do |(from_template_s, to_template_s)|
+        from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
+        transformation = Transformation.new(from, to)
+        forwardings    = manifest.templates[from]
+        trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
+
+        transformations[transformation] = trees
+      end
+
+      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
 
       unless global_options.force && command_options.quiet
-        puts transformation.inspect
-        puts "Applied to:"
-        forwardings.sort.each {|f| puts "  #{f.inspect}" }
+        transformations.each do |transformation, trees|
+          puts transformation.inspect
+          puts "Applied to:"
+          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+        end
         puts ""
       end
 
       unless global_options.force
-        puts "Continue? (y/n)"
+        print "Continue? (y/n) "; $stdout.flush
         exit unless $stdin.gets.chomp == "y"
         puts ""
       end
 
       Gizzard.schedule! manager,
                         base_name,
-                        { transformation => trees },
+                        transformations,
                         command_options.scheduler_options
     end
   end

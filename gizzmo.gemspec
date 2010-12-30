@@ -82,6 +82,7 @@ Gem::Specification.new do |s|
     "test/gizzmo_spec.rb",
      "test/helper.rb",
      "test/nameserver_spec.rb",
+     "test/scheduler_spec.rb",
      "test/shard_template_spec.rb",
      "test/spec_helper.rb",
      "test/test_server/target/gen-rb/test_server.rb",

@@ -334,7 +334,7 @@ c2:c2host2:7777 0
       gizzmo "addforwarding 0 1 localhost/s_0_001_replicating"
       gizzmo "-f reload"
 
-      gizzmo('-f transform-tree "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" localhost/s_0_001_replicating').should == <<-EOF
+      gizzmo('-f transform-tree --poll-interval=1 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" localhost/s_0_001_replicating').should == <<-EOF
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
@@ -349,26 +349,13 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     remove_link(ReplicatingShard -> WriteOnlyShard)
     delete_shard(WriteOnlyShard)
 
-Jobs starting:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  PREPARE
-    create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
-Reloading nameserver configuration.
-Scheduling copies:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  COPY
-    copy_shard(TestShard/127.0.0.1)
-Jobs finishing:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  CLEANUP
-    add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-All transformations applied. Have a nice day!
+STARTING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+COPIES:
+  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
+FINISHING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+All transformations applied. Total time elapsed: 10
       EOF
 
       nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
@@ -392,7 +379,7 @@ All transformations applied. Have a nice day!
       end
       gizzmo "-f reload"
 
-      gizzmo('-f -T 0 transform "ReplicatingShard -> TestShard(localhost,1,Int,Int)" "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
+      gizzmo('-f -T0 transform --poll-interval=1 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
@@ -407,44 +394,19 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     remove_link(ReplicatingShard -> WriteOnlyShard)
     delete_shard(WriteOnlyShard)
 Applied to:
-  [0] 1 -> localhost/s_0_001_replicating
-  [0] 2 -> localhost/s_0_002_replicating
+  [0] 1 = localhost/s_0_001_replicating
+  [0] 2 = localhost/s_0_002_replicating
 
-Jobs starting:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  PREPARE
-    create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
-  [0] 2 -> localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  PREPARE
-    create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
-Reloading nameserver configuration.
-Scheduling copies:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  COPY
-    copy_shard(TestShard/127.0.0.1)
-  [0] 2 -> localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  COPY
-    copy_shard(TestShard/127.0.0.1)
-Jobs finishing:
-  [0] 1 -> localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  CLEANUP
-    add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-  [0] 2 -> localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  CLEANUP
-    add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-All transformations applied. Have a nice day!
+STARTING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+COPIES:
+  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
+  localhost/s_0_002_a -> 127.0.0.1/s_0_0002
+FINISHING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+All transformations applied. Total time elapsed: 01
       EOF
 
       nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),

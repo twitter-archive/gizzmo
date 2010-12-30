@@ -9,9 +9,9 @@ module Gizzard
     attr_reader :max_copies, :copies_per_host
 
     DEFAULT_OPTIONS = {
-      :max_copies => 30,
+      :max_copies      => 30,
       :copies_per_host => 8,
-      :poll_interval => 5
+      :poll_interval   => 10
     }.freeze
 
     def initialize(nameserver, base_name, transformations, options = {})
@@ -44,8 +44,16 @@ module Gizzard
     # 4. schedule a new job or reload app servers.
 
     def apply!
+      @start_time = Time.now
+
       loop do
-        reload_busy_shards
+        begin
+          reload_busy_shards
+        rescue GizzardException
+          sleep 10
+          next
+        end
+
         cleanup_jobs
         schedule_jobs(max_copies - busy_shards.length)
 
@@ -61,7 +69,7 @@ module Gizzard
 
       nameserver.reload_config
 
-      log "All transformations applied. Have a nice day!"
+      log "All transformations applied. Total time elapsed: #{time_elapsed}"
     end
 
     def schedule_jobs(num_to_schedule)
@@ -78,23 +86,22 @@ module Gizzard
         end
 
         job
-      end.compact
+      end.compact.sort_by {|t| t.forwarding }
 
       unless jobs.empty?
-        log "Jobs starting:"
-        jobs.each {|j| log "  #{j.inspect(:prepare)}" }
+        log "STARTING:"
+        jobs.each {|j| log "  #{j.inspect}" }
 
         jobs.each {|j| j.prepare!(nameserver) }
 
-        log "Reloading nameserver configuration."
         nameserver.reload_config
 
         copy_jobs = jobs.select {|j| j.copy_required? }
 
         unless copy_jobs.empty?
-          log "Scheduling copies:"
+          log "COPIES:"
           copy_jobs.each do |j|
-            log "  #{j.inspect(:copy)}"
+            j.copy_descs.each {|d| log "  #{d}" }
             j.copy!(nameserver)
           end
         end
@@ -108,8 +115,8 @@ module Gizzard
       @jobs_in_progress -= jobs
 
       unless jobs.empty?
-        log "Jobs finishing:"
-        jobs.each {|j| log "  #{j.inspect(:cleanup)}" }
+        log "FINISHING:"
+        jobs.each {|j| log "  #{j.inspect}" }
       end
 
       jobs.each {|j| j.cleanup!(nameserver) }
@@ -141,7 +148,7 @@ module Gizzard
         h.update(host => 1) {|_,a,b| a + b }
       end
 
-      copies_count_map.select {|_, count| count >= @max_copies }.map {|(host, _)| host }
+      copies_count_map.select {|_, count| count >= @copies_per_host }.map {|(host, _)| host }
     end
 
     def reset_progress_string
@@ -149,6 +156,17 @@ module Gizzard
         @progress_string = nil
         puts ""
       end
+    end
+
+    def time_elapsed
+      s = (Time.now - @start_time).to_i
+
+      days    = s / (60 * 60 * 24)               if s >= 60 * 60 * 24
+      hours   = (s % (60 * 60 * 24)) / (60 * 60) if s >= 60 * 60
+      minutes = (s % (60 * 60)) / 60             if s >= 60
+      seconds = s % 60
+
+      [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
     end
 
     def log(*args)
@@ -164,10 +182,10 @@ module Gizzard
       unless @jobs_in_progress.empty? || @busy_shards.empty?
         if @progress_string
           print "\r"
-          print " " * @progress_string.length + 10
+          print " " * (@progress_string.length + 10)
           print "\r"
         end
-        @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length}"
+        @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length} Time elapsed: #{time_elapsed}"
         print @progress_string; $stdout.flush
       end
     end
