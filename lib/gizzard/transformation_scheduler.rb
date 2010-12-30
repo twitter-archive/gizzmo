@@ -9,8 +9,8 @@ module Gizzard
     attr_reader :max_copies, :copies_per_host
 
     DEFAULT_OPTIONS = {
-      :max_copies => 30,
-      :copies_per_host => 8,
+      :max_copies => 20,
+      :copies_per_host => 4,
       :poll_interval => 5
     }.freeze
 
@@ -52,8 +52,8 @@ module Gizzard
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
 
         unless nameserver.dryrun?
-          6.times do
-            sleep(@poll_interval / 6.0)
+          12.times do
+            sleep(@poll_interval / 12.0)
             put_copy_progress
           end
         end
@@ -152,12 +152,12 @@ module Gizzard
     def put_copy_progress
       @i ||= 0
       @i  += 1
-      spinner = %w(- \ | /)[@i % 4]
+      spinner = ['-', '\\', '|', '/'][@i % 4]
 
       unless @jobs_in_progress.empty? || @busy_shards.empty?
         print "" * @progress_string.length if @progress_string
         @progress_string = "#{spinner} Copies in progress: #{@busy_shards.length}"
-        print @progress_string
+        print @progress_string; $stdout.flush
       end
     end
   end
