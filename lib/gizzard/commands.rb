@@ -796,6 +796,7 @@ module Gizzard
     def run
       help!("wrong number of arguments") unless @argv.length == 2
 
+      scheduler_options = command_options.scheduler_options || {}
       template_s, shard_id_s = @argv
 
       to_template    = ShardTemplate.parse(template_s)
@@ -804,11 +805,11 @@ module Gizzard
       forwarding     = manager.get_forwarding_for_shard(shard_id)
       manifest       = manager.manifest(forwarding.table_id)
       shard          = manifest.trees[forwarding]
-      copy_wrapper   = command_options.scheduler_options[:copy_wrapper]
+      copy_wrapper   = scheduler_options[:copy_wrapper]
       be_quiet       = global_options.force && command_options.quiet
       transformation = Transformation.new(shard.template, to_template, copy_wrapper)
 
-      command_options.scheduler_options[:quiet] = be_quiet
+      scheduler_options[:quiet] = be_quiet
 
       unless be_quiet
         puts transformation.inspect
@@ -824,7 +825,7 @@ module Gizzard
       Gizzard.schedule! manager,
                         base_name,
                         { transformation => { forwarding => shard } },
-                        command_options.scheduler_options
+                        scheduler_options
     end
   end
 
@@ -832,12 +833,13 @@ module Gizzard
     def run
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
 
-      manifest        = manager.manifest(*global_options.tables)
-      copy_wrapper    = command_options.scheduler_options[:copy_wrapper]
-      be_quiet        = global_options.force && command_options.quiet
-      transformations = {}
+      scheduler_options = command_options.scheduler_options || {}
+      manifest          = manager.manifest(*global_options.tables)
+      copy_wrapper      = scheduler_options[:copy_wrapper]
+      be_quiet          = global_options.force && command_options.quiet
+      transformations   = {}
 
-      command_options.scheduler_options[:quiet] = be_quiet
+      scheduler_options[:quiet] = be_quiet
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
@@ -868,7 +870,7 @@ module Gizzard
       Gizzard.schedule! manager,
                         base_name,
                         transformations,
-                        command_options.scheduler_options
+                        scheduler_options
     end
   end
 end
