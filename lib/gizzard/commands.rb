@@ -844,7 +844,7 @@ module Gizzard
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
         transformation = Transformation.new(from, to, copy_wrapper)
-        forwardings    = manifest.templates[from]
+        forwardings    = manifest.templates[from] || []
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
         transformations[transformation] = trees
