@@ -72,7 +72,7 @@ module Gizzard
 
       nameserver.reload_config
 
-      log "All transformations applied. Total time elapsed: #{time_elapsed}"
+      log "#{@jobs_finished.length} transformation#{'s' if @jobs_finished.length > 1} applied. Total time elapsed: #{time_elapsed}"
     end
 
     def schedule_jobs(num_to_schedule)
@@ -117,16 +117,17 @@ module Gizzard
 
     def cleanup_jobs
       jobs = jobs_completed
-      @jobs_in_progress -= jobs
 
       unless jobs.empty?
+        @jobs_in_progress -= jobs
+
         log "FINISHING:"
         jobs.each {|j| log "  #{j.inspect}" }
+
+        jobs.each {|j| j.cleanup!(nameserver) }
+
+        @jobs_finished.concat(jobs)
       end
-
-      jobs.each {|j| j.cleanup!(nameserver) }
-
-      @jobs_finished.concat(jobs)
     end
 
     def jobs_completed
@@ -135,6 +136,7 @@ module Gizzard
 
     def reload_busy_shards
       @busy_shards = nil
+      busy_shards
     end
 
     def busy_shards
@@ -204,12 +206,18 @@ module Gizzard
     def time_elapsed
       s = (Time.now - @start_time).to_i
 
-      days    = s / (60 * 60 * 24)               if s >= 60 * 60 * 24
-      hours   = (s % (60 * 60 * 24)) / (60 * 60) if s >= 60 * 60
-      minutes = (s % (60 * 60)) / 60             if s >= 60
-      seconds = s % 60
+      if s == 1
+        "1 second"
+      elsif s < 60
+        "#{s} seconds"
+      else
+        days    = s / (60 * 60 * 24)               if s >= 60 * 60 * 24
+        hours   = (s % (60 * 60 * 24)) / (60 * 60) if s >= 60 * 60
+        minutes = (s % (60 * 60)) / 60             if s >= 60
+        seconds = s % 60
 
-      [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
+        [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
+      end
     end
   end
 end

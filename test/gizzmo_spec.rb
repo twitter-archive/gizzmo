@@ -355,7 +355,7 @@ COPIES:
   localhost/s_0_001_a -> 127.0.0.1/s_0_0001
 FINISHING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-All transformations applied. Total time elapsed: 01
+1 transformation applied. Total time elapsed: 1 second
       EOF
 
       nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
@@ -406,7 +406,7 @@ COPIES:
 FINISHING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
   [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-All transformations applied. Total time elapsed: 01
+2 transformations applied. Total time elapsed: 1 second
       EOF
 
       nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
