@@ -495,6 +495,7 @@ rescue HelpNeededError => e
   exit 1
 rescue ThriftClient::Simple::ThriftException, Gizzard::GizzardException, Errno::ECONNREFUSED => e
   STDERR.puts e.message
+  STDERR.puts e.backtrace
   exit 1
 rescue Errno::EPIPE
   # This is just us trying to puts into a closed stdout.  For example, if you pipe into

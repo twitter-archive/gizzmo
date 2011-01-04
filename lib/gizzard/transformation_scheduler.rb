@@ -49,12 +49,7 @@ module Gizzard
       @start_time = Time.now
 
       loop do
-        begin
-          reload_busy_shards
-        rescue GizzardException
-          sleep 10
-          next
-        end
+        reload_busy_shards
 
         cleanup_jobs
         schedule_jobs(max_copies - busy_shards.length)
