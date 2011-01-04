@@ -393,7 +393,7 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> WriteOnlyShard)
     delete_shard(WriteOnlyShard)
-Applied to:
+Applied to 2 shards:
   [0] 1 = localhost/s_0_001_replicating
   [0] 2 = localhost/s_0_002_replicating
 
@@ -449,7 +449,7 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> WriteOnlyShard)
     delete_shard(WriteOnlyShard)
-Applied to:
+Applied to 4 shards:
   [0] 1 = localhost/s_0_001_replicating
   [0] 2 = localhost/s_0_002_replicating
   [1] 1 = localhost/s_1_001_replicating
