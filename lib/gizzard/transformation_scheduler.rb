@@ -1,3 +1,5 @@
+require "set"
+
 module Gizzard
   def self.schedule!(*args)
     Transformation::Scheduler.new(*args).apply!
@@ -79,7 +81,7 @@ module Gizzard
         end
 
         if job
-          to_be_busy_hosts.concat job.involved_hosts
+          to_be_busy_hosts.concat job.involved_hosts_array
           @jobs_pending.delete(job)
         end
 
@@ -139,9 +141,9 @@ module Gizzard
     def busy_shards
       @busy_shards ||=
         if nameserver.dryrun?
-          []
+          Set.new
         else
-          nameserver.get_busy_shards.map {|s| s.id }
+          nameserver.get_busy_shards.inject(Set.new) {|set, shard| set.add(shard.id) }
         end
     end
 
@@ -152,7 +154,7 @@ module Gizzard
         h.update(host => 1) {|_,a,b| a + b }
       end
 
-      copies_count_map.select {|_, count| count >= @copies_per_host }.map {|(host, _)| host }
+      copies_count_map.select {|_, count| count >= @copies_per_host }.inject(Set.new) {|set,(host, _)| set.add(host) }
     end
 
     def sleep_with_progress(interval)
