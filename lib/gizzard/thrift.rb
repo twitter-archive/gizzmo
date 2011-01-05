@@ -32,7 +32,7 @@ module Gizzard
     alias_method :to_unix, :inspect
 
     def self.parse(string)
-      new(*string.split("/"))
+      new(*string.match("(.*)/(.*)").values_at(1, 2))
     end
   end
 
