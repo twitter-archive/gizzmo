@@ -5,21 +5,21 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.11.0"
+  s.version = "0.10.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
   s.date = %q{2011-01-05}
+  s.default_executable = %q{gizzmo}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
-  s.executables = ["gizzmo", "setup_shards"]
+  s.executables = ["gizzmo"]
   s.extra_rdoc_files = [
     "LICENSE",
      "README.rdoc"
   ]
   s.files = [
-    ".document",
-     ".gitignore",
+    ".gitignore",
      "LICENSE",
      "README.rdoc",
      "Rakefile",
@@ -59,13 +59,7 @@ Gem::Specification.new do |s|
   s.rubygems_version = %q{1.3.6}
   s.summary = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.test_files = [
-    "test/gizzmo_spec.rb",
-     "test/helper.rb",
-     "test/nameserver_spec.rb",
-     "test/scheduler_spec.rb",
-     "test/shard_template_spec.rb",
-     "test/spec_helper.rb",
-     "test/transformation_spec.rb"
+    "test/helper.rb"
   ]
 
   if s.respond_to? :specification_version then
