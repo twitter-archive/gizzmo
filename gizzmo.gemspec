@@ -5,15 +5,14 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.10.1"
+  s.version = "0.11.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2010-11-23}
-  s.default_executable = %q{gizzmo}
+  s.date = %q{2011-01-05}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
-  s.executables = ["gizzmo"]
+  s.executables = ["gizzmo", "setup_shards"]
   s.extra_rdoc_files = [
     "LICENSE",
      "README.rdoc"
@@ -57,17 +56,23 @@ Gem::Specification.new do |s|
   s.homepage = %q{http://github.com/twitter/gizzmo}
   s.rdoc_options = ["--charset=UTF-8"]
   s.require_paths = ["lib"]
-  s.rubygems_version = %q{1.3.7}
+  s.rubygems_version = %q{1.3.6}
   s.summary = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.test_files = [
-    "test/helper.rb"
+    "test/gizzmo_spec.rb",
+     "test/helper.rb",
+     "test/nameserver_spec.rb",
+     "test/scheduler_spec.rb",
+     "test/shard_template_spec.rb",
+     "test/spec_helper.rb",
+     "test/transformation_spec.rb"
   ]
 
   if s.respond_to? :specification_version then
     current_version = Gem::Specification::CURRENT_SPECIFICATION_VERSION
     s.specification_version = 3
 
-    if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
+    if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
     else
     end
   else
