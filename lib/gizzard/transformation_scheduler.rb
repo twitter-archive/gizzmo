@@ -88,9 +88,10 @@ module Gizzard
 
       unless jobs.empty?
         log "STARTING:"
-        jobs.each {|j| log "  #{j.inspect}" }
-
-        jobs.each {|j| j.prepare!(nameserver) }
+        jobs.each do |j|
+          log "  #{j.inspect}"
+          j.prepare!(nameserver)
+        end
 
         nameserver.reload_config
 
@@ -117,9 +118,10 @@ module Gizzard
         @jobs_in_progress -= jobs
 
         log "FINISHING:"
-        jobs.each {|j| log "  #{j.inspect}" }
-
-        jobs.each {|j| j.cleanup!(nameserver) }
+        jobs.each do |j|
+          log "  #{j.inspect}"
+          j.cleanup!(nameserver)
+        end
 
         @jobs_finished.concat(jobs)
       end
