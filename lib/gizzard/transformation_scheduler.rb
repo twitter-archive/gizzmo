@@ -29,9 +29,9 @@ module Gizzard
       @jobs_in_progress = []
       @jobs_finished    = []
 
-      @jobs_pending = transformations.map do |transformation, forwardings_to_shards|
+      @jobs_pending = Set.new(transformations.map do |transformation, forwardings_to_shards|
         transformation.bind(base_name, forwardings_to_shards)
-      end.flatten
+      end.flatten)
     end
 
     # to schedule a job:
@@ -74,19 +74,20 @@ module Gizzard
 
     def schedule_jobs(num_to_schedule)
       to_be_busy_hosts = []
+      jobs             = []
 
-      jobs = (1..num_to_schedule).map do
-        job = @jobs_pending.find do |j|
-          (busy_hosts(to_be_busy_hosts) & j.involved_hosts).empty?
+      @jobs_pending.each do |j|
+        if (busy_hosts(to_be_busy_hosts) & j.involved_hosts).empty?
+          jobs << j
+          to_be_busy_hosts.concat j.involved_hosts_array
+
+          break if jobs.length == num_to_schedule
         end
+      end
 
-        if job
-          to_be_busy_hosts.concat job.involved_hosts_array
-          @jobs_pending.delete(job)
-        end
+      @jobs_pending.subtract(jobs)
 
-        job
-      end.compact.sort_by {|t| t.forwarding }
+      jobs = jobs.sort_by {|t| t.forwarding }
 
       unless jobs.empty?
         log "STARTING:"
