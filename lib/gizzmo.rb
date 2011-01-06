@@ -22,7 +22,7 @@ DOC_STRINGS = {
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
   "markbusy" => "Mark a shard as busy.",
   "pair" => "Report the replica pairing structure for a list of hosts.",
-  "reload" => "Instruct an appserver to reload its nameserver state.",
+  "reload" => "Instruct application servers to reload the nameserver state.",
   "report" => "Show each unique replica structure for a given list of shards. Usually this shard list comes from << gizzmo forwardings | awk '{ print $3 }' >>.",
   "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
@@ -32,9 +32,12 @@ ORIGINAL_ARGV = ARGV.dup
 zero = File.basename($0)
 
 # Container for parsed options
-global_options     = OpenStruct.new
-global_options.render = []
-global_options.framed = false
+global_options = OpenStruct.new
+global_options.port          = 7920
+global_options.injector_port = 7921
+global_options.render        = []
+global_options.framed        = false
+
 subcommand_options = OpenStruct.new
 
 # Leftover arguments
@@ -78,7 +81,26 @@ end
 
 def load_config(options, filename)
   YAML.load(File.open(filename)).each do |k, v|
+    v = v.split(",").map {|h| h.strip } if k == "hosts"
     options.send("#{k}=", v)
+  end
+end
+
+def add_scheduler_opts(subcommand_options, opts)
+  opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT.") do |c|
+    (subcommand_options.scheduler_options ||= {})[:max_copies] = c.to_i
+  end
+  opts.on("--copies-per-host=COUNT", "Limit max copies per individual destination host to COUNT") do |c|
+    (subcommand_options.scheduler_options ||= {})[:copies_per_host] = c.to_i
+  end
+  opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
+    (subcommand_options.scheduler_options ||= {})[:poll_interval] = c.to_i
+  end
+  opts.on("--copy-wrapper=TYPE", "Wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
+    (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
+  end
+  opts.on("--no-progress", "Do not show progress bar at bottom.") do
+    (subcommand_options.scheduler_options ||= {})[:no_progress] = true
   end
 end
 
@@ -106,7 +128,7 @@ subcommands = {
     opts.on("-w", "--write-only=CLASS") do |w|
       subcommand_options.write_only_shard = w
     end
-    opts.on("-h", "--hosts=list") do |h|
+    opts.on("-h", "--shard-hosts=list") do |h|
       subcommand_options.hosts = h
     end
     opts.on("-x", "--exclude-hosts=list") do |x|
@@ -149,10 +171,6 @@ subcommands = {
     opts.banner = "Usage: #{zero} addforwarding TABLE_ID BASE_ID SHARD_ID"
     separators(opts, DOC_STRINGS["addforwarding"])
   end,
-  'currentforwarding' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} currentforwarding SOURCE_ID [ANOTHER_SOURCE_ID...]"
-    separators(opts, DOC_STRINGS["addforwarding"])
-  end,
   'forwardings' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} forwardings [options]"
     separators(opts, DOC_STRINGS["forwardings"])
@@ -177,7 +195,7 @@ subcommands = {
       subcommand_options.shard_type = shard_type
     end
 
-    opts.on("-H", "--host=HOST", "HOST of shard") do |shard_host|
+    opts.on("-h", "--shard-host=HOST", "HOST of shard") do |shard_host|
       subcommand_options.shard_host = shard_host
     end
   end,
@@ -267,6 +285,46 @@ subcommands = {
     opts.on("--all", "Flush all error queues.") do
       subcommand_options.flush_all = true
     end
+  end,
+  'add-host' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} add-host HOSTS"
+    separators(opts, DOC_STRINGS["add-host"])
+  end,
+  'remove-host' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} remove-host HOST"
+    separators(opts, DOC_STRINGS["remove-host"])
+  end,
+  'list-hosts' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} list-hosts"
+    separators(opts, DOC_STRINGS["list-hosts"])
+  end,
+  'topology' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} topology [options]"
+    separators(opts, DOC_STRINGS["topology"])
+
+    opts.on("--forwardings", "Show topology of forwardings instead of counts") do
+      subcommand_options.forwardings = true
+    end
+  end,
+  'transform-tree' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} transform-tree [options] ROOT_SHARD_ID TEMPLATE"
+    separators(opts, DOC_STRINGS['transform-tree'])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
+  end,
+  'transform' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
+    separators(opts, DOC_STRINGS['transform'])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
   end
 }
 
@@ -288,7 +346,7 @@ global = OptionParser.new do |opts|
   opts.separator "key/value pairs corresponding to options you want by default. A common .gizzmorc"
   opts.separator "simply contains:"
   opts.separator ""
-  opts.separator "    host: localhost"
+  opts.separator "    hosts: localhost"
   opts.separator "    port: 7917"
   opts.separator ""
   opts.separator "Subcommands:"
@@ -305,12 +363,20 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator ""
   opts.separator "Global options:"
-  opts.on("-H", "--host=HOSTNAME", "HOSTNAME of remote thrift service") do |host|
-    global_options.host = host
+  opts.on("-H", "--hosts=HOST[,HOST,...]", "HOSTS of application servers") do |hosts|
+    global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
 
-  opts.on("-P", "--port=PORT", "PORT of remote thrift service") do |port|
+  opts.on("-P", "--port=PORT", "PORT of remote manager service. default 7920") do |port|
     global_options.port = port.to_i
+  end
+
+  opts.on("-I", "--injector=PORT", "PORT of remote job injector service. default 7921") do |port|
+    global_options.injector_port = port.to_i
+  end
+
+  opts.on("-T", "--tables=TABLE[,TABLE,...]", "TABLE ids of forwardings to affect") do |tables|
+    global_options.tables = tables.split(",").map {|t| t.to_i }
   end
 
   opts.on("-F", "--framed", "use the thrift framed transport") do |framed|
@@ -318,11 +384,11 @@ global = OptionParser.new do |opts|
   end
 
   opts.on("-r", "--retry=TIMES", "TIMES to retry the command") do |r|
-    global_options.retry = r
+    global_options.retry = r.to_i
   end
 
   opts.on("-t", "--timeout=SECONDS", "SECONDS to let the command run") do |r|
-    global_options.timeout = r
+    global_options.timeout = r.to_i
   end
 
   opts.on("--subtree", "Render in subtree mode") do
@@ -333,7 +399,7 @@ global = OptionParser.new do |opts|
     global_options.render << "info"
   end
 
-  opts.on("-D", "--dry-run", "") do |port|
+  opts.on("-D", "--dry-run", "") do
     global_options.dry = true
   end
 
@@ -401,12 +467,12 @@ def custom_timeout(seconds)
     begin
       require "rubygems"
       require "system_timer"
-      SystemTimer.timeout_after(seconds.to_i) do
+      SystemTimer.timeout_after(seconds) do
         yield
       end
     rescue LoadError
       require "timeout"
-      Timeout.timeout(seconds.to_i) do
+      Timeout.timeout(seconds) do
         yield
       end
     end
@@ -427,8 +493,9 @@ rescue HelpNeededError => e
   end
   STDERR.puts subcommands[subcommand_name]
   exit 1
-rescue ThriftClient::Simple::ThriftException, Gizzard::Thrift::ShardException, Errno::ECONNREFUSED => e
+rescue ThriftClient::Simple::ThriftException, Gizzard::GizzardException, Errno::ECONNREFUSED => e
   STDERR.puts e.message
+  STDERR.puts e.backtrace
   exit 1
 rescue Errno::EPIPE
   # This is just us trying to puts into a closed stdout.  For example, if you pipe into

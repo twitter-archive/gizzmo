@@ -1,3 +1,4 @@
+ROOT_DIR = File.expand_path(File.dirname(__FILE__))
 require 'rubygems'
 require 'rake'
 
@@ -16,28 +17,22 @@ rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
 end
 
-require 'rake/testtask'
-Rake::TestTask.new(:test) do |test|
-  test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
-end
 
 begin
-  require 'rcov/rcovtask'
-  Rcov::RcovTask.new do |test|
-    test.libs << 'test'
-    test.pattern = 'test/**/test_*.rb'
-    test.verbose = true
+  require 'spec/rake/spectask'
+  Spec::Rake::SpecTask.new(:spec) do |t|
+    spec_opts = File.expand_path('test/spec.opts', ROOT_DIR)
+    if File.exist? spec_opts
+      t.spec_opts = ['--options', "\"#{spec_opts}\""]
+    end
+    t.spec_files = FileList['test/**/*_spec.rb']
   end
 rescue LoadError
-  task :rcov do
-    abort "RCov is not available. In order to run rcov, you must: sudo gem install spicycode-rcov"
-  end
+  $stderr.puts "RSpec required to run tests."
 end
 
 task :test do
-  puts 
+  puts
   puts "=" * 79
   puts "You might want to read the README before running tests."
   puts "=" * 79
@@ -45,7 +40,7 @@ task :test do
   exec File.join(File.dirname(__FILE__), "test", "test.sh")
 end
 
-task :default => :test
+task :default => :spec
 
 require 'rake/rdoctask'
 Rake::RDocTask.new do |rdoc|
