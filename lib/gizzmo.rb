@@ -11,6 +11,7 @@ DOC_STRINGS = {
   "addlink" => "Add a relationship link between two shards.",
   "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "drill" => "Show shard trees for replicas of a given structure signature (from 'report').",
+  "dump" => "Show shard trees for given table ids.",
   "find" => "Show all shards with a given hostname.",
   "finish-replica" => "Remove the write-only barrier in front of a shard that's finished being copied after 'setup-replica'.",
   "flush" => "Flush error queue for a given priority.",
@@ -81,6 +82,7 @@ end
 
 def load_config(options, filename)
   YAML.load(File.open(filename)).each do |k, v|
+    k = "hosts" if k == "host"
     v = v.split(",").map {|h| h.strip } if k == "hosts"
     options.send("#{k}=", v)
   end
@@ -116,6 +118,10 @@ subcommands = {
     opts.on("-d", "--destination-type=TYPE") do |s|
       subcommand_options.destination_type = s
     end
+  end,
+  'dump' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} dump TABLE_ID [TABLE_ID...]"
+    separators(opts, DOC_STRINGS["dump"])
   end,
   'wrap' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
@@ -328,8 +334,9 @@ subcommands = {
   end
 }
 
-if ENV['GIZZMORC']
-  load_config(global_options, ENV['GIZZMORC'])
+rc_path = ENV['GIZZMORC'] || "#{ENV["HOME"]}/.gizzmorc"
+if File.exists?(rc_path)
+  load_config(global_options, rc_path)
 end
 
 global = OptionParser.new do |opts|
@@ -366,6 +373,12 @@ global = OptionParser.new do |opts|
   opts.on("-H", "--hosts=HOST[,HOST,...]", "HOSTS of application servers") do |hosts|
     global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
+
+  opts.on("-H", "--host=HOST", "HOST of application servers") do |hosts|
+    global_options.hosts = hosts.split(",").map {|h| h.strip }
+  end
+
+
 
   opts.on("-P", "--port=PORT", "PORT of remote manager service. default 7920") do |port|
     global_options.port = port.to_i

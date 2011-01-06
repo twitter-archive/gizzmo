@@ -93,6 +93,24 @@ module Gizzard
     end
   end
 
+  class DumpCommand < Command
+    def run
+      table_ids = argv.map{|e| e.to_i }
+      manifest = manager.manifest(*table_ids)
+      manifest.trees.values.each do |tree|
+        down(tree, 0)
+      end
+    end
+
+    def down(shard, depth)
+      printable = "  " * depth + shard.info.id.to_unix
+      output printable
+      shard.children.each do |child|
+        down(child, depth + 1)
+      end
+    end
+  end
+
   class DeleteforwardingCommand < Command
     def run
       help! if argv.length != 3
