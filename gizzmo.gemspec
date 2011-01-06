@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.10.1"
+  s.version = "0.11.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2011-01-04}
+  s.date = %q{2011-01-06}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
   s.executables = ["gizzmo", "setup_shards"]
@@ -18,8 +18,7 @@ Gem::Specification.new do |s|
      "README.rdoc"
   ]
   s.files = [
-    ".document",
-     ".gitignore",
+    ".gitignore",
      "LICENSE",
      "README.rdoc",
      "Rakefile",
