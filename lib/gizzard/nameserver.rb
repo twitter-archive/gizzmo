@@ -1,6 +1,17 @@
 module Gizzard
   Shard = Struct.new(:info, :children, :weight)
 
+  module ParallelMap
+    def parallel_map(enumerable, &block)
+      enumerable.map do |elem|
+        Thread.new { Thread.current[:result] = block.call(elem) }
+      end.map do |thread|
+        thread.join
+        thread[:result]
+      end
+    end
+  end
+
   class Shard
     class << self
       def canonical_table_prefix(enum, table_id = nil, base_prefix = "shard")
@@ -75,6 +86,7 @@ module Gizzard
   end
 
   class Nameserver
+    include ParallelMap
 
     DEFAULT_PORT    = 7917
     DEFAULT_RETRIES = 20
@@ -97,7 +109,9 @@ module Gizzard
     end
 
     def reload_config
-      all_clients.each {|c| with_retry { c.reload_config } }
+      parallel_map all_clients do |c|
+        with_retry { c.reload_config }
+      end
     end
 
     def copy_shard(from_shard_id, to_shard_id)
@@ -154,11 +168,12 @@ module Gizzard
     end
 
     class Manifest
+      include ParallelMap
+
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
-
       def initialize(nameserver, table_ids)
-        states = table_ids.map {|id| nameserver.dump_nameserver(id) }
+        states = parallel_map(table_ids) {|id| nameserver.dump_nameserver(id) }
 
         @forwardings = states.map {|s| s.forwardings }.flatten
 

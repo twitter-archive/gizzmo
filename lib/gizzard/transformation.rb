@@ -1,3 +1,5 @@
+require "set"
+
 module Gizzard
   class Transformation
     require 'gizzard/transformation_op'
@@ -198,13 +200,21 @@ module Gizzard
     end
 
     def involved_shards(phase = :copy)
-      transformation.operations[phase].map do |op|
-        op.involved_shards(@table_prefix, @translations)
-      end.flatten.compact.uniq
+      @involved_shards        ||= {}
+      @involved_shards[phase] ||=
+        Set.new(transformation.operations[phase].map do |op|
+          op.involved_shards(@table_prefix, @translations)
+        end.flatten.compact.uniq)
+    end
+
+    def involved_hosts_array(phase = :copy)
+      @involved_hosts_array        ||= {}
+      @involved_hosts_array[phase] ||= involved_shards(phase).map {|s| s.hostname }.uniq
     end
 
     def involved_hosts(phase = :copy)
-      involved_shards(phase).map {|s| s.hostname }.uniq
+      @involved_hosts        ||= {}
+      @involved_hosts[phase] ||= Set.new(involved_hosts_array(phase))
     end
 
     def inspect

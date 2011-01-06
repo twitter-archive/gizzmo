@@ -1,3 +1,5 @@
+require "set"
+
 module Gizzard
   def self.schedule!(*args)
     Transformation::Scheduler.new(*args).apply!
@@ -27,9 +29,9 @@ module Gizzard
       @jobs_in_progress = []
       @jobs_finished    = []
 
-      @jobs_pending = transformations.map do |transformation, forwardings_to_shards|
+      @jobs_pending = Set.new(transformations.map do |transformation, forwardings_to_shards|
         transformation.bind(base_name, forwardings_to_shards)
-      end.flatten
+      end.flatten)
     end
 
     # to schedule a job:
@@ -72,19 +74,20 @@ module Gizzard
 
     def schedule_jobs(num_to_schedule)
       to_be_busy_hosts = []
+      jobs             = []
 
-      jobs = (1..num_to_schedule).map do
-        job = @jobs_pending.find do |j|
-          (busy_hosts(to_be_busy_hosts) & j.involved_hosts).empty?
+      @jobs_pending.each do |j|
+        if (busy_hosts(to_be_busy_hosts) & j.involved_hosts).empty?
+          jobs << j
+          to_be_busy_hosts.concat j.involved_hosts_array
+
+          break if jobs.length == num_to_schedule
         end
+      end
 
-        if job
-          to_be_busy_hosts.concat job.involved_hosts
-          @jobs_pending.delete(job)
-        end
+      @jobs_pending.subtract(jobs)
 
-        job
-      end.compact.sort_by {|t| t.forwarding }
+      jobs = jobs.sort_by {|t| t.forwarding }
 
       unless jobs.empty?
         log "STARTING:"
@@ -139,9 +142,9 @@ module Gizzard
     def busy_shards
       @busy_shards ||=
         if nameserver.dryrun?
-          []
+          Set.new
         else
-          nameserver.get_busy_shards.map {|s| s.id }
+          nameserver.get_busy_shards.inject(Set.new) {|set, shard| set.add(shard.id) }
         end
     end
 
@@ -152,7 +155,7 @@ module Gizzard
         h.update(host => 1) {|_,a,b| a + b }
       end
 
-      copies_count_map.select {|_, count| count >= @copies_per_host }.map {|(host, _)| host }
+      copies_count_map.select {|_, count| count >= @copies_per_host }.inject(Set.new) {|set,(host, _)| set.add(host) }
     end
 
     def sleep_with_progress(interval)

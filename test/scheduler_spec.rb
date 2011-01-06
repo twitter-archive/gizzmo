@@ -15,17 +15,17 @@ describe Gizzard::Transformation::Scheduler do
       shards = [info('127.0.0.1', 't_0_0001', 'TestShard')]
       mock(@nameserver).get_busy_shards { shards }
 
-      @scheduler.busy_shards.should == shards.map {|s| s.id }
-      @scheduler.busy_shards.should == shards.map {|s| s.id }
+      @scheduler.busy_shards.should == shards.map {|s| s.id }.to_set
+      @scheduler.busy_shards.should == shards.map {|s| s.id }.to_set
     end
 
     it "resets after calling reload_busy_shards" do
       shards = [info('127.0.0.1', 't_0_0001', 'TestShard')]
       mock(@nameserver).get_busy_shards { shards }.twice
 
-      @scheduler.busy_shards.should == shards.map {|s| s.id }
+      @scheduler.busy_shards.should == shards.map {|s| s.id }.to_set
       @scheduler.reload_busy_shards
-      @scheduler.busy_shards.should == shards.map {|s| s.id }
+      @scheduler.busy_shards.should == shards.map {|s| s.id }.to_set
     end
   end
 
@@ -35,15 +35,15 @@ describe Gizzard::Transformation::Scheduler do
       stub(@nameserver).get_busy_shards { shards }
       @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, 't', @transformations, :copies_per_host => 2)
 
-      @scheduler.busy_hosts.should == []
+      @scheduler.busy_hosts.should == Set.new
 
       shards = [info('127.0.0.1', 't_0_0001', 'TestShard')]
       @scheduler.reload_busy_shards
-      @scheduler.busy_hosts.should == []
+      @scheduler.busy_hosts.should == Set.new
 
       shards = [info('127.0.0.1', 't_0_0001', 'TestShard'), info('127.0.0.1', 't_0_0002', 'TestShard')]
       @scheduler.reload_busy_shards
-      @scheduler.busy_hosts.should == ['127.0.0.1']
+      @scheduler.busy_hosts.should == ['127.0.0.1'].to_set
     end
 
     it "respects passed in extra hosts" do
@@ -51,9 +51,9 @@ describe Gizzard::Transformation::Scheduler do
       stub(@nameserver).get_busy_shards { shards }
       @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, 't', @transformations, :copies_per_host => 2)
 
-      @scheduler.busy_hosts.should == []
-      @scheduler.busy_hosts(["127.0.0.1"]).should == []
-      @scheduler.busy_hosts(["127.0.0.1", "127.0.0.1"]).should == ["127.0.0.1"]
+      @scheduler.busy_hosts.should == Set.new
+      @scheduler.busy_hosts(["127.0.0.1"]).should == Set.new
+      @scheduler.busy_hosts(["127.0.0.1", "127.0.0.1"]).should == ["127.0.0.1"].to_set
     end
   end
 end
