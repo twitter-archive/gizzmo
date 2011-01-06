@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.11.1"
+  s.version = "0.11.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
@@ -25,6 +25,7 @@ Gem::Specification.new do |s|
      "VERSION",
      "bin/gizzmo",
      "bin/setup_shards",
+     "gizzmo.gemspec",
      "lib/gizzard.rb",
      "lib/gizzard/commands.rb",
      "lib/gizzard/digest.rb",
