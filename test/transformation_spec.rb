@@ -39,6 +39,14 @@ describe Gizzard::Transformation do
     end
   end
 
+  describe "eql?" do
+    it "is true for two transformation involving equivalent templates" do
+      templates = lambda { ["SqlShard(host1)", "SqlShard(host2)"].map {|s| mk_template s } }
+      Gizzard::Transformation.new(*templates.call).should.eql? Gizzard::Transformation.new(*templates.call)
+      Gizzard::Transformation.new(*templates.call).hash.should.eql? Gizzard::Transformation.new(*templates.call).hash
+    end
+  end
+
   # internal method tests
 
   describe "operations" do

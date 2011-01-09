@@ -72,6 +72,10 @@ module Gizzard
       copy_dest_wrapper.eql?(o.copy_dest_wrapper)
     end
 
+    def hash
+      from.hash + to.hash + copy_dest_wrapper.hash
+    end
+
     def inspect
       op_inspect = operations.inject({}) do |h, (phase, ops)|
         h.update phase => ops.map {|job| "    #{job.inspect}" }.join("\n")
