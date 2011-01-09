@@ -790,7 +790,7 @@ module Gizzard
       base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
 
       unless be_quiet
-        transformations.each do |transformation, trees|
+        transformations.sort.each do |transformation, trees|
           puts transformation.inspect
           puts "Applied to #{trees.length} shards:"
           trees.keys.sort.each {|f| puts "  #{f.inspect}" }

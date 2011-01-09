@@ -72,6 +72,12 @@ module Gizzard
       copy_dest_wrapper.eql?(o.copy_dest_wrapper)
     end
 
+    def <=>(o)
+      to_a = lambda {|t| [t.from, t.to, t.copy_dest_wrapper] }
+
+      to_a.call(self) <=> to_a.call(o)
+    end
+
     def hash
       from.hash + to.hash + copy_dest_wrapper.hash
     end
