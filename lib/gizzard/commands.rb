@@ -736,6 +736,11 @@ module Gizzard
 
       scheduler_options[:quiet] = be_quiet
 
+      if transformation.noop?
+        puts "Nothing to do!"
+        exit
+      end
+
       unless be_quiet
         puts transformation.inspect
         puts ""
@@ -773,6 +778,13 @@ module Gizzard
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
         transformations[transformation] = trees
+      end
+
+      transformations.reject! {|t,_| t.noop? }
+
+      if transformations.empty?
+        puts "Nothing to do!"
+        exit
       end
 
       base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
@@ -825,6 +837,11 @@ module Gizzard
         rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
+      end
+
+      if transformations.empty?
+        puts "Nothing to do!"
+        exit
       end
 
       base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
