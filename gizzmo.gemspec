@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2011-01-06}
+  s.date = %q{2011-01-08}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
   s.executables = ["gizzmo", "setup_shards"]
@@ -31,6 +31,7 @@ Gem::Specification.new do |s|
      "lib/gizzard/digest.rb",
      "lib/gizzard/migrator.rb",
      "lib/gizzard/nameserver.rb",
+     "lib/gizzard/rebalancer.rb",
      "lib/gizzard/shard_template.rb",
      "lib/gizzard/thrift.rb",
      "lib/gizzard/transformation.rb",
@@ -85,6 +86,9 @@ Gem::Specification.new do |s|
      "test/scheduler_spec.rb",
      "test/shard_template_spec.rb",
      "test/spec_helper.rb",
+     "test/test_server/target/gen-rb/test_server.rb",
+     "test/test_server/target/gen-rb/test_server_constants.rb",
+     "test/test_server/target/gen-rb/test_server_types.rb",
      "test/transformation_spec.rb"
   ]
 

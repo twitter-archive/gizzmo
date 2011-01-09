@@ -317,28 +317,6 @@ module Gizzard
     end
   end
 
-  class RepairCommand < Command
-    def run
-      args = @argv.dup.map{|a| a.split(/\s+/)}.flatten
-      pairs = []
-      loop do
-        a = args.shift
-        b = args.shift
-        break unless a && b
-        pairs << [a, b]
-      end
-      pairs.each do |master, slave|
-        puts "#{master} #{slave}"
-        mprefixes = manager.shards_for_hostname(master).map{|s| s.id.table_prefix}
-        sprefixes = manager.shards_for_hostname(slave).map{|s| s.id.table_prefix}
-        delta = mprefixes - sprefixes
-        delta.each do |prefix|
-          puts "gizzmo copy #{master}/#{prefix} #{slave}/#{prefix}"
-        end
-      end
-    end
-  end
-
   class WrapCommand < Command
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
       suffix = "_" + wrapping_class_name.split(".").last.downcase.gsub("shard", "")
@@ -363,84 +341,6 @@ module Gizzard
         end
         output wrapper_id.to_unix
       end
-    end
-  end
-
-  class RebalanceCommand < Command
-
-    class NamedArray < Array
-      attr_reader :name
-      def initialize(name)
-        @name = name
-      end
-    end
-
-    def run
-      help! "No shards specified" if @argv.empty?
-      shards = []
-      command_options.write_only_shard ||= "com.twitter.gizzard.shards.WriteOnlyShard"
-      additional_hosts = (command_options.hosts || "").split(/[\s,]+/)
-      exclude_hosts = (command_options.exclude_hosts || "").split(/[\s,]+/)
-      ids = @argv.map{|arg| ShardId.new(*arg.split("/")) rescue nil }.compact
-      by_host = ids.inject({}) do |memo, id|
-        memo[id.hostname] ||= NamedArray.new(id.hostname)
-        memo[id.hostname] << id
-        memo
-      end
-
-      additional_hosts.each do |host|
-        by_host[host] ||= NamedArray.new(host)
-      end
-
-      exclude_hosts.each do |host|
-        by_host[host] ||= NamedArray.new(host)
-      end
-
-      sets = by_host.values
-      exclude_sets = exclude_hosts.map{|host| by_host[host]}
-      target_sets = sets - exclude_sets
-
-      exclude_sets.each do |set|
-        while set.length > 0
-          sorted = target_sets.sort_by{|s| s.length}
-          shortest = sorted.first
-          shortest.push set.pop
-        end
-      end
-
-      exclude_sets.each do |set|
-        while set.length > 0
-          sorted = target_sets.sort_by{|s| s.length}
-          shortest = sorted.first
-          shortest.push set.pop
-        end
-      end
-
-      begin
-        sorted = target_sets.sort_by{|s| s.length }
-        longest = sorted.last
-        shortest = sorted.first
-        shortest.push longest.pop
-      end while longest.length > shortest.length + 1
-
-      shard_info = nil
-      sets.each do |set|
-        host = set.name
-        set.each do |id|
-          if id.hostname != host
-            shard_info ||= manager.get_shard(id)
-            old = id.to_unix
-            id.hostname = host
-            shards << [old, id.to_unix]
-          end
-        end
-      end
-
-      new_shards = shards.map{|(old, new)| new }
-
-      puts "gizzmo create #{shard_info.class_name} -s '#{shard_info.source_type}' -d '#{shard_info.destination_type}' #{new_shards.join(" ")}"
-      puts "gizzmo wrap #{command_options.write_only_shard} #{new_shards.join(" ")}"
-      shards.map { |(old, new)| puts "gizzmo copy #{old} #{new}" }
     end
   end
 
@@ -793,15 +693,21 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
-      templates = manager.manifest(*global_options.tables).templates.inject({}) do |h, (t, fs)|
+      manifest  = manager.manifest(*global_options.tables)
+      templates = manifest.templates.inject({}) do |h, (t, fs)|
         h.update t.to_config => fs
       end
 
       if command_options.forwardings
         templates.
-          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.base_id, t] }; h }.
+          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.inspect, t] }; h }.
           sort.
-          each { |a| puts "%25d\t%s" % a }
+          each { |a| puts "%s\t%s" % a }
+      elsif command_options.root_shards
+        templates.
+          inject([]) { |a, (t, fs)| fs.each { |f| a << [f.shard_id.inspect, t] }; a }.
+          sort.
+          each { |a| puts "%s\t%s" % a }
       else
         templates.
           map { |(t, fs)| [fs.length, t] }.
@@ -867,6 +773,58 @@ module Gizzard
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
         transformations[transformation] = trees
+      end
+
+      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+
+      unless be_quiet
+        transformations.each do |transformation, trees|
+          puts transformation.inspect
+          puts "Applied to #{trees.length} shards:"
+          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+        end
+        puts ""
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      Gizzard.schedule! manager,
+                        base_name,
+                        transformations,
+                        scheduler_options
+    end
+  end
+
+  class RebalanceCommand < Command
+    def run
+      help!("must have an even number of arguments") unless @argv.length % 2 == 0
+
+      scheduler_options = command_options.scheduler_options || {}
+      manifest          = manager.manifest(*global_options.tables)
+      copy_wrapper      = scheduler_options[:copy_wrapper]
+      be_quiet          = global_options.force && command_options.quiet
+      transformations   = {}
+
+      scheduler_options[:quiet] = be_quiet
+
+      dest_templates_and_weights = {}
+
+      @argv.each_slice(2) do |(weight_s, to_template_s)|
+        to     = ShardTemplate.parse(to_template_s)
+        weight = weight_s.to_i
+
+        dest_templates_and_weights[to] = weight
+      end
+
+      transformations = global_options.tables.inject({}) do |all, table|
+        trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+
+        all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
 
       base_name = transformations.values.first.values.first.id.table_prefix.split('_').first

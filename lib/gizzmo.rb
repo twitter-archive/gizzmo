@@ -127,24 +127,6 @@ subcommands = {
     opts.banner = "Usage: #{zero} wrap CLASS_NAME SHARD_ID_TO_WRAP [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["wrap"])
   end,
-  'rebalance' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} rebalance"
-    separators(opts, DOC_STRINGS["rebalance"])
-
-    opts.on("-w", "--write-only=CLASS") do |w|
-      subcommand_options.write_only_shard = w
-    end
-    opts.on("-h", "--shard-hosts=list") do |h|
-      subcommand_options.hosts = h
-    end
-    opts.on("-x", "--exclude-hosts=list") do |x|
-      subcommand_options.exclude_hosts = x
-    end
-  end,
-  'repair' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} repair MASTER SLAVE [MASTER SLAVE...]"
-    separators(opts, DOC_STRINGS["repair"])
-  end,
   'pair' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} pair"
     separators(opts, DOC_STRINGS["pair"])
@@ -308,8 +290,12 @@ subcommands = {
     opts.banner = "Usage: #{zero} topology [options]"
     separators(opts, DOC_STRINGS["topology"])
 
-    opts.on("--forwardings", "Show topology of forwardings instead of counts") do
+    opts.on("--forwardings", "Show topology by forwarding instead of counts") do
       subcommand_options.forwardings = true
+    end
+
+    opts.on("--shards", "Show topology by root shard ids instead of counts") do
+      subcommand_options.root_shards = true
     end
   end,
   'transform-tree' => OptionParser.new do |opts|
@@ -323,8 +309,18 @@ subcommands = {
     end
   end,
   'transform' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE"
+    opts.banner = "Usage: #{zero} transform [options] FROM_TEMPLATE TO_TEMPLATE ..."
     separators(opts, DOC_STRINGS['transform'])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
+  end,
+  'rebalance' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} rebalance [options] WEIGHT TO_TEMPLATE ..."
+    separators(opts, DOC_STRINGS["rebalance"])
 
     add_scheduler_opts subcommand_options, opts
 

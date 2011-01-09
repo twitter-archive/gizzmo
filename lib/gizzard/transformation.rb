@@ -35,7 +35,7 @@ module Gizzard
 
     DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
 
-    attr_reader :from, :to
+    attr_reader :from, :to, :copy_dest_wrapper
 
     def initialize(from_template, to_template, copy_dest_wrapper = nil)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
@@ -59,6 +59,17 @@ module Gizzard
       forwardings_to_shards.map do |forwarding, shard|
         BoundTransformation.new(self, base_name, forwarding, shard)
       end
+    end
+
+    def noop?
+      from.eql? to
+    end
+
+    def eql?(o)
+      o.is_a?(self.class) &&
+      from.eql?(o.from) &&
+      to.eql?(o.to) &&
+      copy_dest_wrapper.eql?(o.copy_dest_wrapper)
     end
 
     def inspect

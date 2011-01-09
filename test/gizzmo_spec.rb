@@ -264,9 +264,17 @@ c2:c2host2:7777 0
 
       it "shows the template for each forwarding" do
         gizzmo("-T 0 topology --forwardings").should == <<-EOF
-                        0	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
-                        1	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
-                        2	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+[0] 0 = localhost/t0_0_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+[0] 1 = localhost/t0_1_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+[0] 2 = localhost/t0_2_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+        EOF
+      end
+
+      it "shows the template for each root shard" do
+        gizzmo("-T 0 topology --shards").should == <<-EOF
+localhost/t0_0_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+localhost/t0_1_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
+localhost/t0_2_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1,Int,Int))
         EOF
       end
     end
@@ -551,6 +559,82 @@ FINISHING:
                                      link(id("localhost", "s_1_001_replicating"), id("localhost", "s_1_001_a"), 1),
                                      link(id("localhost", "s_1_002_replicating"), id("127.0.0.1", "s_1_0002"), 1),
                                      link(id("localhost", "s_1_002_replicating"), id("localhost", "s_1_002_a"), 1) ]
+    end
+  end
+
+  describe "rebalance" do
+    it "works" do
+      1.upto(4) do |i|
+        gizzmo "create TestShard localhost/s_0_00#{i}_a"
+        gizzmo "create ReplicatingShard localhost/s_0_00#{i}_replicating"
+        gizzmo "addlink localhost/s_0_00#{i}_replicating localhost/s_0_00#{i}_a 1"
+        gizzmo "addforwarding 0 #{i} localhost/s_0_00#{i}_replicating"
+      end
+      gizzmo "-f reload"
+
+      gizzmo('-f -T0 rebalance --no-progress --poll-interval=1 \
+1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
+1 "ReplicatingShard -> TestShard(localhost,1)"').should == <<-EOF
+ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
+  PREPARE
+    create_shard(TestShard/127.0.0.1)
+    create_shard(WriteOnlyShard)
+    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> WriteOnlyShard)
+  COPY
+    copy_shard(TestShard/127.0.0.1)
+  CLEANUP
+    add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> TestShard/localhost)
+    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> WriteOnlyShard)
+    delete_shard(TestShard/localhost)
+    delete_shard(WriteOnlyShard)
+Applied to 1 shards:
+  [0] 1 = localhost/s_0_001_replicating
+ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
+  PREPARE
+    create_shard(TestShard/127.0.0.1)
+    create_shard(WriteOnlyShard)
+    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> WriteOnlyShard)
+  COPY
+    copy_shard(TestShard/127.0.0.1)
+  CLEANUP
+    add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> TestShard/localhost)
+    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> WriteOnlyShard)
+    delete_shard(TestShard/localhost)
+    delete_shard(WriteOnlyShard)
+Applied to 1 shards:
+  [0] 2 = localhost/s_0_002_replicating
+
+STARTING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
+COPIES:
+  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
+  localhost/s_0_002_a -> 127.0.0.1/s_0_0002
+FINISHING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
+2 transformations applied. Total time elapsed: 1 second
+      EOF
+
+      nameserver[:shards].should == [ info("127.0.0.1", "s_0_0001", "TestShard"),
+                                      info("127.0.0.1", "s_0_0002", "TestShard"),
+                                      info("localhost", "s_0_001_replicating", "ReplicatingShard"),
+                                      info("localhost", "s_0_002_replicating", "ReplicatingShard"),
+                                      info("localhost", "s_0_003_a", "TestShard"),
+                                      info("localhost", "s_0_003_replicating", "ReplicatingShard"),
+                                      info("localhost", "s_0_004_a", "TestShard"),
+                                      info("localhost", "s_0_004_replicating", "ReplicatingShard") ]
+
+      nameserver[:links].should == [ link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),
+                                     link(id("localhost", "s_0_002_replicating"), id("127.0.0.1", "s_0_0002"), 1),
+                                     link(id("localhost", "s_0_003_replicating"), id("localhost", "s_0_003_a"), 1),
+                                     link(id("localhost", "s_0_004_replicating"), id("localhost", "s_0_004_a"), 1) ]
     end
   end
 end

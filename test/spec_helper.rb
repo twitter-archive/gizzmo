@@ -11,6 +11,13 @@ JOB_PORT     = 7921
 SERVICE_DATABASE    = 'gizzard_test_integration'
 NAMESERVER_DATABASE = 'gizzard_test_integration_ns'
 
+class Object
+  def T; p self; self end
+end
+
+class NilClass
+  def T; p self; self end
+end
 
 require 'rubygems'
 require 'spec'
