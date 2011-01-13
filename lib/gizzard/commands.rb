@@ -27,6 +27,7 @@ module Gizzard
       end
 
       def make_manager(global_options, log)
+        raise "No hosts specified" unless global_options.hosts
         hosts = global_options.hosts.map {|h| [h, global_options.port].join(":") }
 
         Nameserver.new(hosts, :retries => global_options.retry,
@@ -499,6 +500,18 @@ module Gizzard
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
       manager.copy_shard(from_shard_id, to_shard_id)
+    end
+  end
+
+  class RepairShardCommand < Command
+    def run
+      from_shard_id_string, to_shard_id_string, table_id_string, dry_run_string = @argv
+      help!("Requires source, destination shard id & table id") unless from_shard_id_string && to_shard_id_string && table_id_string
+      from_shard_id = ShardId.parse(from_shard_id_string)
+      to_shard_id = ShardId.parse(to_shard_id_string)
+      table_id = Integer(table_id)
+      dry_run = !dry_run_string.nil? && (dry_run == '1' || dry_run == 'true')
+      manager.repair_shard(from_shard_id, to_shard_id, table_id, dry_run)
     end
   end
 
