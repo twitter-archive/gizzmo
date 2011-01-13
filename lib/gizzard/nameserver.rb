@@ -173,7 +173,7 @@ module Gizzard
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
       def initialize(nameserver, table_ids)
-        states = parallel_map(table_ids) {|id| nameserver.dump_nameserver(id) }
+        states = nameserver.dump_nameserver(table_ids)
 
         @forwardings = states.map {|s| s.forwardings }.flatten
 
