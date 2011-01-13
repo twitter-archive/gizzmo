@@ -316,6 +316,10 @@ localhost/t0_2_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int
     it "works"
   end
 
+  describe "repair-shard" do
+    it "works"
+  end
+
   describe "setup-migrate" do
     it "works"
   end

@@ -52,6 +52,29 @@ module Gizzard
       end
     end
 
+    class RepairShard < BaseOp
+      attr_reader :from, :to
+      alias template to
+
+      def initialize(from, to)
+        @from = from
+        @to   = to
+      end
+
+      def expand(*args); { :repair => [self] } end
+
+      def involved_shards(table_prefix, translations)
+        [to.to_shard_id(table_prefix, translations)]
+      end
+
+      def apply(nameserver, table_id, base_id, table_prefix, translations, dry_run)
+        from_shard_id = from.to_shard_id(table_prefix, translations)
+        to_shard_id   = to.to_shard_id(table_prefix, translations)
+
+        nameserver.repair_shard(from_shard_id, to_shard_id, table_id, dry_run)
+      end
+    end
+
     class LinkOp < BaseOp
       attr_reader :from, :to
       alias template to

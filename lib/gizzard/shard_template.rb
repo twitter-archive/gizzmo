@@ -1,3 +1,5 @@
+require 'yaml'
+
 module Gizzard
   class ShardTemplate
     include Comparable

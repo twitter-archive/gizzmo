@@ -119,6 +119,11 @@ module Gizzard
       with_retry { c.copy_shard(from_shard_id, to_shard_id) }
     end
 
+    def repair_shard(from_shard_id, to_shard_id, table_id, dry_run = false)
+      c = random_client
+      with_retry { c.repair_shard(from_shard_id, to_shard_id, table_id, dry_run ? 1 : 0) }
+    end
+
     def respond_to?(method)
       client.respond_to? method or super
     end
