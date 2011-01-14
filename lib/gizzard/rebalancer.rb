@@ -30,7 +30,7 @@ module Gizzard
         last_cost = nil
 
         @buckets.each do |bucket|
-          cost      = (bucket_concrete_descendants(bucket) - descendants).length
+          cost      = (memoized_concrete_descendants(bucket) - descendants).length
           last_cost = cost if last_cost.nil?
 
           if cost == last_cost
