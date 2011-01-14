@@ -106,7 +106,7 @@ end
 def read_nameserver_db(db = NAMESERVER_DATABASE)
   { :shards      => map_rs($mysql.query("select * from `#{db}`.shards"), &method(:as_shard)),
     :links       => map_rs($mysql.query("select * from `#{db}`.shard_children"), &method(:as_link)),
-    :forwardings => map_rs($mysql.query("select * from `#{db}`.forwardings"), &method(:as_forwarding)),
+    :forwardings => map_rs($mysql.query("select * from `#{db}`.forwardings where deleted = 0"), &method(:as_forwarding)),
     :hosts       => map_rs($mysql.query("select * from `#{db}`.hosts"), &method(:as_host)) }
 end
 

@@ -96,7 +96,7 @@ describe Gizzard::Nameserver::Manifest do
     @nameserver = Gizzard::Nameserver.new("localhost:1234")
     @state = Object.new
 
-    mock(@nameserver).dump_nameserver(0) { @state }
+    mock(@nameserver).dump_nameserver([0]) { [@state] }
     mock(@state).forwardings { @forwardings }
     mock(@state).links { @links }
     mock(@state).shards { @shardinfos }
