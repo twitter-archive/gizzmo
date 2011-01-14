@@ -141,6 +141,8 @@ end
 
 mysql_connect!("localhost", '', '')
 reset_databases!
-start_test_server!
 
-at_exit { stop_test_server! }
+unless ENV['EXTERNAL_TEST_SERVER']
+  start_test_server!
+  at_exit { stop_test_server! }
+end
