@@ -110,7 +110,7 @@ module Gizzard
 
     def reload_updated_forwardings
       parallel_map all_clients do |c|
-        with_retry { c.reload_config }
+        with_retry { c.reload_updated_forwardings }
       end
     end
 
