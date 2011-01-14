@@ -108,6 +108,12 @@ module Gizzard
       ids.map {|id| with_retry { client.get_shard(id) } }
     end
 
+    def reload_updated_forwardings
+      parallel_map all_clients do |c|
+        with_retry { c.reload_config }
+      end
+    end
+
     def reload_config
       parallel_map all_clients do |c|
         with_retry { c.reload_config }

@@ -150,6 +150,7 @@ module Gizzard
   end
 
   class Manager < GizzmoService
+    thrift_method :reload_updated_forwardings, void, :throws => exception(GizzardException)
     thrift_method :reload_config, void, :throws => exception(GizzardException)
     thrift_method :rebuild_schema, void, :throws => exception(GizzardException)
 
