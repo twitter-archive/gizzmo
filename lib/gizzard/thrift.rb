@@ -90,7 +90,7 @@ module Gizzard
     end
   end
 
-  NameServerState = T.make_struct(:NameserverState,
+  NameServerState = T.make_struct(:NameServerState,
     T::Field.new(:shards, list(struct(ShardInfo)), 1),
     T::Field.new(:links, list(struct(LinkInfo)), 2),
     T::Field.new(:forwardings, list(struct(Forwarding)), 3),
