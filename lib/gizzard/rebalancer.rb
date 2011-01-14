@@ -24,17 +24,24 @@ module Gizzard
 
     def home!
       @shards.each do |s|
-        descendants           = s.template.concrete_descendants
-        most_similar_template = @buckets.
-          map        {|b| [(b.concrete_descendants - descendants).length, b] }.
-          inject({}) {|h, (cost, b)| h.update(cost => [b]) {|k,a,b| a.concat b } }.
-          to_a.
-          sort_by    {|a| a.first }.
-          first.
-          last.
-          choice
+        descendants = memoized_concrete_descendants(s.template)
 
-        move_shard most_similar_template, s
+        most_similar_templates = []
+        last_cost = nil
+
+        @buckets.each do |bucket|
+          cost      = (bucket_concrete_descendants(bucket) - descendants).length
+          last_cost = cost if last_cost.nil?
+
+          if cost == last_cost
+            most_similar_templates << bucket
+          elsif cost < last_cost
+            last_cost = cost
+            most_similar_templates = [bucket]
+          end
+        end
+
+        move_shard most_similar_templates.choice, s
       end
     end
 
@@ -67,6 +74,11 @@ module Gizzard
 
     def ordered_buckets
       @result.sort_by {|bucket, shards| shards.length }
+    end
+
+    def memoized_concrete_descendants(t)
+      @memoized_concrete_descendants ||= {}
+      @memoized_concrete_descendants[t] ||= t.concrete_descendants
     end
 
     def bucket_disparity
