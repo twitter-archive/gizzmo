@@ -3,6 +3,13 @@ require 'set'
 module Gizzard
   class Rebalancer
     TemplateAndTree = Struct.new(:template, :forwarding, :tree)
+    Bucket          = Struct.new(:template, :approx_shards, :set)
+
+    class Bucket
+      def balance; set.length - approx_shards end
+      def add(e); set.add(e) end
+      def delete(e); set.delete(e) end
+    end
 
     # steps for rebalancing.
     #
@@ -18,8 +25,17 @@ module Gizzard
         TemplateAndTree.new(tree.template, forwarding, tree)
       end.flatten
 
-      @buckets = dest_templates_and_weights.keys
-      @result  = @buckets.inject({}) {|h,b| h.update b => Set.new }
+      @dest_templates      = dest_templates_and_weights.keys
+
+      total_shards = @shards.length
+      total_weight = dest_templates_and_weights.values.inject {|a,b| a + b }
+
+      @result = dest_templates_and_weights.map do |template, weight|
+        weight_fraction = weight / total_weight.to_f
+        approx_shards   = total_shards * weight_fraction
+
+        Bucket.new template, approx_shards, Set.new
+      end
     end
 
     def home!
@@ -29,7 +45,7 @@ module Gizzard
         most_similar_templates = []
         last_cost = nil
 
-        @buckets.each do |bucket|
+        @dest_templates.each do |bucket|
           cost      = (memoized_concrete_descendants(bucket) - descendants).length
           last_cost = cost if last_cost.nil?
 
@@ -48,7 +64,7 @@ module Gizzard
     def rebalance!
       while bucket_disparity > 1
         ordered = ordered_buckets
-        move_shard ordered.first.first, ordered.last.last.each {|e| break e }
+        move_shard ordered.first.template, ordered.last.set.each {|e| break e }
       end
     end
 
@@ -59,9 +75,9 @@ module Gizzard
       rebalance!
 
       @transformations = {}
-      @result.each do |template, shards|
-        shards.each do |shard|
-          trans = Transformation.new(shard.template, template, @copy_dest_wrapper)
+      @result.each do |bucket|
+        bucket.set.each do |shard|
+          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper)
           forwardings_to_trees = (@transformations[trans] ||= {})
 
           forwardings_to_trees.update(shard.forwarding => shard.tree)
@@ -73,7 +89,7 @@ module Gizzard
     end
 
     def ordered_buckets
-      @result.sort_by {|bucket, shards| shards.length }
+      @result.sort_by {|bucket| bucket.balance }
     end
 
     def memoized_concrete_descendants(t)
@@ -83,12 +99,17 @@ module Gizzard
 
     def bucket_disparity
       ordered = ordered_buckets
-      ordered.last.last.length - ordered.first.last.length
+      ordered.last.balance - ordered.first.balance
     end
 
-    def move_shard(bucket, shard)
-      @result.each {|_, ss| ss.delete shard }
-      @result[bucket].add shard
+    def move_shard(template, shard)
+      @result.each do |bucket|
+        if bucket.template == template
+          bucket.add shard
+        else
+          bucket.delete shard
+        end
+      end
     end
   end
 end
