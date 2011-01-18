@@ -136,6 +136,17 @@ def as_host(h)
   Gizzard::Host.new(h['hostname'], h['port'].to_i, h['cluster'], h['status'].to_i)
 end
 
+def gizzmo(cmd)
+  result = `cd #{ROOT_DIR} && ruby -rubygems -Ilib bin/gizzmo -H localhost -P #{MANAGER_PORT} #{cmd} 2>&1`
+  puts result if ENV['GIZZMO_OUTPUT']
+  result
+end
+
+def nameserver
+  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s)
+end
+
+alias ns nameserver
 
 # setup
 
