@@ -180,6 +180,7 @@ module Gizzard
     thrift_method :get_forwardings, list(struct(Forwarding)), :throws => exception(GizzardException)
 
     thrift_method :list_hostnames, list(string), :throws => exception(GizzardException)
+    thrift_method :list_tables, list(i32), :throws => exception(GizzardException)
 
     thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(GizzardException)
     thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(GizzardException)

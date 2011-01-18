@@ -147,6 +147,10 @@ subcommands = {
     opts.banner = "Usage: #{zero} hosts"
     separators(opts, DOC_STRINGS["hosts"])
   end,
+  'tables' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} tables"
+    separators(opts, DOC_STRINGS["tables"])
+  end,
   'deleteforwarding' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} deleteforwarding TABLE_ID BASE_ID SHARD_ID"
     separators(opts, DOC_STRINGS["deleteforwarding"])

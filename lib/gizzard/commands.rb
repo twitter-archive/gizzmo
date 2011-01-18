@@ -691,6 +691,12 @@ module Gizzard
     end
   end
 
+  class ListTablesCommand < Command
+    def run
+      puts manager.list_tables.join(" ")
+    end
+  end
+
   class TopologyCommand < Command
     def run
       manifest  = manager.manifest(*global_options.tables)

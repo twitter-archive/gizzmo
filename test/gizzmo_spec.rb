@@ -206,6 +206,12 @@ describe "gizzmo (cli)" do
       end
     end
 
+    describe "tables" do
+      it "prints a list of table ids in the cluster" do
+        gizzmo("tables").should == "0"
+      end
+    end
+
     describe "forwardings" do
       it "lists forwardings and the root of the corresponding shard trees" do
         gizzmo("forwardings").should == <<-EOF
