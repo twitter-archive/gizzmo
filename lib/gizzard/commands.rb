@@ -510,8 +510,7 @@ module Gizzard
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
       table_id = Integer(table_id)
-      dry_run = !dry_run_string.nil? && (dry_run == '1' || dry_run == 'true')
-      manager.repair_shard(from_shard_id, to_shard_id, table_id, dry_run)
+      manager.repair_shard(from_shard_id, to_shard_id, table_id)
     end
   end
 
