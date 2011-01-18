@@ -8,6 +8,7 @@ module Gizzard
     class Bucket
       def balance; set.length - approx_shards end
       def add(e); set.add(e) end
+      def merge(es); set.merge(es) end
       def delete(e); set.delete(e) end
     end
 
@@ -39,25 +40,34 @@ module Gizzard
     end
 
     def home!
-      @shards.each do |s|
-        descendants = memoized_concrete_descendants(s.template)
 
-        most_similar_templates = []
+      # list of [template, shards] in descending length of shards
+      templates_to_shards =
+        @shards.inject({}) do |h, shard|
+          (h[shard.template] ||= []) << shard; h
+        end.sort_by {|(_,ss)| ss.length * -1 }
+
+      templates_to_shards.each do |(template, shards)|
+        descendants = memoized_concrete_descendants(template)
+
+        most_similar_buckets = []
         last_cost = nil
 
-        @dest_templates.each do |bucket|
-          cost      = (memoized_concrete_descendants(bucket) - descendants).length
+        @result.each do |bucket|
+          cost      = (memoized_concrete_descendants(bucket.template) - descendants).length
           last_cost = cost if last_cost.nil?
 
           if cost == last_cost
-            most_similar_templates << bucket
+            most_similar_buckets << bucket
           elsif cost < last_cost
             last_cost = cost
-            most_similar_templates = [bucket]
+            most_similar_buckets = [bucket]
           end
         end
 
-        move_shard most_similar_templates.choice, s
+        dest_bucket = most_similar_buckets.sort_by {|b| b.balance }.first
+
+        dest_bucket.merge shards
       end
     end
 
