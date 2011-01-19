@@ -85,6 +85,8 @@ def reset_nameserver(db = NAMESERVER_DATABASE)
   $mysql.query("delete from `#{db}`.shard_children")
   $mysql.query("delete from `#{db}`.forwardings")
   $mysql.query("delete from `#{db}`.hosts")
+
+  nameserver.reload_config rescue nil
 end
 
 def reset_databases!
@@ -96,8 +98,7 @@ def reset_databases!
   rescue MysqlError
 
     begin
-      m = Gizzard::Manager.new("localhost", MANAGER_PORT, '/dev/null', false)
-      m.rebuild_schema
+      nameserver.rebuild_schema
     rescue Errno::ECONNREFUSED
     end
   end
