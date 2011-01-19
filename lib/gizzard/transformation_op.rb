@@ -67,11 +67,11 @@ module Gizzard
         [to.to_shard_id(table_prefix, translations)]
       end
 
-      def apply(nameserver, table_id, base_id, table_prefix, translations, dry_run)
+      def apply(nameserver, table_id, base_id, table_prefix, translations)
         from_shard_id = from.to_shard_id(table_prefix, translations)
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
-        nameserver.repair_shard(from_shard_id, to_shard_id, table_id, dry_run)
+        nameserver.repair_shard(from_shard_id, to_shard_id)
       end
     end
 

@@ -505,12 +505,11 @@ module Gizzard
 
   class RepairShardCommand < Command
     def run
-      from_shard_id_string, to_shard_id_string, table_id_string, dry_run_string = @argv
-      help!("Requires source, destination shard id & table id") unless from_shard_id_string && to_shard_id_string && table_id_string
+      from_shard_id_string, to_shard_id_string = @argv
+      help!("Requires source, destination shard id") unless from_shard_id_string && to_shard_id_string
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
-      table_id = Integer(table_id)
-      manager.repair_shard(from_shard_id, to_shard_id, table_id)
+      manager.repair_shard(from_shard_id, to_shard_id)
     end
   end
 
