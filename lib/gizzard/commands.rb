@@ -825,6 +825,9 @@ module Gizzard
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       be_quiet          = global_options.force && command_options.quiet
+      shard_weights_file= command_options.shard_weights
+      strategy          = command_options.strategy || "minimal"
+      tolerance         = (command_options.tolerance || "0.05").to_f
       transformations   = {}
 
       scheduler_options[:quiet] = be_quiet
@@ -840,7 +843,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, shard_weights_file, strategy, tolerance, copy_wrapper)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end

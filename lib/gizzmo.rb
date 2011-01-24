@@ -331,6 +331,15 @@ subcommands = {
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
+    opts.on("-w", "--shard_weights=WEIGHTS", "File containing weights for shards") do |o|
+      subcommand_options.shard_weights = o
+    end
+    opts.on("-s", "--strategy=greedy|sticky|minimal", "Which rebalancing strategy to use") do |s|
+      subcommand_options.strategy = s
+    end
+    opts.on("-t", "--tolerance=TOLERANCE", "How close to equal should the template weights be") do |t|
+      subcommand_options.tolerance = t
+    end
   end
 }
 
