@@ -786,7 +786,7 @@ module Gizzard
         transformations[transformation] = trees
       end
 
-      transformations.reject! {|t,_| t.noop? }
+      transformations.reject! {|t,trees| t.noop? or trees.empty? }
 
       if transformations.empty?
         puts "Nothing to do!"
