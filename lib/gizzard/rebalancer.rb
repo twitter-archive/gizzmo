@@ -62,9 +62,10 @@ module Gizzard
           (h[shard.template] ||= []) << shard; h
         end.sort_by {|(_,ss)| ss.length * -1 }
 
-      template_to_bucket = Hash[*@result.map {|b| [b.template, b]}.flatten]
+      @template_to_bucket = Hash[*@result.map {|b| [b.template, b]}.flatten]
       templates_to_shards.each do |(template, shards)|
-        template_to_bucket[template].merge(shards)
+        @template_to_bucket[template] ||= Bucket.new template, 0.0, Set.new
+        @template_to_bucket[template].merge(shards)
       end
 
 #      templates_to_shards.each do |(template, shards)|
@@ -92,7 +93,6 @@ module Gizzard
     end
 
     def rebalance_sticky_greedy!
-      template_to_bucket = Hash[*@result.map {|b| [b.template, b]}.flatten]
       template_weights = Hash[*@result.map {|b| [b.template, 0]}.flatten]
 
       threshold = @shards.inject(0) {|h, s| h + get_shard_weight(s)} / @result.length * @tolerance
@@ -101,15 +101,16 @@ module Gizzard
       total = 0.0
       ordered_shards(@shards).each do |shard|
         average = total/@result.length
-        shard_weight = get_shard_weight(shard)
         current = shard.template
-      	puts "#{template_weights[current] + shard_weight} > #{average + threshold}"
-        if template_weights[current] + shard_weight > average + threshold
+        template_weight = template_weights[current] || 9999999999
+        shard_weight = get_shard_weight(shard)
+        puts "#{template_weight + shard_weight} > #{average + threshold}"
+        if template_weight + shard_weight > average + threshold
           smallest = ordered_buckets(template_weights).first
           if template_weights[current] != template_weights[smallest]
             puts "move"
-            template_to_bucket[current].delete(shard)
-            template_to_bucket[smallest].add(shard)
+            @template_to_bucket[current].delete(shard)
+            @template_to_bucket[smallest].add(shard)
             template_weights[smallest] += shard_weight
           else
             puts "stay"
@@ -139,7 +140,6 @@ module Gizzard
     end
 
     def rebalance_greedy!
-      template_to_bucket = Hash[*@result.map {|b| [b.template, b]}.flatten]
       template_weights = Hash[*@result.map {|b| [b.template, 0]}.flatten]
 
       ordered_shards(@shards).each do |shard|
@@ -148,8 +148,8 @@ module Gizzard
         smallest = ordered_buckets(template_weights).first
         if template_weights[current] != template_weights[smallest]
           puts "move"
-          template_to_bucket[current].delete(shard)
-          template_to_bucket[smallest].add(shard)
+          @template_to_bucket[current].delete(shard)
+          @template_to_bucket[smallest].add(shard)
           template_weights[smallest] += shard_weight
         else
           puts "stay"
@@ -160,8 +160,6 @@ module Gizzard
     end
 
     def rebalance_minimal!
-      template_to_bucket = Hash[*@result.map {|b| [b.template, b]}.flatten]
-
       templates = @result.map {|b| b.template}
       dead_templates = {}
       template_weights = templates.inject({}) {|h, t| h[t] = 0; h}
@@ -170,6 +168,63 @@ module Gizzard
         h[s.template] += get_shard_weight(s)
         h
       end
+      print_template_weights(template_weights)
+
+      average = template_weights.keys.inject(0) {|s, t| s + template_weights[t]} / templates.length
+      upper = average * (1.0 + @tolerance)
+      lower = average * (1.0 - @tolerance)
+
+      moved_shards = Set.new
+
+      sorted_templates = ordered_templates(template_weights)
+      while template_weights.length > 1 and (template_weights[sorted_templates[0]] < lower or template_weights[sorted_templates[-1]] > upper) and moved_shards.length < @shards.length
+        weight, shard_to_move = nil, nil
+        big_shards = ordered_shards(@template_to_bucket[sorted_templates[-1]].set).reverse
+        big_shards.each do |shard|
+          puts 'a'
+          if moved_shards.include?(shard)
+            next
+          end
+          weight = get_shard_weight(shard)
+          if template_weights[sorted_templates[-1]] - weight >= lower
+            shard_to_move = shard
+            puts 'b'
+            break
+          end
+        end
+        puts 'c'
+
+        if shard_to_move.nil?
+          weight = template_weights.delete(sorted_templates[-1])
+          dead_templates[sorted_templates[-1]] = weight
+        else
+          @template_to_bucket[sorted_templates[-1]].delete(shard_to_move)
+          @template_to_bucket[sorted_templates[0]].add(shard_to_move)
+          template_weights[sorted_templates[-1]] -= weight
+          template_weights[sorted_templates[0]] += weight
+          moved_shards.add(shard_to_move)
+          puts "move"
+        end
+        sorted_templates = ordered_templates(template_weights)
+        puts "(#{template_weights[sorted_templates[0]]} < #{lower} or #{template_weights[sorted_templates[-1]]} > #{upper}) and #{moved_shards.length} < #{@shards.length}"
+      end
+      print_template_weights(template_weights)
+      puts "dead templates:"
+      print_template_weights(dead_templates)
+      puts "end dead templates"
+    end
+
+   def rebalance_minimal_aggressive!
+      templates = @result.map {|b| b.template}
+      dead_templates = {}
+      template_weights = templates.inject({}) {|h, t| h[t] = 0; h}
+      template_weights = @shards.inject({}) do |h, s|
+        h[s.template] ||= 0
+        h[s.template] += get_shard_weight(s)
+        h
+      end
+      print_template_weights(template_weights)
+
       average = template_weights.keys.inject(0) {|s, t| s + template_weights[t]} / templates.length
       upper = average * (1.0 + @tolerance)
       lower = average * (1.0 - @tolerance)
@@ -179,7 +234,7 @@ module Gizzard
       sorted_templates = ordered_templates(template_weights)
       while template_weights.length > 1 and (template_weights[sorted_templates[0]] < lower or template_weights[sorted_templates[-1]] > upper) and moved_shards.length < @shards.length
         weight, shard_to_move, movable_shard = nil, nil, nil
-        big_shards = ordered_shards(template_to_bucket[sorted_templates[-1]].set).reverse
+        big_shards = ordered_shards(@template_to_bucket[sorted_templates[-1]].set).reverse
         big_shards.each do |shard|
           puts 'a'
           if moved_shards.include?(shard)
@@ -198,12 +253,13 @@ module Gizzard
         if movable_shard.nil?
           weight = template_weights.delete(sorted_templates[-1])
           dead_templates[sorted_templates[-1]] = weight
+          puts "stay"
         else
           to_template = sorted_templates[0]
           if shard_to_move.nil?
             shard_to_move = movable_shard
-            average_sort_templates = template_weights.sort_by {|t, w| w/template_to_bucket[t].set.length}
-            puts average_sort_templates.map {|k, v| v/template_to_bucket[k].set.length}.inspect
+            average_sort_templates = template_weights.sort_by {|t, w| w/@template_to_bucket[t].set.length}
+            puts average_sort_templates.map {|k, v| v/@template_to_bucket[k].set.length}.inspect
             if average_sort_templates[0][0] == to_template
               to_template = average_sort_templates[1][0]
               puts 'd'
@@ -214,8 +270,8 @@ module Gizzard
             #moved_shards.add(shard_to_move)
           end
 
-          template_to_bucket[sorted_templates[-1]].delete(shard_to_move)
-          template_to_bucket[to_template].add(shard_to_move)
+          @template_to_bucket[sorted_templates[-1]].delete(shard_to_move)
+          @template_to_bucket[to_template].add(shard_to_move)
           template_weights[sorted_templates[-1]] -= weight
           template_weights[to_template] += weight
           moved_shards.add(shard_to_move)
@@ -231,7 +287,8 @@ module Gizzard
     end
 
     def print_template_weights(template_weights)
-      template_weights.each {|t, w| puts "#{w}:\t#{t}"}
+      ordered = ordered_templates(template_weights)
+      ordered.each {|t| puts "#{template_weights[t]}:\t#{t}"}
     end
 
     def ordered_shards(shards)
@@ -259,6 +316,7 @@ module Gizzard
       when "sticky" then rebalance_sticky_greedy!
       when "greedy" then rebalance_greedy!
       when "minimal" then rebalance_minimal!
+      when "minagg" then rebalance_minimal_aggressive!
       end
 
       @transformations = {}

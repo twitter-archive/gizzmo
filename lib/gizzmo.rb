@@ -4,6 +4,7 @@ class HelpNeededError < RuntimeError; end
 require "optparse"
 require "ostruct"
 require "gizzard"
+require "shellwords"
 require "yaml"
 
 DOC_STRINGS = {
@@ -103,6 +104,9 @@ def add_scheduler_opts(subcommand_options, opts)
   end
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true
+  end
+  opts.on("--argv=FILE", "Put the contents of FILE onto the command line") do |f|
+    ARGV.push *Shellwords.shellwords(File.read(f))
   end
 end
 
