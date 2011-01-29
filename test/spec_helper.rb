@@ -85,6 +85,8 @@ def reset_nameserver(db = NAMESERVER_DATABASE)
   $mysql.query("delete from `#{db}`.shard_children")
   $mysql.query("delete from `#{db}`.forwardings")
   $mysql.query("delete from `#{db}`.hosts")
+
+  nameserver.reload_config rescue nil
 end
 
 def reset_databases!
@@ -96,8 +98,7 @@ def reset_databases!
   rescue MysqlError
 
     begin
-      m = Gizzard::Manager.new("localhost", MANAGER_PORT, '/dev/null', false)
-      m.rebuild_schema
+      nameserver.rebuild_schema
     rescue Errno::ECONNREFUSED
     end
   end
@@ -106,7 +107,7 @@ end
 def read_nameserver_db(db = NAMESERVER_DATABASE)
   { :shards      => map_rs($mysql.query("select * from `#{db}`.shards"), &method(:as_shard)),
     :links       => map_rs($mysql.query("select * from `#{db}`.shard_children"), &method(:as_link)),
-    :forwardings => map_rs($mysql.query("select * from `#{db}`.forwardings"), &method(:as_forwarding)),
+    :forwardings => map_rs($mysql.query("select * from `#{db}`.forwardings where deleted = 0"), &method(:as_forwarding)),
     :hosts       => map_rs($mysql.query("select * from `#{db}`.hosts"), &method(:as_host)) }
 end
 
@@ -136,11 +137,24 @@ def as_host(h)
   Gizzard::Host.new(h['hostname'], h['port'].to_i, h['cluster'], h['status'].to_i)
 end
 
+def gizzmo(cmd)
+  result = `cd #{ROOT_DIR} && ruby -rubygems -Ilib bin/gizzmo -H localhost -P #{MANAGER_PORT} #{cmd} 2>&1`
+  puts result if ENV['GIZZMO_OUTPUT']
+  result
+end
+
+def nameserver
+  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s)
+end
+
+alias ns nameserver
 
 # setup
 
 mysql_connect!("localhost", '', '')
 reset_databases!
-start_test_server!
 
-at_exit { stop_test_server! }
+unless ENV['EXTERNAL_TEST_SERVER']
+  start_test_server!
+  at_exit { stop_test_server! }
+end

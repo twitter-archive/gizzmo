@@ -702,6 +702,12 @@ module Gizzard
     end
   end
 
+  class TablesCommand < Command
+    def run
+      puts manager.list_tables.join(" ")
+    end
+  end
+
   class TopologyCommand < Command
     def run
       manifest  = manager.manifest(*global_options.tables)
@@ -791,7 +797,7 @@ module Gizzard
         transformations[transformation] = trees
       end
 
-      transformations.reject! {|t,_| t.noop? }
+      transformations.reject! {|t,trees| t.noop? or trees.empty? }
 
       if transformations.empty?
         puts "Nothing to do!"

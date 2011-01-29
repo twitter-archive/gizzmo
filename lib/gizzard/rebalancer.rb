@@ -3,6 +3,14 @@ require 'set'
 module Gizzard
   class Rebalancer
     TemplateAndTree = Struct.new(:template, :forwarding, :tree)
+    Bucket          = Struct.new(:template, :approx_shards, :set)
+
+    class Bucket
+      def balance; set.length - approx_shards end
+      def add(e); set.add(e) end
+      def merge(es); set.merge(es) end
+      def delete(e); set.delete(e) end
+    end
 
     # steps for rebalancing.
     #
@@ -18,30 +26,55 @@ module Gizzard
         TemplateAndTree.new(tree.template, forwarding, tree)
       end.flatten
 
-      @buckets = dest_templates_and_weights.keys
-      @result  = @buckets.inject({}) {|h,b| h.update b => Set.new }
+      @dest_templates      = dest_templates_and_weights.keys
+
+      total_shards = @shards.length
+      total_weight = dest_templates_and_weights.values.inject {|a,b| a + b }
+
+      @result = dest_templates_and_weights.map do |template, weight|
+        weight_fraction = weight / total_weight.to_f
+        approx_shards   = total_shards * weight_fraction
+
+        Bucket.new template, approx_shards, Set.new
+      end
     end
 
     def home!
-      @shards.each do |s|
-        descendants           = s.template.concrete_descendants
-        most_similar_template = @buckets.
-          map        {|b| [(b.concrete_descendants - descendants).length, b] }.
-          inject({}) {|h, (cost, b)| h.update(cost => [b]) {|k,a,b| a.concat b } }.
-          to_a.
-          sort_by    {|a| a.first }.
-          first.
-          last.
-          choice
 
-        move_shard most_similar_template, s
+      # list of [template, shards] in descending length of shards
+      templates_to_shards =
+        @shards.inject({}) do |h, shard|
+          (h[shard.template] ||= []) << shard; h
+        end.sort_by {|(_,ss)| ss.length * -1 }
+
+      templates_to_shards.each do |(template, shards)|
+        descendants = memoized_concrete_descendants(template)
+
+        most_similar_buckets = []
+        last_cost = nil
+
+        @result.each do |bucket|
+          cost      = (memoized_concrete_descendants(bucket.template) - descendants).length
+          last_cost = cost if last_cost.nil?
+
+          if cost == last_cost
+            most_similar_buckets << bucket
+          elsif cost < last_cost
+            last_cost = cost
+            most_similar_buckets = [bucket]
+          end
+        end
+
+        dest_bucket = most_similar_buckets.sort_by {|b| b.balance }.first
+
+        dest_bucket.merge shards
       end
     end
 
     def rebalance!
       while bucket_disparity > 1
         ordered = ordered_buckets
-        move_shard ordered.first.first, ordered.last.last.each {|e| break e }
+        move_shard ordered.first.template, ordered.last.set.each {|e| break e }
       end
     end
 
@@ -52,9 +85,9 @@ module Gizzard
       rebalance!
 
       @transformations = {}
-      @result.each do |template, shards|
-        shards.each do |shard|
-          trans = Transformation.new(shard.template, template, @copy_dest_wrapper)
+      @result.each do |bucket|
+        bucket.set.each do |shard|
+          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper)
           forwardings_to_trees = (@transformations[trans] ||= {})
 
           forwardings_to_trees.update(shard.forwarding => shard.tree)
@@ -66,17 +99,27 @@ module Gizzard
     end
 
     def ordered_buckets
-      @result.sort_by {|bucket, shards| shards.length }
+      @result.sort_by {|bucket| bucket.balance }
+    end
+
+    def memoized_concrete_descendants(t)
+      @memoized_concrete_descendants ||= {}
+      @memoized_concrete_descendants[t] ||= t.concrete_descendants
     end
 
     def bucket_disparity
       ordered = ordered_buckets
-      ordered.last.last.length - ordered.first.last.length
+      ordered.last.balance - ordered.first.balance
     end
 
-    def move_shard(bucket, shard)
-      @result.each {|_, ss| ss.delete shard }
-      @result[bucket].add shard
+    def move_shard(template, shard)
+      @result.each do |bucket|
+        if bucket.template == template
+          bucket.add shard
+        else
+          bucket.delete shard
+        end
+      end
     end
   end
 end

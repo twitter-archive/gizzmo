@@ -108,6 +108,12 @@ module Gizzard
       ids.map {|id| with_retry { client.get_shard(id) } }
     end
 
+    def reload_updated_forwardings
+      parallel_map all_clients do |c|
+        with_retry { c.reload_updated_forwardings }
+      end
+    end
+
     def reload_config
       parallel_map all_clients do |c|
         with_retry { c.reload_config }
@@ -178,7 +184,7 @@ module Gizzard
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
       def initialize(nameserver, table_ids)
-        states = parallel_map(table_ids) {|id| nameserver.dump_nameserver(id) }
+        states = nameserver.dump_nameserver(table_ids)
 
         @forwardings = states.map {|s| s.forwardings }.flatten
 

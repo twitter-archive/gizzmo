@@ -67,7 +67,7 @@ module Gizzard
         end
       end
 
-      nameserver.reload_config
+      nameserver.reload_updated_forwardings
 
       log "#{@jobs_finished.length} transformation#{'s' if @jobs_finished.length > 1} applied. Total time elapsed: #{time_elapsed}"
     end
@@ -96,7 +96,7 @@ module Gizzard
           j.prepare!(nameserver)
         end
 
-        nameserver.reload_config
+        nameserver.reload_updated_forwardings
 
         copy_jobs = jobs.select {|j| j.copy_required? }
 

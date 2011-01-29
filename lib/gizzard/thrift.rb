@@ -90,7 +90,7 @@ module Gizzard
     end
   end
 
-  NameServerState = T.make_struct(:NameserverState,
+  NameServerState = T.make_struct(:NameServerState,
     T::Field.new(:shards, list(struct(ShardInfo)), 1),
     T::Field.new(:links, list(struct(LinkInfo)), 2),
     T::Field.new(:forwardings, list(struct(Forwarding)), 3),
@@ -150,6 +150,7 @@ module Gizzard
   end
 
   class Manager < GizzmoService
+    thrift_method :reload_updated_forwardings, void, :throws => exception(GizzardException)
     thrift_method :reload_config, void, :throws => exception(GizzardException)
     thrift_method :rebuild_schema, void, :throws => exception(GizzardException)
 
@@ -179,12 +180,13 @@ module Gizzard
     thrift_method :get_forwardings, list(struct(Forwarding)), :throws => exception(GizzardException)
 
     thrift_method :list_hostnames, list(string), :throws => exception(GizzardException)
+    thrift_method :list_tables, list(i32), :throws => exception(GizzardException)
 
     thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(GizzardException)
     thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(GizzardException)
     thrift_method :repair_shard, void, field(:shard_ids, list(struct(ShardId)), 1), :throws => exception(GizzardException)
 
-    thrift_method :dump_nameserver, struct(NameServerState), field(:table_id, i32, 1), :throws => exception(GizzardException)
+    thrift_method :dump_nameserver, list(struct(NameServerState)), field(:table_ids, list(i32), 1), :throws => exception(GizzardException)
 
 
     # Job Scheduler Management
