@@ -128,6 +128,11 @@ module Gizzard
       with_retry { c.repair_shard(*shards) }
     end
 
+    def diff_shards(*shards)
+      c = random_client
+      with_retry { c.repair_shard(*shards) }
+    end
+
     def respond_to?(method)
       client.respond_to? method or super
     end
