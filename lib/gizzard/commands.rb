@@ -509,7 +509,7 @@ module Gizzard
       help!("Requires source, destination shard id") unless from_shard_id_string && to_shard_id_string
       from_shard_id = ShardId.parse(from_shard_id_string)
       to_shard_id = ShardId.parse(to_shard_id_string)
-      manager.repair_shard(from_shard_id, to_shard_id)
+      manager.repair_shard([from_shard_id, to_shard_id])
     end
   end
 
@@ -804,7 +804,7 @@ module Gizzard
         exit
       end
 
-      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+      base_name = transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
 
       unless be_quiet
         transformations.sort.each do |transformation, trees|

@@ -248,7 +248,7 @@ subcommands = {
     separators(opts, DOC_STRINGS["copy"])
   end,
   'repair-shard' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} repair-shard SOURCE_SHARD_ID DESTINATION_SHARD_ID TABLE_ID"
+    opts.banner = "Usage: #{zero} repair-shard SOURCE_SHARD_ID DESTINATION_SHARD_ID"
     separators(opts, DOC_STRINGS["repair-shard"])
   end,
   'busy' => OptionParser.new do |opts|

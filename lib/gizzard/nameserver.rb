@@ -1,6 +1,4 @@
 module Gizzard
-  Shard = Struct.new(:info, :children, :weight)
-
   module ParallelMap
     def parallel_map(enumerable, &block)
       enumerable.map do |elem|
@@ -12,7 +10,7 @@ module Gizzard
     end
   end
 
-  class Shard
+  class Shard < Struct.new(:info, :children, :weight)
     class << self
       def canonical_table_prefix(enum, table_id = nil, base_prefix = "shard")
         enum_s         = "%0.4i" % enum
@@ -125,9 +123,9 @@ module Gizzard
       with_retry { c.copy_shard(from_shard_id, to_shard_id) }
     end
 
-    def repair_shard(from_shard_id, to_shard_id)
+    def repair_shard(*shards)
       c = random_client
-      with_retry { c.repair_shard(from_shard_id, to_shard_id) }
+      with_retry { c.repair_shard(*shards) }
     end
 
     def respond_to?(method)
