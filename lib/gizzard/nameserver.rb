@@ -130,7 +130,7 @@ module Gizzard
 
     def diff_shards(*shards)
       c = random_client
-      with_retry { c.repair_shard(*shards) }
+      with_retry { c.diff_shards(*shards) }
     end
 
     def respond_to?(method)
