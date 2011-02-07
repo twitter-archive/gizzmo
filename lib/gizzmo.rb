@@ -24,7 +24,8 @@ DOC_STRINGS = {
   "markbusy" => "Mark a shard as busy.",
   "pair" => "Report the replica pairing structure for a list of hosts.",
   "reload" => "Instruct application servers to reload the nameserver state.",
-  "repair-shard" => "Repair shard",
+  "repair-shards" => "Repair shard",
+  "diff-shards" => "Diff shards",
   "report" => "Show each unique replica structure for a given list of shards. Usually this shard list comes from << gizzmo forwardings | awk '{ print $3 }' >>.",
   "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
@@ -247,9 +248,13 @@ subcommands = {
     opts.banner = "Usage: #{zero} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
     separators(opts, DOC_STRINGS["copy"])
   end,
-  'repair-shard' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} repair-shard SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-    separators(opts, DOC_STRINGS["repair-shard"])
+  'repair-shards' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} repair-shards SHARD_IDS..."
+    separators(opts, DOC_STRINGS["repair-shards"])
+  end,
+  'diff-shards' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} diff-shards SHARD_IDS..."
+    separators(opts, DOC_STRINGS["diff-shards"])
   end,
   'busy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} busy"

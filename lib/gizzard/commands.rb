@@ -505,11 +505,10 @@ module Gizzard
 
   class RepairShardCommand < Command
     def run
-      from_shard_id_string, to_shard_id_string = @argv
-      help!("Requires source, destination shard id") unless from_shard_id_string && to_shard_id_string
-      from_shard_id = ShardId.parse(from_shard_id_string)
-      to_shard_id = ShardId.parse(to_shard_id_string)
-      manager.repair_shard([from_shard_id, to_shard_id])
+      shard_id_strings = @argv
+      help!("Requires at least two shard ids") unless shard_id_strings.size >= 2
+      shard_id = shard_id_strings.map{|s| ShardId.parse(s)}
+      manager.repair_shard(shard_id)
     end
   end
 
