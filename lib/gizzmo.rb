@@ -256,6 +256,10 @@ subcommands = {
     opts.banner = "Usage: #{zero} diff-shards SHARD_IDS..."
     separators(opts, DOC_STRINGS["diff-shards"])
   end,
+  'diff-shards' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} diff-shards SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    separators(opts, DOC_STRINGS["diff-shards"])
+  end,
   'busy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} busy"
     separators(opts, DOC_STRINGS["busy"])

@@ -185,6 +185,7 @@ module Gizzard
     thrift_method :mark_shard_busy, void, field(:id, struct(ShardId), 1), field(:busy, i32, 2), :throws => exception(GizzardException)
     thrift_method :copy_shard, void, field(:source_id, struct(ShardId), 1), field(:destination_id, struct(ShardId), 2), :throws => exception(GizzardException)
     thrift_method :repair_shard, void, field(:shard_ids, list(struct(ShardId)), 1), :throws => exception(GizzardException)
+    thrift_method :diff_shards, void, field(:shard_ids, list(struct(ShardId)), 1), :throws => exception(GizzardException)
 
     thrift_method :dump_nameserver, list(struct(NameServerState)), field(:table_ids, list(i32), 1), :throws => exception(GizzardException)
 

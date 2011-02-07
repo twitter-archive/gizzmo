@@ -13,7 +13,8 @@ module Gizzard
       Op::AddLink          => "add_link",
       Op::SetForwarding    => "set_forwarding",
       Op::CopyShard        => "copy_shard",
-      Op::RepairShard      => "repair_shard"
+      Op::RepairShard      => "repair_shard",
+      Op::DiffShards       => "diff_shards"
     }
 
     OP_INVERSES = {
@@ -32,7 +33,8 @@ module Gizzard
       Op::RemoveLink       => 5,
       Op::DeleteShard      => 6,
       Op::CopyShard        => 7,
-      Op::RepairShard      => 8
+      Op::RepairShard      => 8,
+      Op::DiffShards       => 9
     }
 
     DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
