@@ -13,7 +13,7 @@ module Gizzard
       Op::AddLink          => "add_link",
       Op::SetForwarding    => "set_forwarding",
       Op::CopyShard        => "copy_shard",
-      Op::RepairShard      => "repair_shard",
+      Op::RepairShards     => "repair_shards",
       Op::DiffShards       => "diff_shards"
     }
 
@@ -33,7 +33,7 @@ module Gizzard
       Op::RemoveLink       => 5,
       Op::DeleteShard      => 6,
       Op::CopyShard        => 7,
-      Op::RepairShard      => 8,
+      Op::RepairShards     => 8,
       Op::DiffShards       => 9
     }
 
@@ -94,6 +94,7 @@ module Gizzard
       prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
       copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
       repair_inspect  = op_inspect[:repair].empty?  ? "" : "  REPAIR\n#{op_inspect[:repair]}\n"
+      diff_inspect    = op_inspect[:diff].empty?  ? "" : "  DIFF\n#{op_inspect[:diff]}\n"
       cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
 
       op_inspect = [prepare_inspect, copy_inspect, repair_inspect, cleanup_inspect].join
@@ -129,7 +130,7 @@ module Gizzard
     end
 
     def expand_jobs(jobs)
-      expanded = jobs.inject({:prepare => [], :copy => [], :repair => [], :cleanup => []}) do |ops, job|
+      expanded = jobs.inject({:prepare => [], :copy => [], :repair => [], :cleanup => [], :diff => []}) do |ops, job|
         job_ops = job.expand(self.copy_source, involved_in_copy?(job.template), @copy_dest_wrapper)
         ops.update(job_ops) {|k,a,b| a + b }
       end

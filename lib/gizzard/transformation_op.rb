@@ -52,26 +52,22 @@ module Gizzard
       end
     end
 
-    class RepairShard < BaseOp
+    class RepairShards < BaseOp
       attr_reader :from, :to
       alias template to
 
-      def initialize(from, to)
-        @from = from
-        @to   = to
+      def initialize(*shards)
+        @shards = shards
       end
 
       def expand(*args); { :repair => [self] } end
 
       def involved_shards(table_prefix, translations)
-        [to.to_shard_id(table_prefix, translations)]
+        shards.map{|s| s.to_shard_id(table_prefix, translations)}
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        from_shard_id = from.to_shard_id(table_prefix, translations)
-        to_shard_id   = to.to_shard_id(table_prefix, translations)
-
-        nameserver.repair_shard(from_shard_id, to_shard_id)
+        nameserver.repair_shards(involved_shards(table_prefix, translations))
       end
     end
 
