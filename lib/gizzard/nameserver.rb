@@ -125,7 +125,7 @@ module Gizzard
 
     def repair_shards(*shards)
       c = random_client
-      with_retry { c.repair_shards(*shards) }
+      with_retry { c.repair_shard(*shards) }
     end
 
     def diff_shards(*shards)
