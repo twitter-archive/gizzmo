@@ -793,7 +793,7 @@ module Gizzard
         exit
       end
 
-      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+      base_name = transformations.values.find {|v| !v.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
 
       unless be_quiet
         transformations.sort.each do |transformation, trees|

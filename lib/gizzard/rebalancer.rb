@@ -3,7 +3,7 @@ require 'set'
 module Gizzard
   class Rebalancer
     TemplateAndTree = Struct.new(:template, :forwarding, :tree)
-    Bucket          = Struct.new(:template, :approx_shards, :set)
+    Bucket          = Struct.new(:template, :capacity, :set)
 
     class Bucket
       def balance; set.length - approx_shards end
@@ -34,10 +34,10 @@ module Gizzard
       total_weight = dest_templates_and_weights.values.inject {|a,b| a + b }
 
       @result = dest_templates_and_weights.map do |template, weight|
-        weight_fraction = weight / total_weight.to_f
-        approx_shards   = total_shards * weight_fraction
+        weight_fraction   = weight / total_weight.to_f
+        weight_adjustment = @dest_templates.length * weight_fraction
 
-        Bucket.new template, approx_shards, Set.new
+        Bucket.new template, weight_adjustment, Set.new
       end
 
       load_shard_weights(shard_weight_filename)
@@ -67,29 +67,18 @@ module Gizzard
         @template_to_bucket[template] ||= Bucket.new template, 0.0, Set.new
         @template_to_bucket[template].merge(shards)
       end
+    end
 
-#      templates_to_shards.each do |(template, shards)|
-#        descendants = memoized_concrete_descendants(template)
-#
-#        most_similar_buckets = []
-#        last_cost = nil
-#
-#        @result.each do |bucket|
-#          cost      = (memoized_concrete_descendants(bucket.template) - descendants).length
-#          last_cost = cost if last_cost.nil?
-#
-#          if cost == last_cost
-#            most_similar_buckets << bucket
-#          elsif cost < last_cost
-#            last_cost = cost
-#            most_similar_buckets = [bucket]
-#          end
-#        end
-#
-#        dest_bucket = most_similar_buckets.sort_by {|b| b.balance }.first
-#
-#        dest_bucket.merge shards
-#      end
+    def rebalance_print_weights
+      template_weights = @shards.inject({}) do |h, s|
+        h[s.template] ||= 0
+        h[s.template] += get_shard_weight(s)
+        #puts "#{h[s.template]}\t#{s.forwarding.shard_id.inspect}\t#{s.template}"
+        h
+      end
+      @result.map {|b| template_weights[b.template] ||= 0}
+      print_template_weights(template_weights)
+      puts @shards.length
     end
 
     def rebalance_sticky_greedy!
@@ -104,8 +93,8 @@ module Gizzard
         current = shard.template
         template_weight = template_weights[current] || 9999999999
         shard_weight = get_shard_weight(shard)
-        puts "#{template_weight + shard_weight} > #{average + threshold}"
-        if template_weight + shard_weight > average + threshold
+        puts "#{template_weight + (shard_weight/@template_to_bucket[current].capacity)} > #{average + threshold}"
+        if template_weight + shard_weight > (average + threshold) * @template_to_bucket[current].capacity
           smallest = ordered_buckets(template_weights).first
           if template_weights[current] != template_weights[smallest]
             puts "move"
@@ -129,7 +118,7 @@ module Gizzard
       puts "#{lower} < #{upper}"
       dead_templates = {}
       template_weights.each do |k, v|
-        if v < lower or v > upper
+        if v < lower * @template_to_bucket[k].capacity or v > upper * @template_to_bucket[k].capacity
           dead_templates[k] = template_weights.delete(k)
         end
       end
@@ -296,11 +285,11 @@ module Gizzard
     end
 
     def ordered_templates(template_weights)
-      template_weights.keys.sort_by {|template| template_weights[template]}
+      template_weights.keys.sort_by {|template| template_weights[template] / @template_to_bucket[template].capacity}
     end
 
     def ordered_buckets(bucket_weights)
-      bucket_weights.keys.sort_by {|bucket| bucket_weights[bucket]}
+      bucket_weights.keys.sort_by {|bucket| bucket_weights[bucket] / @template_to_bucket[bucket].capacity}
     end
 
     def memoized_concrete_descendants(t)
@@ -313,6 +302,7 @@ module Gizzard
 
       home!
       case @strategy 
+      when "print" then rebalance_print_weights
       when "sticky" then rebalance_sticky_greedy!
       when "greedy" then rebalance_greedy!
       when "minimal" then rebalance_minimal!
