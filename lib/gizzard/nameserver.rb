@@ -174,10 +174,9 @@ module Gizzard
     def with_retry
       times ||= @retries
       yield
-    rescue ThriftClient::Simple::ThriftException, NoMethodError, Gizzard::GizzardException => e
-      raise if e.is_a? Gizzard::GizzardException and e.message !~ /Communications link failure/
-
-      times -= 1
+    rescue Exception => e
+      puts "retrying #{e.inspect} ..."
+      #times -= 1
       (times < 0) ? raise : (sleep 2; retry)
     end
 
