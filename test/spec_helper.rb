@@ -144,14 +144,14 @@ def gizzmo(cmd)
 end
 
 def nameserver
-  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s)
+  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s, :retries => 5)
 end
 
 alias ns nameserver
 
 # setup
 
-mysql_connect!("localhost", '', '')
+mysql_connect!("localhost", 'root', '')
 reset_databases!
 
 unless ENV['EXTERNAL_TEST_SERVER']
