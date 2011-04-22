@@ -350,8 +350,6 @@ subcommands = {
     opts.banner = "Usage: #{zero} create-table [options] WEIGHT TEMPLATE ..."
     separators(opts, DOC_STRINGS["create-table"])
 
-    add_scheduler_opts subcommand_options, opts
-
     opts.on("--shards=COUNT", "Create COUNT shards for each table.") do |count|
       subcommand_options.shards = count.to_i
     end
@@ -366,6 +364,10 @@ subcommands = {
 
     opts.on("--base-name=NAME", "Use NAME as the base prefix for each shard's table prefix (default 'shard')") do |base_name|
       subcommand_options.base_name = base_name
+    end
+
+    opts.on("-q", "--quiet", "Do not display table creation info (only valid with --force)") do
+      subcommand_options.quiet = true
     end
   end
 }
@@ -409,12 +411,6 @@ global = OptionParser.new do |opts|
   opts.on("-H", "--hosts=HOST[,HOST,...]", "HOSTS of application servers") do |hosts|
     global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
-
-  opts.on("-H", "--host=HOST", "HOST of application servers") do |hosts|
-    global_options.hosts = hosts.split(",").map {|h| h.strip }
-  end
-
-
 
   opts.on("-P", "--port=PORT", "PORT of remote manager service. default 7920") do |port|
     global_options.port = port.to_i

@@ -130,7 +130,7 @@ def as_link(h)
 end
 
 def as_forwarding(h)
-  Gizzard::Forwarding.new(h['table_id'].to_i, h['base_id'].to_i, as_shard_id(h, 'shard'))
+  Gizzard::Forwarding.new(h['table_id'].to_i, h['base_source_id'].to_i, as_shard_id(h, 'shard'))
 end
 
 def as_host(h)
