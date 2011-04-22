@@ -625,4 +625,15 @@ FINISHING:
       EOF
     end
   end
+
+  describe "create-table" do
+    it "works" do
+      puts gizzmo('-f -T0 create-table --shards=4 --no-progress --poll-interval=1 \
+1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
+1 "ReplicatingShard -> TestShard(localhost,1)"')
+
+      "".should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d")))
+      EOF
+    end
+  end
 end

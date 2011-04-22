@@ -345,6 +345,28 @@ subcommands = {
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
+  end,
+  'create-table' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} create-table [options] WEIGHT TEMPLATE ..."
+    separators(opts, DOC_STRINGS["create-table"])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("--shards=COUNT", "Create COUNT shards for each table.") do |count|
+      subcommand_options.shards = count.to_i
+    end
+
+    opts.on("--min-id=NUM", "Set lower bound on the id space to NUM (default min signed long: -1 * 2^63)") do |min_id|
+      subcommand_options.min_id = min_id.to_i
+    end
+
+    opts.on("--max-id=NUM", "Set upper bound on the id space to NUM (default max signed long: 2^63 - 1)") do |max_id|
+      subcommand_options.max_id = max_id.to_i
+    end
+
+    opts.on("--base-name=NAME", "Use NAME as the base prefix for each shard's table prefix (default 'shard')") do |base_name|
+      subcommand_options.base_name = base_name
+    end
   end
 }
 
