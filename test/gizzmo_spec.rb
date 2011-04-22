@@ -440,6 +440,38 @@ FINISHING:
                                        link(id("localhost", "s_0_002_replicating"), id("localhost", "s_0_002_a"), 1)]
     end
 
+    it "properly re-weights shards" do
+      1.upto(2) do |i|
+        gizzmo "create TestShard -s Int -d Int localhost/s_0_00#{i}_a"
+        gizzmo "create ReplicatingShard localhost/s_0_00#{i}_replicating"
+        gizzmo "addlink localhost/s_0_00#{i}_replicating localhost/s_0_00#{i}_a 1"
+        gizzmo "addforwarding 0 #{i} localhost/s_0_00#{i}_replicating"
+      end
+      gizzmo "-f reload"
+
+      gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
+"ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
+"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should == <<-EOF
+ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int) :
+  PREPARE
+    add_link(ReplicatingShard -> TestShard/localhost)
+    remove_link(ReplicatingShard -> TestShard/localhost)
+Applied to 2 shards:
+  [0] 1 = localhost/s_0_001_replicating
+  [0] 2 = localhost/s_0_002_replicating
+
+STARTING:
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+FINISHING:
+  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+STARTING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+FINISHING:
+  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+2 transformations applied. Total time elapsed: 2 seconds
+EOF
+    end
+
     it "works with multiple pages" do
       1.upto(2) do |i|
         gizzmo "create TestShard -s Int -d Int localhost/s_0_00#{i}_a"
