@@ -899,9 +899,9 @@ module Gizzard
     DEFAULT_NUM_SHARDS   = 1024
     DEFAULT_BASE_NAME    = "shard"
 
-    FORWARDING_SPACE     = 2 ** 64
-    FORWARDING_SPACE_MIN = 2 ** 63 * -1
-    FORWARDING_SPACE_MAX = 2 ** 63 - 1
+    FORWARDING_SPACE     = 2 ** 60
+    FORWARDING_SPACE_MIN = 0
+    FORWARDING_SPACE_MAX = 2 ** 60 - 1
 
     def generate_base_ids(num_shards, min_id, max_id)
       srand(42) # consistent randomization

@@ -666,12 +666,12 @@ FINISHING:
 Create tables 0, 1:
   ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   for 2 base ids:
-    -4611686018427387904
-    0
+    288230376151711744
+    576460752303423488
   ReplicatingShard(1) -> TestShard(localhost,1)
   for 2 base ids:
-    4611686018427387904
-    -9223372036854775808
+    864691128455135232
+    0
 
 create_shard(ReplicatingShard): s_0_0003
 create_shard(TestShard/127.0.0.1): s_0_0003
@@ -733,14 +733,14 @@ set_forwarding(ReplicatingShard): s_1_0000
                                        link(id("localhost", "s_1_0002_replicating"), id("127.0.0.1", "s_1_0002"), 1),
                                        link(id("localhost", "s_1_0003_replicating"), id("127.0.0.1", "s_1_0003"), 1)]
 
-      nameserver_db[:forwardings].should == [forwarding(0, -9223372036854775808, id("localhost", "s_0_0000_replicating")),
-                                             forwarding(1, -9223372036854775808, id("localhost", "s_1_0000_replicating")),
-                                             forwarding(0, -4611686018427387904, id("localhost", "s_0_0003_replicating")),
-                                             forwarding(1, -4611686018427387904, id("localhost", "s_1_0003_replicating")),
-                                             forwarding(0, 0, id("localhost", "s_0_0002_replicating")),
-                                             forwarding(1, 0, id("localhost", "s_1_0002_replicating")),
-                                             forwarding(0, 4611686018427387904, id("localhost", "s_0_0001_replicating")),
-                                             forwarding(1, 4611686018427387904, id("localhost", "s_1_0001_replicating"))]
+      nameserver_db[:forwardings].should == [forwarding(0, 0, id("localhost", "s_0_0000_replicating")),
+                                             forwarding(1, 0, id("localhost", "s_1_0000_replicating")),
+                                             forwarding(0, 288230376151711744, id("localhost", "s_0_0003_replicating")),
+                                             forwarding(1, 288230376151711744, id("localhost", "s_1_0003_replicating")),
+                                             forwarding(0, 576460752303423488, id("localhost", "s_0_0002_replicating")),
+                                             forwarding(1, 576460752303423488, id("localhost", "s_1_0002_replicating")),
+                                             forwarding(0, 864691128455135232, id("localhost", "s_0_0001_replicating")),
+                                             forwarding(1, 864691128455135232, id("localhost", "s_1_0001_replicating"))]
 
     end
   end
