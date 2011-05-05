@@ -126,7 +126,13 @@ module Gizzard
     def shared_host?(other)
       raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
 
-      (self.concrete_descendants & other.concrete_descendants).length > 0
+      self.concrete_descendants.each do |s|
+        other.concrete_descendants.each do |o|
+          return true if s.shard_eql? o
+        end
+      end
+
+      false
     end
 
     def hash
