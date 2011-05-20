@@ -147,8 +147,9 @@ module Gizzard
 
     def copies_required?
       return @copies_required unless  @copies_required.nil?
+
       @copies_required = !from.nil? &&
-        to.concrete_descendants.reject {|d| from.shared_host? d }.length > 0
+        to.concrete_descendants.select {|d| !from.shared_host? d }.length > 0
     end
 
     def involved_in_copy?(template)

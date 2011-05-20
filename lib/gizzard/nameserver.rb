@@ -87,7 +87,7 @@ module Gizzard
     include ParallelMap
 
     DEFAULT_PORT    = 7917
-    DEFAULT_RETRIES = 20
+    DEFAULT_RETRIES = 10
     PARALLELISM     = 10
 
     attr_reader :hosts, :logfile, :dryrun, :framed
@@ -174,11 +174,9 @@ module Gizzard
     def with_retry
       times ||= @retries
       yield
-    rescue ThriftClient::Simple::ThriftException, NoMethodError, Gizzard::GizzardException => e
-      raise if e.is_a? Gizzard::GizzardException and e.message !~ /Communications link failure/
-
+    rescue Exception => e
       times -= 1
-      (times < 0) ? raise : (sleep 2; retry)
+      (times < 0) ? raise : (sleep 0.1; retry)
     end
 
     class Manifest

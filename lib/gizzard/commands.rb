@@ -892,4 +892,110 @@ module Gizzard
                         scheduler_options
     end
   end
+
+
+  class CreateTableCommand < Command
+
+    DEFAULT_NUM_SHARDS   = 1024
+    DEFAULT_BASE_NAME    = "shard"
+
+    FORWARDING_SPACE     = 2 ** 60
+    FORWARDING_SPACE_MIN = 0
+    FORWARDING_SPACE_MAX = 2 ** 60 - 1
+
+    def generate_base_ids(num_shards, min_id, max_id)
+      srand(42) # consistent randomization
+
+      id_space  = max_id - min_id + 1
+      step_size = id_space / num_shards
+
+      enums = (0...num_shards).to_a
+      ids   = enums.map {|i| min_id + (i * step_size) }.sort_by { rand }
+
+      enums.zip(ids)
+    end
+
+    def parse_templates_and_weights(arr)
+      templates_and_weights = {}
+
+      arr.each_slice(2) do |(weight_s, to_template_s)|
+        to     = ShardTemplate.parse(to_template_s)
+        weight = weight_s.to_i
+
+        templates_and_weights[to] = weight
+      end
+
+      templates_and_weights
+    end
+
+    # This is all super hacky but I don't have time to generalize right now
+
+    def run
+      help!("must have an even number of arguments") unless @argv.length % 2 == 0
+
+      base_name    = command_options.base_name || DEFAULT_BASE_NAME
+      num_shards   = (command_options.shards || DEFAULT_NUM_SHARDS).to_i
+      max_id       = (command_options.max_id || FORWARDING_SPACE_MAX).to_i
+      min_id       = (command_options.min_id || FORWARDING_SPACE_MIN).to_i
+
+      be_quiet     = global_options.force && command_options.quiet
+
+      templates_and_weights = parse_templates_and_weights(@argv)
+      total_weight = templates_and_weights.values.inject {|a,b| a + b }
+      templates = templates_and_weights.keys
+
+      base_ids = generate_base_ids(num_shards, min_id, max_id)
+
+      templates_and_base_ids = templates_and_weights.inject({}) do |h, (template, weight)|
+        share = (weight.to_f / total_weight * num_shards).floor
+        ids   = []
+        share.times { ids << base_ids.pop }
+
+        h.update template => ids
+      end
+
+      # divvy up the remainder across all templates.
+      base_ids.each_with_index do |base, idx|
+        templates_and_base_ids.values[idx % templates_and_base_ids.length] << base
+      end
+
+      proto     = templates.first
+      transform = Transformation.new(proto, proto)
+
+      op_sets = templates.inject({}) do |h, template|
+        ops = transform.create_tree(template).sort
+        h.update template => ops
+      end
+
+      unless be_quiet
+        puts "Create tables #{global_options.tables.join(", ")}:"
+        templates_and_base_ids.each do |template, base_ids|
+          puts "  #{template.inspect}"
+          puts "  for #{base_ids.length} base ids:"
+          base_ids.each {|(enum, base_id)| puts "    #{base_id}" }
+        end
+        puts ""
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      global_options.tables.each do |table_id|
+        templates_and_base_ids.each do |template, base_ids|
+          ops = op_sets[template]
+
+          base_ids.each do |(enum, base_id)|
+            table_prefix = Shard.canonical_table_prefix(enum, table_id, base_name)
+            ops.each do |op|
+              puts "#{op.inspect}: #{table_prefix}"
+              op.apply(manager, table_id, base_id, table_prefix, {})
+            end
+          end
+        end
+      end
+    end
+  end
 end

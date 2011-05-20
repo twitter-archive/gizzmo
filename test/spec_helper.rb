@@ -130,7 +130,7 @@ def as_link(h)
 end
 
 def as_forwarding(h)
-  Gizzard::Forwarding.new(h['table_id'].to_i, h['base_id'].to_i, as_shard_id(h, 'shard'))
+  Gizzard::Forwarding.new(h['table_id'].to_i, h['base_source_id'].to_i, as_shard_id(h, 'shard'))
 end
 
 def as_host(h)
@@ -144,14 +144,14 @@ def gizzmo(cmd)
 end
 
 def nameserver
-  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s)
+  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s, :retries => 5)
 end
 
 alias ns nameserver
 
 # setup
 
-mysql_connect!("localhost", '', '')
+mysql_connect!("localhost", 'root', '')
 reset_databases!
 
 unless ENV['EXTERNAL_TEST_SERVER']
