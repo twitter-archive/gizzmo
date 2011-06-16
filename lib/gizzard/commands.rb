@@ -640,6 +640,8 @@ module Gizzard
         manager.remove_link(link.up_id, link.down_id)
         manager.add_link(link.up_id, to_shard_id, link.weight)
       end
+      manager.remove_link(replica_shard_id, from_shard_id)
+      manager.remove_link(replica_shard_id, write_only_shard_id)
       manager.replace_forwarding(replica_shard_id, to_shard_id)
       manager.delete_shard(replica_shard_id)
       manager.delete_shard(write_only_shard_id)
