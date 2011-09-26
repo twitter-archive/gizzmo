@@ -317,7 +317,7 @@ subcommands = {
     end
   end,
   'transform-tree' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform-tree [options] ROOT_SHARD_ID TEMPLATE"
+    opts.banner = "Usage: #{zero} transform-tree [options] TEMPLATE ROOT_SHARD_ID"
     separators(opts, DOC_STRINGS['transform-tree'])
 
     add_scheduler_opts subcommand_options, opts
@@ -392,7 +392,7 @@ global = OptionParser.new do |opts|
   opts.separator "simply contains:"
   opts.separator ""
   opts.separator "    hosts: localhost"
-  opts.separator "    port: 7917"
+  opts.separator "    port: 7920"
   opts.separator ""
   opts.separator "Subcommands:"
   subcommands.keys.compact.sort.each do |sc|

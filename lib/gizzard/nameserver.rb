@@ -86,7 +86,7 @@ module Gizzard
   class Nameserver
     include ParallelMap
 
-    DEFAULT_PORT    = 7917
+    DEFAULT_PORT    = 7920
     DEFAULT_RETRIES = 10
     PARALLELISM     = 10
 
