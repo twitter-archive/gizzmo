@@ -7,7 +7,7 @@ Gizzmo is a command-line client for managing gizzard clusters.
 Installation is a simple gem install.  You may find it useful to create a ~/.gizzmorc file, which is simply YAML key/values.  The keys are the long-style command line option keys converted into Ruby-style variables.  A common .gizzmorc will simply be:
 
     host: localhost
-    port: 7917
+    port: 7920
 
 == Usage
 
@@ -37,7 +37,7 @@ Contributions are welcome!  Please send a pull request, or if you're internal to
 
 The tests may be somewhat difficult to run outside of Twitter.  They assume the following:
 
-1. You have a running FlockDB development environment exposing a ShardManager over thrift on localhost:7917
+1. You have a running FlockDB development environment exposing a ShardManager over thrift on localhost:7920
 2. You don't mind blowing away the data in your dev environment.
 3. Your MySQL username and password are in the environment variables DB_USERNAME and DB_PASSWORD
 
