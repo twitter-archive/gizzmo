@@ -4,6 +4,7 @@ class HelpNeededError < RuntimeError; end
 require "optparse"
 require "ostruct"
 require "gizzard"
+require "shellwords"
 require "yaml"
 
 DOC_STRINGS = {
@@ -102,6 +103,9 @@ def add_scheduler_opts(subcommand_options, opts)
   end
   opts.on("--copy-wrapper=TYPE", "Wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
     (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
+  end
+  opts.on("--skip-copies", "Do transformation without copying. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do
+    (subcommand_options.scheduler_options ||= {})[:skip_copies] = true
   end
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true
@@ -458,6 +462,10 @@ global = OptionParser.new do |opts|
 
   opts.on("-f", "--force", "Don't display confirmation dialogs") do |force|
     global_options.force = force
+  end
+ 
+  opts.on("--argv=FILE", "Put the contents of FILE onto the command line") do |f|
+    ARGV.push *Shellwords.shellwords(File.read(f))
   end
 
   opts.on_tail("-v", "--version", "Show version") do

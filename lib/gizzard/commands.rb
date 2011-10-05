@@ -793,6 +793,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
+      skip_copies       = scheduler_options[:skip_copies] || false
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
 
@@ -800,7 +801,7 @@ module Gizzard
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper)
+        transformation = Transformation.new(from, to, copy_wrapper, skip_copies)
         forwardings    = Set.new(manifest.templates[from] || [])
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
@@ -819,7 +820,7 @@ module Gizzard
       unless be_quiet
         transformations.sort.each do |transformation, trees|
           puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
+          puts "Applied to #{trees.length} shards"
           trees.keys.sort.each {|f| puts "  #{f.inspect}" }
         end
         puts ""
@@ -876,7 +877,7 @@ module Gizzard
       unless be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
+          puts "Applied to #{trees.length} shards"
           trees.keys.sort.each {|f| puts "  #{f.inspect}" }
         end
         puts ""
