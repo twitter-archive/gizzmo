@@ -31,6 +31,7 @@ DOC_STRINGS = {
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
 }
 
+
 ORIGINAL_ARGV = ARGV.dup
 zero = File.basename($0)
 
@@ -45,6 +46,7 @@ subcommand_options = OpenStruct.new
 
 # Leftover arguments
 argv = nil
+
 
 GIZZMO_VERSION = File.read(File.dirname(__FILE__) + "/../VERSION") rescue "unable to read version file"
 
@@ -547,5 +549,6 @@ rescue Errno::EPIPE
   # head -1, then this script will keep running after head closes.  We don't care, and
   # seeing the backtrace is annoying!
 rescue Interrupt
+  STDERR.puts "\nERROR: Received an unhandled interrupt"
   exit 1
 end
