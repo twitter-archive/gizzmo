@@ -251,10 +251,12 @@ module Gizzard
 
     def copy_descs
       transformation.operations[:copy].map do |copy|
-        from_id = copy.from.to_shard_id(@table_prefix, @translations)
-        to_id   = copy.to.to_shard_id(@table_prefix, @translations)
-        "#{from_id.inspect} -> #{to_id.inspect}"
+        desc = copy.shards.inject("") do |d, shard|
+          d += shard.to_shard_id(@table_prefix, @translations).inspect + " <-> "
+        end
+        desc.chomp " <-> "
       end
+      
     end
 
     private

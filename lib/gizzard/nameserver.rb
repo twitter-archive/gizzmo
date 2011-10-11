@@ -118,9 +118,9 @@ module Gizzard
       end
     end
 
-    def copy_shard(from_shard_id, to_shard_id)
+    def copy_shard(*shards)
       c = random_client
-      with_retry { c.copy_shard(from_shard_id, to_shard_id) }
+      with_retry { c.copy_shard(*shards) }
     end
 
     def repair_shards(*shards)
