@@ -87,17 +87,27 @@ module Gizzard
     end
 
     def inspect
+      # TODO: Need to limit this to e.g. 10 ops in the list, and show a total
+      # count instead of showing the whole thing.
       op_inspect = operations.inject({}) do |h, (phase, ops)|
         h.update phase => ops.map {|job| "    #{job.inspect}" }.join("\n")
       end
 
+      # TODO: This seems kind of daft to copy around these long strings.
+      # Loop over it once just for display?
       prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
       copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
       repair_inspect  = op_inspect[:repair].empty?  ? "" : "  REPAIR\n#{op_inspect[:repair]}\n"
       diff_inspect    = op_inspect[:diff].empty?  ? "" : "  DIFF\n#{op_inspect[:diff]}\n"
       cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
 
-      op_inspect = [prepare_inspect, copy_inspect, repair_inspect, cleanup_inspect].join
+      op_inspect = [
+        prepare_inspect,
+        copy_inspect,
+        repair_inspect,
+        diff_inspect,
+        cleanup_inspect,
+      ].join
 
       "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
     end
