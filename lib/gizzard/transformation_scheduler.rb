@@ -223,16 +223,14 @@ module Gizzard
 
     # Trap interrupt (Ctrl+C) for better/safer handling
     def control_interrupts
-      num_interrupts = 0
-      max_interrupts = 3
-      trap("INT") do 
-        if num_interrupts == 0
+      ints_left = 3
+      trap("INT") do
+        ints_left -= 1 
+        if !@jobs_pending.empty?
           # get rid of scheduled jobs
           puts "\nINTERRUPT RECEIVED! Cancelling jobs not yet started. Finishing jobs in progress..."
           @jobs_pending.clear
         end
-        num_interrupts +=1
-        ints_left = max_interrupts - num_interrupts
         if ints_left > 0
           puts "\nPress Ctrl+C #{ints_left} more time#{'s' if ints_left > 1} to terminate jobs in progress. This is dangerous."
         end
@@ -241,8 +239,8 @@ module Gizzard
         elsif ints_left == 0
           puts "\nTerminating on interrupt..."
           exit 1
-        end#if
-      end#trap
-    end#def
+        end
+      end
+    end
   end
 end
