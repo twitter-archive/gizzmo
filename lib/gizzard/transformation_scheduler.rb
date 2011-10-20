@@ -49,10 +49,11 @@ module Gizzard
 
     def apply!
       @start_time = Time.now
-
+      control_interrupts
+      
       loop do
         reload_busy_shards
-
+        
         cleanup_jobs
         schedule_jobs(max_copies - busy_shards.length)
 
@@ -217,6 +218,28 @@ module Gizzard
         seconds = s % 60
 
         [days,hours,minutes,seconds].compact.map {|i| "%0.2i" % i }.join(":")
+      end
+    end
+
+    # Trap interrupt (Ctrl+C) for better/safer handling
+    def control_interrupts
+      ints_left = 3
+      trap("INT") do
+        ints_left -= 1 
+        if !@jobs_pending.empty?
+          # get rid of scheduled jobs
+          puts "\nINTERRUPT RECEIVED! Cancelling jobs not yet started. Finishing jobs in progress..."
+          @jobs_pending.clear
+        end
+        if ints_left > 0
+          puts "\nPress Ctrl+C #{ints_left} more time#{'s' if ints_left > 1} to terminate jobs in progress. This is dangerous."
+        end
+        if ints_left == 1
+          puts "This could leave the database in a bad state. Make sure you know what you're doing."
+        elsif ints_left == 0
+          puts "\nTerminating on interrupt..."
+          exit 1
+        end
       end
     end
   end

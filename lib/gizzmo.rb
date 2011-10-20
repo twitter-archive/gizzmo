@@ -547,5 +547,6 @@ rescue Errno::EPIPE
   # head -1, then this script will keep running after head closes.  We don't care, and
   # seeing the backtrace is annoying!
 rescue Interrupt
+  STDERR.puts "\nERROR: Received an unhandled interrupt"
   exit 1
 end
