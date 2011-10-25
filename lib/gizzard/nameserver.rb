@@ -47,6 +47,14 @@ module Gizzard
       "BlockedShard" => 'blocked'
     }
 
+    SHARD_TAGS = {
+      "ReplicatingShard" => 'replicating',
+      "ReadOnlyShard" => 'read_only',
+      "WriteOnlyShard" => 'write_only',
+      "BlockedShard" => 'blocked',
+      "BlackHoleShard" => 'blackhole'
+    }
+
     def id; info.id end
     def hostname; id.hostname end
     def table_prefix; id.table_prefix end
@@ -175,6 +183,8 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
+      puts "\nException: #{e} #{e.description rescue ""}"
+      puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0 
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end

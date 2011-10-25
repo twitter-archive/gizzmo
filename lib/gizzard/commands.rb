@@ -64,7 +64,7 @@ module Gizzard
         puts string
       end
     end
-end
+  end
 
   class RetryProxy
     def initialize(retries, object)
