@@ -175,6 +175,8 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
+      STDERR.puts "\nException: #{e} #{e.description rescue ""}"
+      STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0 
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end
