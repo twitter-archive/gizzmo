@@ -37,7 +37,7 @@ module Gizzard
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
-    INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
+    INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard"]
 
     SHARD_SUFFIXES = {
       "FailingOverShard" => 'replicating',
