@@ -106,6 +106,9 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true
   end
+  opts.on("--batch-finish", "Wait until all copies are complete before cleaning up unneeded links and shards") do
+    (subcommand_options.scheduler_options ||= {})[:batch_finish] = true
+  end
 end
 
 subcommands = {
