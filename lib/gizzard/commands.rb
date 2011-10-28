@@ -714,7 +714,7 @@ module Gizzard
 
   class TablesCommand < Command
     def run
-      puts manager.list_tables.join(" ")
+      puts manager.list_tables.join(",")
     end
   end
 
