@@ -349,6 +349,26 @@ subcommands = {
       subcommand_options.quiet = true
     end
   end,
+  'add-partition' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} add-partition [options] TEMPLATE ..."
+    separators(opts, DOC_STRINGS["add-partition"])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
+  end,
+  'remove-partition' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} remove-partition [options] TEMPLATE ..."
+    separators(opts, DOC_STRINGS["remove-partition"])
+
+    add_scheduler_opts subcommand_options, opts
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
+  end,
   'create-table' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} create-table [options] WEIGHT TEMPLATE ..."
     separators(opts, DOC_STRINGS["create-table"])

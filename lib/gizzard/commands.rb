@@ -895,6 +895,125 @@ module Gizzard
     end
   end
 
+  class AddPartitionCommand < Command
+    def run
+      scheduler_options = command_options.scheduler_options || {}
+      manifest          = manager.manifest(*global_options.tables)
+      copy_wrapper      = scheduler_options[:copy_wrapper]
+      be_quiet          = global_options.force && command_options.quiet
+      transformations   = {}
+
+      scheduler_options[:quiet] = be_quiet
+
+      puts "Note: All partitions, including existing ones, will be weighted evenly." unless be_quiet
+
+      add_templates_and_weights = {}
+
+      @argv.each do |template_s|
+        to     = ShardTemplate.parse(template_s)
+
+        add_templates_and_weights[to] = ShardTemplate::DEFAULT_WEIGHT
+      end
+
+      orig_templates_and_weights = manifest.templates.inject({}) do |h, (template, forwardings)|
+        h[template] = ShardTemplate::DEFAULT_WEIGHT; h
+      end
+
+      dest_templates_and_weights = orig_templates_and_weights.merge(add_templates_and_weights)
+
+      transformations = global_options.tables.inject({}) do |all, table|
+        trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+
+        all.update(rebalancer.transformations) {|t,a,b| a.merge b }
+      end
+
+      if transformations.empty?
+        puts "Nothing to do!"
+        exit
+      end
+
+      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+
+      unless be_quiet
+        transformations.each do |transformation, trees|
+          puts transformation.inspect
+          puts "Applied to #{trees.length} shards:"
+          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+        end
+        puts ""
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      Gizzard.schedule! manager,
+                        base_name,
+                        transformations,
+                        scheduler_options
+    end
+  end
+
+  class RemovePartitionCommand < Command
+    def run
+      scheduler_options = command_options.scheduler_options || {}
+      manifest          = manager.manifest(*global_options.tables)
+      copy_wrapper      = scheduler_options[:copy_wrapper]
+      be_quiet          = global_options.force && command_options.quiet
+      transformations   = {}
+
+      scheduler_options[:quiet] = be_quiet
+
+      puts "Note: All partitions will be weighted evenly." unless be_quiet
+
+      dest_templates_and_weights = manifest.templates.inject({}) do |h, (template, forwardings)|
+        h[template] = ShardTemplate::DEFAULT_WEIGHT; h
+      end
+
+      @argv.each do |template_s|
+        t     = ShardTemplate.parse(template_s)
+
+        dest_templates_and_weights.delete(t)
+      end
+
+      transformations = global_options.tables.inject({}) do |all, table|
+        trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+
+        all.update(rebalancer.transformations) {|t,a,b| a.merge b }
+      end
+
+      if transformations.empty?
+        puts "Nothing to do!"
+        exit
+      end
+
+      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+
+      unless be_quiet
+        transformations.each do |transformation, trees|
+          puts transformation.inspect
+          puts "Applied to #{trees.length} shards:"
+          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+        end
+        puts ""
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      Gizzard.schedule! manager,
+                        base_name,
+                        transformations,
+                        scheduler_options
+    end
+  end
 
   class CreateTableCommand < Command
 
