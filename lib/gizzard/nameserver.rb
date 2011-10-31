@@ -47,6 +47,14 @@ module Gizzard
       "BlockedShard" => 'blocked'
     }
 
+    SHARD_TAGS = {
+      "ReplicatingShard" => 'replicating',
+      "ReadOnlyShard" => 'read_only',
+      "WriteOnlyShard" => 'write_only',
+      "BlockedShard" => 'blocked',
+      "BlackHoleShard" => 'blackhole'
+    }
+
     def id; info.id end
     def hostname; id.hostname end
     def table_prefix; id.table_prefix end
@@ -118,9 +126,9 @@ module Gizzard
       end
     end
 
-    def copy_shard(from_shard_id, to_shard_id)
+    def copy_shard(*shards)
       c = random_client
-      with_retry { c.copy_shard(from_shard_id, to_shard_id) }
+      with_retry { c.copy_shard(*shards) }
     end
 
     def repair_shards(*shards)

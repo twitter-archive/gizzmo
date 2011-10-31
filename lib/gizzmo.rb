@@ -31,6 +31,7 @@ DOC_STRINGS = {
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
 }
 
+
 ORIGINAL_ARGV = ARGV.dup
 zero = File.basename($0)
 
@@ -46,11 +47,12 @@ subcommand_options = OpenStruct.new
 # Leftover arguments
 argv = nil
 
+
 GIZZMO_VERSION = File.read(File.dirname(__FILE__) + "/../VERSION") rescue "unable to read version file"
 
 begin
   YAML.load_file(File.join(ENV["HOME"], ".gizzmorc")).each do |k, v|
-    global_options.send("#{k}=", v)
+    #global_options.send("#{k}=", v)
   end
 rescue Errno::ENOENT
   # Do nothing...
@@ -86,6 +88,13 @@ def load_config(options, filename)
   YAML.load(File.open(filename)).each do |k, v|
     k = "hosts" if k == "host"
     v = v.split(",").map {|h| h.strip } if k == "hosts"
+    if k == "template_options"
+      opts = {}
+      v.each do |k1, v1|
+        opts[k1.to_sym] = v1
+      end
+      v = opts
+    end
     options.send("#{k}=", v)
   end
 end
@@ -100,7 +109,7 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
     (subcommand_options.scheduler_options ||= {})[:poll_interval] = c.to_i
   end
-  opts.on("--copy-wrapper=TYPE", "Wrap copy destination shards with TYPE. default WriteOnlyShard") do |t|
+  opts.on("--copy-wrapper=SHARD_TYPE", "Wrap copy destination shards with SHARD_TYPE. default WriteOnlyShard") do |t|
     (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
   end
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
@@ -108,6 +117,24 @@ def add_scheduler_opts(subcommand_options, opts)
   end
   opts.on("--batch-finish", "Wait until all copies are complete before cleaning up unneeded links and shards") do
     (subcommand_options.scheduler_options ||= {})[:batch_finish] = true
+  end
+end
+
+def add_template_opts(subcommand_options, opts)
+  opts.on("--virtual=SHARD_TYPE", "Concrete shards will exist behind a virtual shard of this SHARD_TYPE (default ReplcatingShard)") do |t|
+    (subcommand_options.template_options ||= {})[:replicating] = t
+  end
+
+  opts.on("-c", "--concrete=SHARD_TYPE", "Concrete shards will be this SHARD_TYPE (REQUIRED when using -s)") do |t|
+    (subcommand_options.template_options ||= {})[:concrete] = t
+  end
+
+  opts.on("--source-type=DATA_TYPE", "The data type for the source column. (default INT UNSIGNED)") do |t|
+    (subcommand_options.template_options ||= {})[:source_type] = t
+  end
+
+  opts.on("--dest-type=DATA_TYPE", "The data type for the destination column. (default INT UNSIGNED)") do |t|
+    (subcommand_options.template_options ||= {})[:dest_type] = t
   end
 end
 
@@ -324,6 +351,7 @@ subcommands = {
     separators(opts, DOC_STRINGS['transform-tree'])
 
     add_scheduler_opts subcommand_options, opts
+    add_template_opts subcommand_options, opts
 
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
@@ -334,6 +362,7 @@ subcommands = {
     separators(opts, DOC_STRINGS['transform'])
 
     add_scheduler_opts subcommand_options, opts
+    add_template_opts subcommand_options, opts
 
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
@@ -344,6 +373,7 @@ subcommands = {
     separators(opts, DOC_STRINGS["rebalance"])
 
     add_scheduler_opts subcommand_options, opts
+    add_template_opts subcommand_options, opts
 
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
@@ -372,6 +402,8 @@ subcommands = {
   'create-table' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} create-table [options] WEIGHT TEMPLATE ..."
     separators(opts, DOC_STRINGS["create-table"])
+
+    add_template_opts subcommand_options, opts
 
     opts.on("--shards=COUNT", "Create COUNT shards for each table.") do |count|
       subcommand_options.shards = count.to_i
@@ -471,6 +503,10 @@ global = OptionParser.new do |opts|
     global_options.dry = true
   end
 
+  opts.on("-s", "--simple", "Represent shard templates in a simple format") do
+    (global_options.template_options ||= {})[:simple] = true #This is a temporary setting until the nameserver design changes match the simpler format
+  end
+
   opts.on("-C", "--config=YAML_FILE", "YAML_FILE of option key/values") do |filename|
     load_config(global_options, filename)
   end
@@ -551,6 +587,7 @@ end
 
 begin
   custom_timeout(global_options.timeout) do
+    Gizzard::ShardTemplate.configure((global_options.template_options || {}).merge(subcommand_options.template_options || {}))
     Gizzard::Command.run(subcommand_name, global_options, argv, subcommand_options, log)
   end
 rescue HelpNeededError => e
