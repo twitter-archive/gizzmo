@@ -7,4 +7,6 @@ require "gizzard/shard_template"
 require "gizzard/migrator"
 require "gizzard/transformation"
 require "gizzard/digest"
+require "gizzard/command_logger"
 require "gizzard/rebalancer"
+

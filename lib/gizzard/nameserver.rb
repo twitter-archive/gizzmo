@@ -96,7 +96,7 @@ module Gizzard
     def initialize(*hosts)
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
       @retries = options[:retries] || DEFAULT_RETRIES
-      @logfile = options[:log]     || "/tmp/gizzmo.log"
+      @logfile = options[:log]     || "./gizzmo.log"
       @dryrun  = options[:dry_run] || false
       @framed  = options[:framed]  || false
       @hosts   = hosts.flatten
@@ -175,7 +175,7 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
-      STDERR.puts "\nException: #{e} #{e.description rescue ""}"
+      STDERR.puts "\nException: #{e}"
       STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0 
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)

@@ -41,7 +41,7 @@ module Gizzard
 
     attr_reader :from, :to, :copy_dest_wrapper
 
-    def initialize(from_template, to_template, copy_dest_wrapper = nil)
+    def initialize(from_template, to_template, copy_dest_wrapper = nil, logger=nil)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 
       unless Shard::VIRTUAL_SHARD_TYPES.include? copy_dest_wrapper
@@ -51,6 +51,7 @@ module Gizzard
       @from = from_template
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper
+      @logger = logger
 
       if copies_required? && copy_source.nil?
         raise ArgumentError, "copy required without a valid copy source"
@@ -170,16 +171,16 @@ module Gizzard
 
     def create_tree(root)
       jobs = visit_collect(root) do |parent, child|
-        [Op::CreateShard.new(child), Op::AddLink.new(parent, child)]
+        [Op::CreateShard.new(child, @logger), Op::AddLink.new(parent, child, @logger)]
       end
-      [Op::CreateShard.new(root)].concat jobs << Op::SetForwarding.new(root)
+      [Op::CreateShard.new(root, @logger)].concat jobs << Op::SetForwarding.new(root, @logger)
     end
 
     def destroy_tree(root)
       jobs = visit_collect(root) do |parent, child|
-        [Op::RemoveLink.new(parent, child), Op::DeleteShard.new(child)]
+        [Op::RemoveLink.new(parent, child, @logger), Op::DeleteShard.new(child, @logger)]
       end
-      [Op::RemoveForwarding.new(root)].concat jobs << Op::DeleteShard.new(root)
+      [Op::RemoveForwarding.new(root, @logger)].concat jobs << Op::DeleteShard.new(root, @logger)
     end
 
     private

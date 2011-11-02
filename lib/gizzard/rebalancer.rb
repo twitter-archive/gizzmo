@@ -20,7 +20,8 @@ module Gizzard
     # 4. put shards in destinations based on reducing number of copies required.
     # 5.
 
-    def initialize(forwardings_to_trees, dest_templates_and_weights, wrapper)
+    def initialize(forwardings_to_trees, dest_templates_and_weights, wrapper, logger)
+      @logger = logger
       @copy_dest_wrapper = wrapper
       @shards = forwardings_to_trees.map do |forwarding, tree|
         TemplateAndTree.new(tree.template, forwarding, tree)
@@ -87,7 +88,7 @@ module Gizzard
       @transformations = {}
       @result.each do |bucket|
         bucket.set.each do |shard|
-          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper)
+          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper, @logger)
           forwardings_to_trees = (@transformations[trans] ||= {})
 
           forwardings_to_trees.update(shard.forwarding => shard.tree)

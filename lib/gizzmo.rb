@@ -392,6 +392,14 @@ subcommands = {
     opts.on("-q", "--quiet", "Do not display table creation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
+  end,
+  'rollback' => OptionParser.new do |opts|
+    opts.banner = "Usage: gizzmo rollback"
+    separators(opts, DOC_STRINGS["rollback"])
+
+    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
+      subcommand_options.quiet = true
+    end
   end
 }
 

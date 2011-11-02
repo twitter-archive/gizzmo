@@ -27,6 +27,7 @@ module Gizzard
       @dont_show_progress = options[:no_progress] || @be_quiet
       @batch_finish       = options[:batch_finish]
 
+
       @jobs_in_progress = []
       @jobs_finished    = []
 

@@ -10,7 +10,6 @@ module Gizzard
     class << self
       def run(command_name, global_options, argv, subcommand_options, log)
         command_class = Gizzard.const_get("#{classify(command_name)}Command")
-
         @manager      ||= make_manager(global_options, log)
         @job_injector ||= make_job_injector(global_options, log)
 
@@ -50,6 +49,7 @@ module Gizzard
       @global_options  = global_options
       @argv            = argv
       @command_options = command_options
+      @logger = CommandLogger.new "./gizzmo-commands.log"
     end
 
     def help!(message = nil)
@@ -759,7 +759,7 @@ module Gizzard
       shard          = manifest.trees[forwarding]
       copy_wrapper   = scheduler_options[:copy_wrapper]
       be_quiet       = global_options.force && command_options.quiet
-      transformation = Transformation.new(shard.template, to_template, copy_wrapper)
+      transformation = Transformation.new(shard.template, to_template, copy_wrapper, @logger)
 
       scheduler_options[:quiet] = be_quiet
 
@@ -800,7 +800,7 @@ module Gizzard
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper)
+        transformation = Transformation.new(from, to, copy_wrapper, @logger)
         forwardings    = Set.new(manifest.templates[from] || [])
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
@@ -861,7 +861,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, @logger)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
@@ -923,7 +923,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, @logger)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
@@ -981,7 +981,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, @logger)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
@@ -1081,7 +1081,7 @@ module Gizzard
       end
 
       proto     = templates.first
-      transform = Transformation.new(proto, proto)
+      transform = Transformation.new(proto, proto, nil, @logger)
 
       op_sets = templates.inject({}) do |h, template|
         ops = transform.create_tree(template).sort
@@ -1118,5 +1118,37 @@ module Gizzard
         end
       end
     end
+  end
+
+  class RollbackCommand < Command
+
+    def run
+      help!("must specify a logger") unless @logger
+
+      be_quiet     = global_options.force && command_options.quiet
+
+      lc = @logger.last_command.map { |op| {:op => op[:operation].inverse, :param => op[:extras] }}.compact
+      
+      unless be_quiet
+        puts "Rolling back to would cause the following actions:"
+        lc.each do |op|
+          puts "#{op[:op].inspect} #{op[:param].inspect}"
+        end
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      lc.each do |op|
+        puts "calling #{op[:op]}.apply(#{op[:param].join(', ')})"
+        op[:op].apply(manager, *(op[:param]))
+      end
+
+    end
+
+
   end
 end
