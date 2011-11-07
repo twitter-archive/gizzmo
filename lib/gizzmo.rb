@@ -355,6 +355,12 @@ subcommands = {
 
     add_scheduler_opts subcommand_options, opts
 
+    opts.on("--staged", "Staged addition") do 
+      subcommand_options.staged = true
+    end
+    opts.on("--continue", "Continue a staged addition") do
+      subcommand_options.continued = true
+    end
     opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
       subcommand_options.quiet = true
     end

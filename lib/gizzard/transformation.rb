@@ -40,6 +40,7 @@ module Gizzard
     DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
 
     attr_reader :from, :to, :copy_dest_wrapper
+    attr_accessor :logger
 
     def initialize(from_template, to_template, copy_dest_wrapper = nil, logger=nil)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
@@ -148,7 +149,6 @@ module Gizzard
 
     def copies_required?
       return @copies_required unless  @copies_required.nil?
-
       @copies_required = !from.nil? &&
         to.concrete_descendants.select {|d| !from.shared_host? d }.length > 0
     end

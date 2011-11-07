@@ -896,36 +896,143 @@ module Gizzard
   end
 
   class AddPartitionCommand < Command
+    
+    def next_stage 
+      %w{1 2 3}.each do |stage|
+        if File.exist? "#{@stage_name}.#{stage}"
+          cl = CommandLogger.new "#{@stage_name}.#{stage}"
+          transforms = cl.last_command.first
+          return transforms[:operation]
+        end
+      end
+      {}
+    end
+
+    def delete_stage!
+      %w{1 2 3}.each do |stage|
+        return File.delete "#{@stage_name}.#{stage}" if File.exist? "#{@stage_name}.#{stage}"
+      end
+    end
+
+    def save_stage! stage, transformations
+      cl = CommandLogger.new "#{@stage_name}.#{stage}"
+      cl.write transformations
+    end
+
+    def in_staged?
+      File.exist?("#{@stage_name}.3")
+    end
+
+    def saved_options opts=nil
+      cl = CommandLogger.new "#{@stage_name}.opts"
+      if opts
+        cl.write opts.marshal_dump
+      else
+        (cl.last_command.first || {})[:operation] || {}
+      end
+    end
+
     def run
+      continued         = command_options.continued
+      staged            = continued ? false : command_options.staged
+      @stage_name       = "gizzmo-rebalance"
+
+      if staged
+        saved_options self.global_options
+      elsif continued
+        @global_options = OpenStruct.new(saved_options.merge(global_options.marshal_dump))
+      end
+
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
-
+      
       scheduler_options[:quiet] = be_quiet
 
       puts "Note: All partitions, including existing ones, will be weighted evenly." unless be_quiet
+      puts "Only concrete shards are considered in a staged rebalance." if staged && !be_quiet
 
-      add_templates_and_weights = {}
+      if in_staged? && !continued && !global_options.force
+        puts "\nYou appear to be in the middle of a staged add-partition command. Do this anyway? [y/N]"
+        print "(To continue your staged command, run 'gizzmo add-partition --continue'): "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
 
+      to_templates = []
       @argv.each do |template_s|
         to     = ShardTemplate.parse(template_s)
+        to_templates << to
 
-        add_templates_and_weights[to] = ShardTemplate::DEFAULT_WEIGHT
       end
 
-      orig_templates_and_weights = manifest.templates.inject({}) do |h, (template, forwardings)|
-        h[template] = ShardTemplate::DEFAULT_WEIGHT; h
+
+      if staged
+        copy_wrapper = "BlockedShard"
+        to_templates = to_templates.map do |t|
+          ShardTemplate.new("WriteOnlyShard", t.host, t.weight, '', '', t.concrete_descendants)
+        end
+      elsif continued
+        transformations = {}
+        next_stage.each do |trans, trees|
+          logged_trans = Transformation.new(trans.from, trans.to, trans.copy_dest_wrapper, @logger)
+          transformations[logged_trans] = trees
+        end
       end
 
-      dest_templates_and_weights = orig_templates_and_weights.merge(add_templates_and_weights)
+      if !continued
+        add_templates_and_weights = {}
+        to_templates.each do |t|
+          add_templates_and_weights[t] = ShardTemplate::DEFAULT_WEIGHT
+        end
 
-      transformations = global_options.tables.inject({}) do |all, table|
-        trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, @logger)
+        orig_templates_and_weights = manifest.templates.inject({}) do |h, (template, forwardings)|
+          h[template] = ShardTemplate::DEFAULT_WEIGHT; h
+        end
 
-        all.update(rebalancer.transformations) {|t,a,b| a.merge b }
+        dest_templates_and_weights = orig_templates_and_weights.merge(add_templates_and_weights)
+
+        transformations = global_options.tables.inject({}) do |all, table|
+          trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
+          rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, @logger)
+
+          all.update(rebalancer.transformations) {|t,a,b| a.merge b }
+        end
+      end
+
+      if staged
+        s1_transformations = {}
+        s2_transformations = {}
+        s3_transformations = {}
+        transformations.each do |trans, trees|
+          s1_descendants = trans.from.concrete_descendants << trans.to
+          s1_trans = Transformation.new(trans.from,
+                                        ShardTemplate.new("ReplicatingShard",nil,1,nil,nil,s1_descendants), 
+                                        trans.copy_dest_wrapper, 
+                                        @logger)
+          s2_descendants = trans.from.concrete_descendants + trans.to.concrete_descendants
+          s2_trans = Transformation.new(s1_trans.to, 
+                                        ShardTemplate.new("ReplicatingShard",nil,1,nil,nil,s2_descendants), 
+                                        trans.copy_dest_wrapper)
+          s3_descendants = trans.to.concrete_descendants
+          s3_trans = Transformation.new(s2_trans.to, 
+                                        ShardTemplate.new("ReplicatingShard",nil,1,nil,nil,s3_descendants), 
+                                        trans.copy_dest_wrapper)
+          
+          s1_transformations[s1_trans] = trees
+          save_stage!(1, 
+                      s1_transformations.inject({}) { |unlogged, (trans, trees)| 
+                        unlogged.merge({Transformation.new(trans.from, trans.to, trans.copy_dest_wrapper) => trees})
+                      })
+          s2_transformations[s2_trans] = trees
+          save_stage! 2, s2_transformations
+          s3_transformations[s3_trans] = trees
+          save_stage! 3, s3_transformations
+
+          transformations = s1_transformations
+        end
       end
 
       if transformations.empty?
@@ -949,6 +1056,8 @@ module Gizzard
         exit unless $stdin.gets.chomp == "y"
         puts ""
       end
+
+      delete_stage! if staged || continued
 
       Gizzard.schedule! manager,
                         base_name,
@@ -1132,7 +1241,7 @@ module Gizzard
       unless be_quiet
         puts "Rolling back to would cause the following actions:"
         lc.each do |op|
-          puts "#{op[:op].inspect} #{op[:param].inspect}"
+          puts "#{op[:op].inspect}"
         end
       end
 
@@ -1143,7 +1252,6 @@ module Gizzard
       end
 
       lc.each do |op|
-        puts "calling #{op[:op]}.apply(#{op[:param].join(', ')})"
         op[:op].apply(manager, *(op[:param]))
       end
 
