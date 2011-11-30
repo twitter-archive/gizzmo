@@ -321,7 +321,7 @@ subcommands = {
     end
   end,
   'transform-tree' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} transform-tree [options] TEMPLATE ROOT_SHARD_ID"
+    opts.banner = "Usage: #{zero} transform-tree [options] TEMPLATE ROOT_SHARD_ID ..."
     separators(opts, DOC_STRINGS['transform-tree'])
 
     add_scheduler_opts subcommand_options, opts
