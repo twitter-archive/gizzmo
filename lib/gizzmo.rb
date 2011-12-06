@@ -7,27 +7,45 @@ require "gizzard"
 require "yaml"
 
 DOC_STRINGS = {
+  "add-host" => "Add a remote cluster host to replicate to. Format: cluster:host:port.",
   "addforwarding" => "Add a forwarding from a graph_id / base_source_id to a given shard.",
   "addlink" => "Add a relationship link between two shards.",
+  "busy" => "List any shards with a busy flag set.",
+  "copy" => "", # TODO: Undocumented
   "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
+  "create-table" => "Create tables in an existing cluster.",
+  "delete" => "", # TODO: Undocumented
+  "deleteforwarding" => "", # TODO: Undocumented
+  "diff-shards" => "Log differences between n shards",
   "drill" => "Show shard trees for replicas of a given structure signature (from 'report').",
   "dump" => "Show shard trees for given table ids.",
   "find" => "Show all shards with a given hostname.",
+  "finish-migrate" => "", # TODO: Undocumented
   "finish-replica" => "Remove the write-only barrier in front of a shard that's finished being copied after 'setup-replica'.",
   "flush" => "Flush error queue for a given priority.",
   "forwardings" => "Get a list of all forwardings.",
   "hosts" => "List hosts used in shard names in the forwarding table and replicas.",
   "info" => "Show id/class/busy for shards.",
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
-  "links" => "List parent & child links for shards.",
+  "links" => "List parent and child links for shards.",
+  "list-hosts" => "List remote cluster hosts being replicated to.",
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
-  "markbusy" => "Mark a shard as busy.",
+  "markbusy" => "Mark a list of shards as busy.",
+  "markunbusy" => "Mark a list of shards as not busy.",
   "pair" => "Report the replica pairing structure for a list of hosts.",
   "reload" => "Instruct application servers to reload the nameserver state.",
+  "remove-host" => "Remove a remote cluster host being replicate to.",
   "repair-shards" => "Reconcile n shards by detecting differences and rescheduling them",
-  "diff-shards" => "Log differences between n shards",
   "report" => "Show each unique replica structure for a given list of shards. Usually this shard list comes from << gizzmo forwardings | awk '{ print $3 }' >>.",
+  "setup-migrate" => "", # TODO: Undocumented
   "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
+  "subtree" => "Show the subtree of replicas given a shard id.",
+  "tables" => "List the table IDs known by this nameserver.",
+  "topology" => "List the full topologies known for the table IDs provided.",
+  "transform" => "Transform from one topology to another.",
+  "transform-tree" => "", # TODO: Undocumented
+  "unlink" => "Remove a link from one shard to another.",
+  "unwrap" => "Remove a wrapper created with wrap.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
 }
 
@@ -354,11 +372,11 @@ subcommands = {
       subcommand_options.shards = count.to_i
     end
 
-    opts.on("--min-id=NUM", "Set lower bound on the id space to NUM (default min signed long: -1 * 2^63)") do |min_id|
+    opts.on("--min-id=NUM", "Set lower bound on the id space to NUM (default 0)") do |min_id|
       subcommand_options.min_id = min_id.to_i
     end
 
-    opts.on("--max-id=NUM", "Set upper bound on the id space to NUM (default max signed long: 2^63 - 1)") do |max_id|
+    opts.on("--max-id=NUM", "Set upper bound on the id space to NUM (default 2^60 - 1)") do |max_id|
       subcommand_options.max_id = max_id.to_i
     end
 
@@ -408,15 +426,15 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator ""
   opts.separator "Global options:"
-  opts.on("-H", "--hosts=HOST[,HOST,...]", "HOSTS of application servers") do |hosts|
+  opts.on("-H", "--hosts=HOST[,HOST,...]", "Comma-delimited list of application servers") do |hosts|
     global_options.hosts = hosts.split(",").map {|h| h.strip }
   end
 
-  opts.on("-P", "--port=PORT", "PORT of remote manager service. default 7920") do |port|
+  opts.on("-P", "--port=PORT", "PORT of remote manager service (default 7920)") do |port|
     global_options.port = port.to_i
   end
 
-  opts.on("-I", "--injector=PORT", "PORT of remote job injector service. default 7921") do |port|
+  opts.on("-I", "--injector=PORT", "PORT of remote job injector service (default 7921)") do |port|
     global_options.injector_port = port.to_i
   end
 
@@ -424,7 +442,7 @@ global = OptionParser.new do |opts|
     global_options.tables = tables.split(",").map {|t| t.to_i }
   end
 
-  opts.on("-F", "--framed", "use the thrift framed transport") do |framed|
+  opts.on("-F", "--framed", "Use the thrift framed transport") do |framed|
     global_options.framed = true
   end
 
@@ -472,7 +490,6 @@ if ARGV.length == 0
   exit 1
 end
 
-# This
 def process_nested_parsers(global, subcommands)
   begin
     global.order!(ARGV) do |subcommand_name|
