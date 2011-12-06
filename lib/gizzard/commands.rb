@@ -744,69 +744,14 @@ module Gizzard
     end
   end
 
-  class TransformTreeCommand < Command
+  class BaseTransformCommand < Command
     def run
-      help!("wrong number of arguments") unless @argv.length == 2
-
       scheduler_options = command_options.scheduler_options || {}
-      template_s, shard_id_s = @argv
-
-      to_template    = ShardTemplate.parse(template_s)
-      shard_id       = ShardId.parse(shard_id_s)
-      base_name      = shard_id.table_prefix.split('_').first
-      forwarding     = manager.get_forwarding_for_shard(shard_id)
-      manifest       = manager.manifest(forwarding.table_id)
-      shard          = manifest.trees[forwarding]
-      copy_wrapper   = scheduler_options[:copy_wrapper]
-      be_quiet       = global_options.force && command_options.quiet
-      transformation = Transformation.new(shard.template, to_template, copy_wrapper)
-
-      scheduler_options[:quiet] = be_quiet
-
-      if transformation.noop?
-        puts "Nothing to do!"
-        exit
-      end
-
-      unless be_quiet
-        puts transformation.inspect
-        puts ""
-      end
-
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
-
-      Gizzard.schedule! manager,
-                        base_name,
-                        { transformation => { forwarding => shard } },
-                        scheduler_options
-    end
-  end
-
-  class TransformCommand < Command
-    def run
-      help!("must have an even number of arguments") unless @argv.length % 2 == 0
-
-      scheduler_options = command_options.scheduler_options || {}
-      manifest          = manager.manifest(*global_options.tables)
-      copy_wrapper      = scheduler_options[:copy_wrapper]
       be_quiet          = global_options.force && command_options.quiet
-      transformations   = {}
 
       scheduler_options[:quiet] = be_quiet
 
-      @argv.each_slice(2) do |(from_template_s, to_template_s)|
-        from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper)
-        forwardings    = Set.new(manifest.templates[from] || [])
-        trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
-
-        transformations[transformation] = trees
-      end
-
+      transformations = get_transformations
       transformations.reject! {|t,trees| t.noop? or trees.empty? }
 
       if transformations.empty?
@@ -817,10 +762,10 @@ module Gizzard
       base_name = transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
 
       unless be_quiet
-        transformations.sort.each do |transformation, trees|
+        transformations.each do |transformation, trees|
           puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
-          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+          puts "Applied to #{trees.length} shards"
+          #trees.keys.sort.each {|f| puts "  #{f.inspect}" }
         end
         puts ""
       end
@@ -838,17 +783,69 @@ module Gizzard
     end
   end
 
-  class RebalanceCommand < Command
-    def run
+  class TransformTreeCommand < BaseTransformCommand
+    def get_transformations
+      help!("must have an even number of arguments") unless @argv.length % 2 == 0
+
+      scheduler_options = command_options.scheduler_options || {}
+      copy_wrapper   = scheduler_options[:copy_wrapper]
+      skip_copies    = scheduler_options[:skip_copies] || false
+      transformations   = {}
+
+      memoized_transforms = {}
+      @argv.each_slice(2) do |(template_s, shard_id_s)|
+        to_template    = ShardTemplate.parse(template_s)
+        shard_id       = ShardId.parse(shard_id_s)
+        base_name      = shard_id.table_prefix.split('_').first
+        forwarding     = manager.get_forwarding_for_shard(shard_id)
+        manifest       = manager.manifest(forwarding.table_id)
+        shard          = manifest.trees[forwarding]
+
+        transform_args = [shard.template, to_template, copy_wrapper, skip_copies]
+        transformation = memoized_transforms.fetch(transform_args) do |args|
+          memoized_transforms[args] = Transformation.new(*args)
+        end
+        tree = transformations.fetch(transformation) do |t|
+          transformations[t] = {}
+        end
+        tree[forwarding] = shard
+      end
+
+      transformations
+    end
+  end
+
+  class TransformCommand < BaseTransformCommand
+    def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
-      be_quiet          = global_options.force && command_options.quiet
+      skip_copies       = scheduler_options[:skip_copies] || false
       transformations   = {}
 
-      scheduler_options[:quiet] = be_quiet
+      @argv.each_slice(2) do |(from_template_s, to_template_s)|
+        from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
+        transformation = Transformation.new(from, to, copy_wrapper, skip_copies)
+        forwardings    = Set.new(manifest.templates[from] || [])
+        trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
+
+        transformations[transformation] = trees
+      end
+
+      transformations
+    end
+  end
+
+  class RebalanceCommand < BaseTransformCommand
+    def get_transformations
+      help!("must have an even number of arguments") unless @argv.length % 2 == 0
+
+      scheduler_options = command_options.scheduler_options || {}
+      manifest          = manager.manifest(*global_options.tables)
+      copy_wrapper      = scheduler_options[:copy_wrapper]
+      transformations   = {}
 
       dest_templates_and_weights = {}
 
@@ -859,39 +856,12 @@ module Gizzard
         dest_templates_and_weights[to] = weight
       end
 
-      transformations = global_options.tables.inject({}) do |all, table|
+      global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
         rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
-
-      if transformations.empty?
-        puts "Nothing to do!"
-        exit
-      end
-
-      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
-
-      unless be_quiet
-        transformations.each do |transformation, trees|
-          puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
-          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
-        end
-        puts ""
-      end
-
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
-
-      Gizzard.schedule! manager,
-                        base_name,
-                        transformations,
-                        scheduler_options
     end
   end
 
