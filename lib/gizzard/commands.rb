@@ -504,10 +504,26 @@ module Gizzard
 
   class RepairShardsCommand < Command
     def run
-      shard_id_strings = @argv
-      help!("Requires at least two shard ids") unless shard_id_strings.size >= 2
-      shard_ids = shard_id_strings.map{|s| ShardId.parse(s)}
-      manager.repair_shards(shard_ids)
+      table_ids = global_options.tables || manager.list_tables
+      manifest = manager.manifest(*table_ids)
+      shard_sets = []
+      manifest.trees.values.each do |tree|
+        shard_sets << concrete_leaves(tree)
+      end
+
+      shard_sets.each do |shard_ids|
+        puts "Repairing " + shard_ids.map {|s| s.to_unix }.join(",")
+        manager.copy_shard(shard_ids)
+      end
+    end
+
+    def concrete_leaves(tree)
+      list = []
+      list << tree.info.id if tree.children.empty? && !tree.info.class_name.include?("BlackHoleShard")
+      tree.children.each do |child|
+        list += concrete_leaves(child)
+      end
+      list
     end
   end
 
