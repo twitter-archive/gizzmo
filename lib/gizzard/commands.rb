@@ -736,23 +736,21 @@ module Gizzard
   class TopologyCommand < Command
     def run
       manifest  = manager.manifest(*global_options.tables)
-      templates = manifest.templates.inject({}) do |h, (t, fs)|
-        h.update t.to_config => fs
-      end
+      templates = manifest.templates
 
       if command_options.forwardings
         templates.
-          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.inspect, t] }; h }.
+          inject([]) { |h, (t, fs)| fs.each { |f| h << [f.inspect, t.to_config] }; h }.
           sort.
           each { |a| puts "%s\t%s" % a }
       elsif command_options.root_shards
         templates.
-          inject([]) { |a, (t, fs)| fs.each { |f| a << [f.shard_id.inspect, t] }; a }.
+          inject([]) { |a, (t, fs)| fs.each { |f| a << [f.shard_id.inspect, t.to_config] }; a }.
           sort.
           each { |a| puts "%s\t%s" % a }
       else
         templates.
-          map { |(t, fs)| [fs.length, t] }.
+          map { |(t, fs)| [fs.length, t.to_config] }.
           sort.reverse.
           each { |a| puts "%4d %s" % a }
       end
