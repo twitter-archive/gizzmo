@@ -39,9 +39,9 @@ module Gizzard
 
     DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
 
-    attr_reader :from, :to, :copy_dest_wrapper
+    attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 
-    def initialize(from_template, to_template, copy_dest_wrapper = nil)
+    def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 
       unless Shard::VIRTUAL_SHARD_TYPES.include? copy_dest_wrapper
@@ -51,6 +51,7 @@ module Gizzard
       @from = from_template
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper
+      @skip_copies = skip_copies
 
       if copies_required? && copy_source.nil?
         raise ArgumentError, "copy required without a valid copy source"
@@ -156,6 +157,7 @@ module Gizzard
     end
 
     def copies_required?
+      return false if skip_copies
       return @copies_required unless  @copies_required.nil?
 
       @copies_required = !from.nil? &&
