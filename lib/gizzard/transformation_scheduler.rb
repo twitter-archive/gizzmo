@@ -13,7 +13,7 @@ module Gizzard
     DEFAULT_OPTIONS = {
       :max_copies      => 30,
       :copies_per_host => 8,
-      :poll_interval   => 10
+      :poll_interval   => 10,
     }.freeze
 
     def initialize(nameserver, base_name, transformations, options = {})
@@ -25,6 +25,7 @@ module Gizzard
       @poll_interval      = options[:poll_interval]
       @be_quiet           = options[:quiet]
       @dont_show_progress = options[:no_progress] || @be_quiet
+      @batch_finish       = options[:batch_finish]
 
       @jobs_in_progress = []
       @jobs_finished    = []
@@ -53,10 +54,10 @@ module Gizzard
       
       loop do
         reload_busy_shards
-        
-        cleanup_jobs
+        cleanup_jobs if !@batch_finish
         schedule_jobs(max_copies - busy_shards.length)
 
+        cleanup_jobs if @batch_finish && @jobs_pending.empty? && jobs_completed == @jobs_in_progress
         break if @jobs_pending.empty? && @jobs_in_progress.empty?
 
         unless nameserver.dryrun?

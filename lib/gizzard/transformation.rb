@@ -122,7 +122,6 @@ module Gizzard
 
       # compact
       log = collapse_jobs(log)
-
       @operations = expand_jobs(log)
 
       @operations.each do |(phase, jobs)|
@@ -142,7 +141,7 @@ module Gizzard
 
     def expand_jobs(jobs)
       expanded = jobs.inject({:prepare => [], :copy => [], :repair => [], :cleanup => [], :diff => []}) do |ops, job|
-        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template), @copy_dest_wrapper)
+        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template))
         ops.update(job_ops) {|k,a,b| a + b }
       end
 
@@ -181,10 +180,19 @@ module Gizzard
     end
 
     def create_tree(root)
-      jobs = visit_collect(root) do |parent, child|
-        [Op::CreateShard.new(child), Op::AddLink.new(parent, child)]
+      get_wrapper_type = Proc.new { |template, wrapper_type|
+        if wrapper_type.nil?
+          nil
+        elsif template.contains_shard_type? wrapper_type 
+          nil
+        else
+          wrapper_type
+        end
+      }
+      jobs = visit_collect(root, get_wrapper_type, @copy_dest_wrapper) do |parent, child, wrapper|
+        [Op::CreateShard.new(child, wrapper), Op::AddLink.new(parent, child, wrapper)]
       end
-      [Op::CreateShard.new(root)].concat jobs << Op::SetForwarding.new(root)
+      [Op::CreateShard.new(root, @copy_dest_wrapper)].concat jobs << Op::SetForwarding.new(root, @copy_dest_wrapper)
     end
 
     def destroy_tree(root)
@@ -196,9 +204,10 @@ module Gizzard
 
     private
 
-    def visit_collect(parent, &block)
+    def visit_collect(parent, pass_down_method=Proc.new{}, pass_down_value=nil, &block)
       parent.children.inject([]) do |acc, child|
-        visit_collect(child, &block).concat(acc.concat(block.call(parent, child)))
+        pass_down_value = pass_down_method.call(child, pass_down_value)
+        visit_collect(child, pass_down_method, pass_down_value, &block).concat(acc.concat(block.call(parent, child, pass_down_value)))
       end
     end
   end
@@ -263,10 +272,12 @@ module Gizzard
 
     def copy_descs
       transformation.operations[:copy].map do |copy|
-        from_id = copy.from.to_shard_id(@table_prefix, @translations)
-        to_id   = copy.to.to_shard_id(@table_prefix, @translations)
-        "#{from_id.inspect} -> #{to_id.inspect}"
+        desc = copy.shards.inject("") do |d, shard|
+          d += shard.to_shard_id(@table_prefix, @translations).inspect + " <-> "
+        end
+        desc.chomp " <-> "
       end
+      
     end
 
     private
