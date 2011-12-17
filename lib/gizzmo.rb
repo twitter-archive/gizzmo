@@ -11,8 +11,9 @@ DOC_STRINGS = {
   "add-host" => "Add a remote cluster host to replicate to. Format: cluster:host:port.",
   "addforwarding" => "Add a forwarding from a graph_id / base_source_id to a given shard.",
   "addlink" => "Add a relationship link between two shards.",
+  "add-partition" => "Rebalance the cluster as it is now with given extra partition tree structures.",
   "busy" => "List any shards with a busy flag set.",
-  "copy" => "", # TODO: Undocumented
+  "copy" => "Copy between the given list of shards. Given a set of shards, it will copy and repair to ensure that all shards have the latest data.",
   "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
   "create-table" => "Create tables in an existing cluster.",
   "delete" => "", # TODO: Undocumented
@@ -34,9 +35,11 @@ DOC_STRINGS = {
   "markbusy" => "Mark a list of shards as busy.",
   "markunbusy" => "Mark a list of shards as not busy.",
   "pair" => "Report the replica pairing structure for a list of hosts.",
+  "rebalance" => "Restructure and move shards to reflect a new list of tree structures.",
   "reload" => "Instruct application servers to reload the nameserver state.",
   "remove-host" => "Remove a remote cluster host being replicate to.",
-  "repair-shards" => "Reconcile n shards by detecting differences and rescheduling them",
+  "remove-partition" => "REbalance the cluster as it is now with given tree structures removed.",
+  "repair-tables" => "Reconcile all the shards in the given tables (supplied with -T) by detecting differences and rescheduling them.",
   "report" => "Show each unique replica structure for a given list of shards. Usually this shard list comes from << gizzmo forwardings | awk '{ print $3 }' >>.",
   "setup-migrate" => "", # TODO: Undocumented
   "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
@@ -44,7 +47,7 @@ DOC_STRINGS = {
   "tables" => "List the table IDs known by this nameserver.",
   "topology" => "List the full topologies known for the table IDs provided.",
   "transform" => "Transform from one topology to another.",
-  "transform-tree" => "", # TODO: Undocumented
+  "transform-tree" => "Transforms given forwardings to the corresponding given tree structure.",
   "unlink" => "Remove a link from one shard to another.",
   "unwrap" => "Remove a wrapper created with wrap.",
   "wrap" => "Wrapping creates a new (virtual, e.g. blocking, replicating, etc.) shard, and relinks SHARD_ID_TO_WRAP's parent links to run through the new shard.",
@@ -143,7 +146,7 @@ def add_scheduler_opts(subcommand_options, opts)
 end
 
 def add_template_opts(subcommand_options, opts)
-  opts.on("--virtual=SHARD_TYPE", "Concrete shards will exist behind a virtual shard of this SHARD_TYPE (default ReplcatingShard)") do |t|
+  opts.on("--virtual=SHARD_TYPE", "Concrete shards will exist behind a virtual shard of this SHARD_TYPE (default ReplicatingShard)") do |t|
     (subcommand_options.template_options ||= {})[:replicating] = t
   end
 
@@ -297,20 +300,15 @@ subcommands = {
     end
   end,
   'copy' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} copy SOURCE_SHARD_ID DESTINATION_SHARD_ID"
+    opts.banner = "Usage: #{zero} copy SHARD_IDS..."
     separators(opts, DOC_STRINGS["copy"])
   end,
-  'repair-shards' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} repair-shards SHARD_IDS..."
-    separators(opts, DOC_STRINGS["repair-shards"])
-  end,
-  'diff-shards' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} diff-shards SHARD_IDS..."
-    separators(opts, DOC_STRINGS["diff-shards"])
-  end,
-  'diff-shards' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} diff-shards SOURCE_SHARD_ID DESTINATION_SHARD_ID"
-    separators(opts, DOC_STRINGS["diff-shards"])
+  'repair-tables' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} -T TABLE,... repair-tables [options]"
+    separators(opts, DOC_STRINGS["repair-tables"])
+    opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT.") do |c|
+      subcommand_options.num_copies = c.to_i
+    end
   end,
   'busy' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} busy"
@@ -463,6 +461,8 @@ global = OptionParser.new do |opts|
   opts.separator "You can type `#{zero} help SUBCOMMAND` for help on a specific subcommand. It's"
   opts.separator "also useful to remember that global options come *before* the subcommand, while"
   opts.separator "subcommand options come *after* the subcommand."
+  opts.separator ""
+  opts.separator "You can find explanations and example usage on the wiki (go/gizzmo)."
   opts.separator ""
   opts.separator "You may find it useful to create a ~/.gizzmorc file, which is simply YAML"
   opts.separator "key/value pairs corresponding to options you want by default. A common .gizzmorc"

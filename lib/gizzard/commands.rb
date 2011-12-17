@@ -64,6 +64,13 @@ module Gizzard
         puts string
       end
     end
+
+    def require_tables
+      if !global_options.tables
+        puts "Please specify tables to repair with the --tables flag" 
+        exit 1
+      end
+    end
   end
 
   class RetryProxy
@@ -499,21 +506,34 @@ module Gizzard
       help!("Requires at least two shard ids") unless shard_id_strings.size >= 2
       shard_ids = shard_id_strings.map{|s| ShardId.parse(s)}
       manager.copy_shard(shard_ids)
+      sleep 2
+      while manager.get_busy_shards().size > 0
+        sleep 5
+      end 
     end
   end
 
-  class RepairShardsCommand < Command
+  class RepairTablesCommand < Command
     def run
-      table_ids = global_options.tables || manager.list_tables
+      require_tables
+
+      table_ids = global_options.tables
       manifest = manager.manifest(*table_ids)
+      num_copies = command_options.num_copies || 100
       shard_sets = []
       manifest.trees.values.each do |tree|
         shard_sets << concrete_leaves(tree)
       end
-
       shard_sets.each do |shard_ids|
+        while  manager.get_busy_shards().size > num_copies
+          sleep 1
+        end
         puts "Repairing " + shard_ids.map {|s| s.to_unix }.join(",")
         manager.copy_shard(shard_ids)
+      end
+
+      while manager.get_busy_shards().size > 0
+        sleep 5
       end
     end
 
@@ -524,15 +544,6 @@ module Gizzard
         list += concrete_leaves(child)
       end
       list
-    end
-  end
-
-  class DiffShardsCommand < Command
-    def run
-      shard_id_strings = @argv
-      help!("Requires at least two shard ids") unless shard_id_strings.size >= 2
-      shard_ids = shard_id_strings.map{|s| ShardId.parse(s)}
-      manager.diff_shards(shard_ids)
     end
   end
 
@@ -735,6 +746,8 @@ module Gizzard
 
   class TopologyCommand < Command
     def run
+      require_tables
+
       manifest  = manager.manifest(*global_options.tables)
       templates = manifest.templates
 
@@ -831,6 +844,7 @@ module Gizzard
   class TransformCommand < BaseTransformCommand
     def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
+      require_tables
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
@@ -854,6 +868,7 @@ module Gizzard
   class RebalanceCommand < BaseTransformCommand
     def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
+      require_tables
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
@@ -880,6 +895,8 @@ module Gizzard
 
   class AddPartitionCommand < Command
     def run
+      require_tables
+
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
@@ -942,6 +959,8 @@ module Gizzard
 
   class RemovePartitionCommand < Command
     def run
+      require_tables
+
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
@@ -1036,6 +1055,7 @@ module Gizzard
 
     def run
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
+      require_tables
 
       base_name    = command_options.base_name || DEFAULT_BASE_NAME
       num_shards   = (command_options.shards || DEFAULT_NUM_SHARDS).to_i
