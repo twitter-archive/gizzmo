@@ -11,7 +11,7 @@ DOC_STRINGS = {
   "add-host" => "Add a remote cluster host to replicate to. Format: cluster:host:port.",
   "addforwarding" => "Add a forwarding from a graph_id / base_source_id to a given shard.",
   "addlink" => "Add a relationship link between two shards.",
-  "add-partition" => "Rebalance the cluster as it is now with given extra partition tree structures.",
+  "add-partition" => "Rebalance the cluster by appending new partitions to the current topology.",
   "busy" => "List any shards with a busy flag set.",
   "copy" => "Copy between the given list of shards. Given a set of shards, it will copy and repair to ensure that all shards have the latest data.",
   "create" => "Create shard(s) of a given Java/Scala class. If you don't know the list of available classes, you can just try a bogus class, and the exception will include a list of valid classes.",
@@ -38,8 +38,8 @@ DOC_STRINGS = {
   "rebalance" => "Restructure and move shards to reflect a new list of tree structures.",
   "reload" => "Instruct application servers to reload the nameserver state.",
   "remove-host" => "Remove a remote cluster host being replicate to.",
-  "remove-partition" => "REbalance the cluster as it is now with given tree structures removed.",
-  "repair-tables" => "Reconcile all the shards in the given tables (supplied with -T) by detecting differences and rescheduling them.",
+  "remove-partition" => "Rebalance the cluster by removing the provided partitions from the current topology.",
+  "repair-tables" => "Reconcile all the shards in the given tables (supplied with -T) by detecting differences and writing them back to shards as needed.",
   "report" => "Show each unique replica structure for a given list of shards. Usually this shard list comes from << gizzmo forwardings | awk '{ print $3 }' >>.",
   "setup-migrate" => "", # TODO: Undocumented
   "setup-replica" => "Add a replica to be parallel to an existing replica, in write-only mode, ready to be copied to.",
@@ -131,7 +131,7 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--poll-interval=SECONDS", "Sleep SECONDS between polling for copy status") do |c|
     (subcommand_options.scheduler_options ||= {})[:poll_interval] = c.to_i
   end
-  opts.on("--copy-wrapper=SHARD_TYPE", "Wrap copy destination shards with SHARD_TYPE. default WriteOnlyShard") do |t|
+  opts.on("--copy-wrapper=SHARD_TYPE", "Wrap copy destination shards with SHARD_TYPE. default BlockedShard") do |t|
     (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
   end
   opts.on("--skip-copies", "Do transformation without copying. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do
@@ -150,15 +150,15 @@ def add_template_opts(subcommand_options, opts)
     (subcommand_options.template_options ||= {})[:replicating] = t
   end
 
-  opts.on("-c", "--concrete=SHARD_TYPE", "Concrete shards will be this SHARD_TYPE (REQUIRED when using -s)") do |t|
+  opts.on("-c", "--concrete=SHARD_TYPE", "Concrete shards will be this SHARD_TYPE (REQUIRED when using --simple)") do |t|
     (subcommand_options.template_options ||= {})[:concrete] = t
   end
 
-  opts.on("--source-type=DATA_TYPE", "The data type for the source column. (default INT UNSIGNED)") do |t|
+  opts.on("--source-type=DATA_TYPE", "The data type for the source column. (REQUIRED when using --simple)") do |t|
     (subcommand_options.template_options ||= {})[:source_type] = t
   end
 
-  opts.on("--dest-type=DATA_TYPE", "The data type for the destination column. (default INT UNSIGNED)") do |t|
+  opts.on("--dest-type=DATA_TYPE", "The data type for the destination column. (REQUIRED when using --simple)") do |t|
     (subcommand_options.template_options ||= {})[:dest_type] = t
   end
 end

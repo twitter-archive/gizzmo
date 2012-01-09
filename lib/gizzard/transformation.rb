@@ -37,7 +37,7 @@ module Gizzard
       Op::DiffShards       => 9
     }
 
-    DEFAULT_DEST_WRAPPER = 'WriteOnlyShard'
+    DEFAULT_DEST_WRAPPER = 'BlockedShard'
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 

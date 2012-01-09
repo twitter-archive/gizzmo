@@ -173,16 +173,20 @@ module Gizzard
     end
 
     def to_config
-     if ShardTemplate.options[:simple]
+      if ShardTemplate.options[:simple]
         to_simple_config
-     else
-        if children.empty?
-          config_definition
-        else
-          child_defs = children.map {|c| c.to_config }
-          child_defs_s = child_defs.length == 1 ? child_defs.first : "(#{child_defs.join(", ")})"
-          "#{config_definition} -> #{child_defs_s}"
-        end
+      else
+        to_complex_config
+      end
+    end
+    
+    def to_complex_config
+      if children.empty?
+        config_definition
+      else
+        child_defs = children.map {|c| c.to_complex_config }
+        child_defs_s = child_defs.length == 1 ? child_defs.first : "(#{child_defs.join(", ")})"
+        "#{config_definition} -> #{child_defs_s}"
       end
     end
 
@@ -213,41 +217,27 @@ module Gizzard
       def options
         @@options ||= {}
         @@options[:replicating] ||= "ReplicatingShard"
-        @@options[:source_type] ||= "INT UNSIGNED"
-        @@options[:dest_type] ||= "INT UNSIGNED"
+        #@@options[:source_type] ||= "BIGINT UNSIGNED"
+        #@@options[:dest_type] ||= "BIGINT UNSIGNED"
         @@options
       end
 
       def parse(string)
         if options[:simple]
-          parse_definition(string)
+          parse_simple(string)
         else
-          definition_s, children_s = string.split(/\s*->\s*/, 2)
-
-          children =
-          if children_s.nil?
-            []
-          else
-            list = parse_arg_list(children_s).map {|c| parse c }
-            raise ArgumentError, "invalid shard config. -> given, no children found" if list.empty?
-            list
-          end
-
-          template_args = parse_complex_definition(definition_s) << children
-          ShardTemplate.new(*template_args)
+          parse_complex(string)
         end
-        
       end
 
       private
 
-      def parse_definition(definition_s)
+      def parse_simple(definition_s)
         shards = definition_s.split(",")
         templates = []
         shards.each do |s|
           s.strip!
-          tags = s.split("+")
-          host = tags.shift
+          host, *tags = s.split("+")
           templates << build_nested_template(host, tags)
         end
         ShardTemplate.new(options[:replicating], nil, 1, "", "", templates)
@@ -270,6 +260,23 @@ module Gizzard
         end
 
         []
+      end
+
+
+      def parse_complex(string)
+        definition_s, children_s = string.split(/\s*->\s*/, 2)
+
+        children =
+        if children_s.nil?
+          []
+        else
+          list = parse_arg_list(children_s).map {|c| parse_complex c }
+          raise ArgumentError, "invalid shard config. -> given, no children found" if list.empty?
+          list
+        end
+
+        template_args = parse_complex_definition(definition_s) << children
+        ShardTemplate.new(*template_args)
       end
 
       def parse_complex_definition(definition_s)

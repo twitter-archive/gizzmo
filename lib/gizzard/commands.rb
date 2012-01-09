@@ -71,6 +71,47 @@ module Gizzard
         exit 1
       end
     end
+
+    def require_template_options
+      options = command_options.template_options || {}
+      if global_options.template_options && global_options.template_options[:simple]
+          fail = false
+          if !options[:concrete]
+            fail = true
+            STDERR.puts "Please specify a concrete shard type with --concrete flag when using --simple"
+          end
+          if !options[:source_type]
+            fail = true
+            STDERR.puts "Please specify a source data type with --source-type flag when using --simple"
+          end
+          if !options[:dest_type]
+            fail = true
+            STDERR.puts "Please specify a destination data type with --dest-type flag when using --simple"
+          end
+          exit 1 if fail
+        end
+    end
+
+    # Infer the shard base_name from a list of transformations
+    def get_base_name(transformations)
+      # Gets the first valid tree from the map of transformations -> applicable trees
+      # Trees are maps of forwardings -> shards. Gets the first valid shard from the this tree.
+      # Gets the ShardId of that shard and pulls the base name out of the table prefix
+      transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
+    end
+
+    def confirm!(message="Continue?")
+      unless global_options.force
+        begin
+        print "#{message} (y/n) "; $stdout.flush
+        resp = $stdin.gets.chomp.downcase
+        puts ""
+        end while resp != 'y' && resp != 'n'
+        exit if resp == 'n'
+      end
+    end
+
+
   end
 
   class RetryProxy
@@ -785,7 +826,7 @@ module Gizzard
         exit
       end
 
-      base_name = transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
+      base_name = get_base_name(transformations)
 
       unless be_quiet
         transformations.each do |transformation, trees|
@@ -796,11 +837,7 @@ module Gizzard
         puts ""
       end
 
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
+      confirm!
 
       Gizzard.schedule! manager,
                         base_name,
@@ -812,6 +849,7 @@ module Gizzard
   class TransformTreeCommand < BaseTransformCommand
     def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
+      require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
       copy_wrapper   = scheduler_options[:copy_wrapper]
@@ -845,6 +883,7 @@ module Gizzard
     def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
       require_tables
+      require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
@@ -869,6 +908,7 @@ module Gizzard
     def get_transformations
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
       require_tables
+      require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
@@ -896,6 +936,7 @@ module Gizzard
   class AddPartitionCommand < Command
     def run
       require_tables
+      require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manager.manifest(*global_options.tables)
@@ -933,7 +974,7 @@ module Gizzard
         exit
       end
 
-      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+      base_name = get_base_name(transformations)
 
       unless be_quiet
         transformations.each do |transformation, trees|
@@ -944,11 +985,7 @@ module Gizzard
         puts ""
       end
 
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
+      confirm!
 
       Gizzard.schedule! manager,
                         base_name,
@@ -993,7 +1030,7 @@ module Gizzard
         exit
       end
 
-      base_name = transformations.values.first.values.first.id.table_prefix.split('_').first
+      base_name = get_base_name(transformations)
 
       unless be_quiet
         transformations.each do |transformation, trees|
@@ -1004,11 +1041,7 @@ module Gizzard
         puts ""
       end
 
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
+      confirm!
 
       Gizzard.schedule! manager,
                         base_name,
@@ -1056,6 +1089,7 @@ module Gizzard
     def run
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
       require_tables
+      require_template_options
 
       base_name    = command_options.base_name || DEFAULT_BASE_NAME
       num_shards   = (command_options.shards || DEFAULT_NUM_SHARDS).to_i
@@ -1101,11 +1135,7 @@ module Gizzard
         puts ""
       end
 
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
+      confirm!
 
       global_options.tables.each do |table_id|
         templates_and_base_ids.each do |template, base_ids|
