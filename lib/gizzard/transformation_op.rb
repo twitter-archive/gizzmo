@@ -12,7 +12,7 @@ module Gizzard
       alias == eql?
 
       def inspect
-        templates = (is_a?(LinkOp) ? [from, to] : [template]).map {|t| t.identifier }.join(" -> ")
+        templates = (is_a?(LinkOp) ? [from, to] : [*template]).map {|t| t.identifier }.join(" -> ")
         name      = Transformation::OP_NAMES[self.class]
         "#{name}(#{templates})"
       end
@@ -29,26 +29,22 @@ module Gizzard
     class CopyShard < BaseOp
       BUSY = 1
 
-      attr_reader :from, :to
-      alias template to
+      attr_reader :from, :to, :shards
+      alias template shards
 
-      def initialize(from, to)
-        @from = from
-        @to   = to
+      def initialize(*shards)
+        @shards = shards
       end
 
       def expand(*args); { :copy => [self] } end
 
       def involved_shards(table_prefix, translations)
-        [to.to_shard_id(table_prefix, translations)]
+        shards.map{|s| s.to_shard_id(table_prefix, translations)}
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        from_shard_id = from.to_shard_id(table_prefix, translations)
-        to_shard_id   = to.to_shard_id(table_prefix, translations)
-
-        nameserver.mark_shard_busy(to_shard_id, BUSY)
-        nameserver.copy_shard(from_shard_id, to_shard_id)
+        involved_shards(table_prefix, translations).each { |sid| nameserver.mark_shard_busy(sid, BUSY) }
+        nameserver.copy_shard(involved_shards(table_prefix, translations))
       end
     end
 
@@ -98,9 +94,10 @@ module Gizzard
       attr_reader :from, :to
       alias template to
 
-      def initialize(from, to)
+      def initialize(from, to, wrapper_type=nil)
         @from = from
         @to   = to
+        @wrapper_type = wrapper_type
       end
 
       def inverse?(other)
@@ -113,9 +110,9 @@ module Gizzard
     end
 
     class AddLink < LinkOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
-        if involved_in_copy
-          wrapper = ShardTemplate.new(wrapper_type, to.host, to.weight, '', '', [to])
+      def expand(copy_source, involved_in_copy)
+        if involved_in_copy && @wrapper_type
+          wrapper = ShardTemplate.new(@wrapper_type, to.host, to.weight, '', '', [to])
           { :prepare => [AddLink.new(from, wrapper)],
             :cleanup => [self, RemoveLink.new(from, wrapper)] }
         else
@@ -132,7 +129,7 @@ module Gizzard
     end
 
     class RemoveLink < LinkOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
+      def expand(copy_source, involved_in_copy)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
@@ -147,8 +144,9 @@ module Gizzard
     class ShardOp < BaseOp
       attr_reader :template
 
-      def initialize(template)
+      def initialize(template, wrapper_type=nil)
         @template = template
+        @wrapper_type = wrapper_type
       end
 
       def inverse?(other)
@@ -161,11 +159,14 @@ module Gizzard
     end
 
     class CreateShard < ShardOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
-        if involved_in_copy
-          wrapper = ShardTemplate.new(wrapper_type, template.host, template.weight, '', '', [template])
+      def expand(copy_source, involved_in_copy)
+        if involved_in_copy && @wrapper_type
+          wrapper = ShardTemplate.new(@wrapper_type, template.host, template.weight, '', '', [template])
           { :prepare => [self, CreateShard.new(wrapper), AddLink.new(wrapper, template)],
             :cleanup => [RemoveLink.new(wrapper, template), DeleteShard.new(wrapper)],
+            :copy => [CopyShard.new(copy_source, template)] }
+        elsif involved_in_copy
+          { :prepare => [self],
             :copy => [CopyShard.new(copy_source, template)] }
         else
           { :prepare => [self] }
@@ -178,7 +179,7 @@ module Gizzard
     end
 
     class DeleteShard < ShardOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
+      def expand(copy_source, involved_in_copy)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
@@ -188,9 +189,9 @@ module Gizzard
     end
 
     class SetForwarding < ShardOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
-        if involved_in_copy
-          wrapper = ShardTemplate.new(wrapper_type, nil, 0, '', '', [to])
+      def expand(copy_source, involved_in_copy)
+        if involved_in_copy && @wrapper_type
+          wrapper = ShardTemplate.new(@wrapper_type, nil, 0, '', '', [to])
           { :prepare => [SetForwarding.new(template, wrapper)],
             :cleanup => [self] }
         else
@@ -209,7 +210,7 @@ module Gizzard
     # XXX: A no-op, but needed for setup/teardown symmetry
 
     class RemoveForwarding < ShardOp
-      def expand(copy_source, involved_in_copy, wrapper_type)
+      def expand(copy_source, involved_in_copy)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
