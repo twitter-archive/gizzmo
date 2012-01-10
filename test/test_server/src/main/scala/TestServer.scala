@@ -1,18 +1,24 @@
 package com.twitter.gizzard.testserver
 
 import java.sql.{ResultSet, SQLException}
+import com.twitter.querulous
 import com.twitter.querulous.evaluator.{QueryEvaluatorFactory, QueryEvaluator}
 import com.twitter.querulous.config.Connection
 import com.twitter.querulous.query.SqlQueryTimeoutException
-import gizzard.GizzardServer
-import nameserver.NameServer
-import shards.{ShardId, ShardInfo, ShardException, ShardTimeoutException}
-import scheduler.{JobScheduler, JsonJob, CopyJob, CopyJobParser, CopyJobFactory, JsonJobParser, PrioritizingJobScheduler}
 
-object config {
+import com.twitter.gizzard
+import com.twitter.gizzard.GizzardServer
+import com.twitter.gizzard.nameserver.{NameServer, Forwarder}
+import com.twitter.gizzard.shards._
+import com.twitter.gizzard.scheduler._
+
+
+package object config {
+  import com.twitter.logging.config._
   import com.twitter.gizzard.config._
+  import com.twitter.gizzard.logging.config._
   import com.twitter.querulous.config._
-  import com.twitter.util.TimeConversions._
+  import com.twitter.conversions.time._
   import com.twitter.util.Duration
 
   trait TestDBConnection extends Connection {
@@ -35,7 +41,16 @@ object config {
   trait TestServer extends gizzard.config.GizzardServer {
     def server: TServer
     def databaseConnection: Connection
+
     val queryEvaluator = TestQueryEvaluator
+    jobRelay.priority = Priority.Low.id
+
+    loggers = List(
+      new LoggerConfig {
+        level = Level.ERROR
+        handlers = List(new ConsoleHandlerConfig)
+      }
+    )
   }
 
   trait TestJobScheduler extends Scheduler {
@@ -46,10 +61,8 @@ object config {
     errorLimit = 25
   }
 
-  class TestNameServer(name: String) extends gizzard.config.NameServer {
-    jobRelay.priority = Priority.Low.id
-
-    val replicas = Seq(new Mysql {
+  private def testNameServerReplicas(name: String) = {
+    Seq(new Mysql {
       queryEvaluator = TestQueryEvaluator
       val connection = new TestDBConnection {
         val database = "gizzard_test_" + name + "_ns"
@@ -57,21 +70,23 @@ object config {
     })
   }
 
+
   object TestServerConfig {
     def apply(name: String, sPort: Int, iPort: Int, mPort: Int) = {
       val queueBase = "gizzard_test_" + name
 
       new TestServer {
-        val server = new TestTHsHaServer { val name = "TestGizzardService"; val port = sPort }
+        mappingFunction    = Identity
+        nameServerReplicas = testNameServerReplicas(name)
+        jobInjector.port   = iPort
+        manager.port       = mPort
+
+        val server             = new TestTHsHaServer { val name = "TestGizzardService"; val port = sPort }
         val databaseConnection = new TestDBConnection { val database = "gizzard_test_" + name }
-        val nameServer = new TestNameServer(name)
         val jobQueues = Map(
           Priority.High.id -> new TestJobScheduler { val name = queueBase+"_high" },
           Priority.Low.id  -> new TestJobScheduler { val name = queueBase+"_low" }
         )
-
-        jobInjector.port = iPort
-        manager.port     = mPort
       }
     }
 
@@ -84,24 +99,25 @@ object Priority extends Enumeration {
   val High, Low = Value
 }
 
-class TestServer(conf: config.TestServer) extends GizzardServer[TestShard, JsonJob](conf) {
+class TestServer(conf: config.TestServer) extends GizzardServer(conf) {
 
   // shard/nameserver/scheduler wiring
-
-  val readWriteShardAdapter = new TestReadWriteAdapter(_)
   val jobPriorities         = List(Priority.High.id, Priority.Low.id)
   val copyPriority          = Priority.Low.id
-  val copyFactory           = new TestCopyFactory(nameServer, jobScheduler(Priority.Low.id))
 
-  shardRepo += ("TestShard" -> new SqlShardFactory(conf.queryEvaluator(), conf.databaseConnection))
+  nameServer.configureForwarder[TestShard](
+    _.tableId(0)
+    .shardFactory(new TestShardFactory(conf.queryEvaluator(), conf.databaseConnection))
+    .copyFactory(new TestCopyFactory(nameServer, jobScheduler(Priority.Low.id)))
+  )
 
-  jobCodec += ("Put".r  -> new PutParser(nameServer.findCurrentForwarding(0, _)))
+  jobCodec += ("Put".r  -> new PutParser(nameServer.forwarder[TestShard]))
   jobCodec += ("Copy".r -> new TestCopyParser(nameServer, jobScheduler(Priority.Low.id)))
 
 
   // service listener
 
-  val testService = new TestServerIFace(nameServer.findCurrentForwarding(0, _), jobScheduler)
+  val testService = new TestServerIFace(nameServer.forwarder[TestShard], jobScheduler)
 
   lazy val testThriftServer = {
     val processor = new thrift.TestServer.Processor(testService)
@@ -122,15 +138,16 @@ class TestServer(conf: config.TestServer) extends GizzardServer[TestShard, JsonJ
 
 // Service Interface
 
-class TestServerIFace(forwarding: Long => TestShard, scheduler: PrioritizingJobScheduler[JsonJob])
+class TestServerIFace(forwarding: Long => RoutingNode[TestShard], scheduler: PrioritizingJobScheduler)
 extends thrift.TestServer.Iface {
+  import scala.collection.JavaConversions._
   import com.twitter.gizzard.thrift.conversions.Sequences._
 
   def put(key: Int, value: String) {
     scheduler.put(Priority.High.id, new PutJob(key, value, forwarding))
   }
 
-  def get(key: Int) = forwarding(key).get(key).map(asTestResult).map(List(_).toJavaList) getOrElse List[thrift.TestResult]().toJavaList
+  def get(key: Int) = forwarding(key).read.any(_.get(key)).toList.map(asTestResult)
 
   private def asTestResult(t: (Int, String, Int)) = new thrift.TestResult(t._1, t._2, t._3)
 }
@@ -138,25 +155,12 @@ extends thrift.TestServer.Iface {
 
 // Shard Definitions
 
-trait TestShard extends shards.Shard {
-  def put(key: Int, value: String): Unit
-  def putAll(kvs: Seq[(Int, String)]): Unit
-  def get(key: Int): Option[(Int, String, Int)]
-  def getAll(key: Int, count: Int): Seq[(Int, String, Int)]
-}
+class TestShardFactory(qeFactory: QueryEvaluatorFactory, conn: Connection) extends ShardFactory[TestShard] {
+  def newEvaluator(host: String) = qeFactory(conn.withHost(host))
 
-class TestReadWriteAdapter(s: shards.ReadWriteShard[TestShard])
-extends shards.ReadWriteShardAdapter(s) with TestShard {
-  def put(k: Int, v: String)         = s.writeOperation(_.put(k,v))
-  def putAll(kvs: Seq[(Int,String)]) = s.writeOperation(_.putAll(kvs))
-  def get(k: Int)                    = s.readOperation(_.get(k))
-  def getAll(k:Int, c: Int)          = s.readOperation(_.getAll(k,c))
-}
+  def instantiate(info: ShardInfo, weight: Int) = new TestShard(newEvaluator(info.hostname), info, false)
 
-class SqlShardFactory(qeFactory: QueryEvaluatorFactory, conn: Connection)
-extends shards.ShardFactory[TestShard] {
-  def instantiate(info: ShardInfo, weight: Int, children: Seq[TestShard]) =
-    new SqlShard(qeFactory(conn.withHost(info.hostname)), info, weight, children)
+  def instantiateReadOnly(info: ShardInfo, weight: Int) = instantiate(info, weight)
 
   def materialize(info: ShardInfo) {
     val ddl =
@@ -177,23 +181,25 @@ extends shards.ShardFactory[TestShard] {
   }
 }
 
-class SqlShard(
-  evaluator: QueryEvaluator,
-  val shardInfo: ShardInfo,
-  val weight: Int,
-  val children: Seq[TestShard])
-extends TestShard {
+// should enforce read/write perms at the db access level
+class TestShard(evaluator: QueryEvaluator, val shardInfo: ShardInfo, readOnly: Boolean) {
+
   private val table = shardInfo.tablePrefix
 
-  private val putSql = """insert into %s (id, value, count) values (?,?,1) on duplicate key
-                          update value = values(value), count = count+1""".format(table)
+  private val putSql  = """insert into %s (id, value, count) values (?,?,1) on duplicate key
+                           update value = values(value), count = count+1""".format(table)
   private val getSql    = "select * from " + table + " where id = ?"
   private val getAllSql = "select * from " + table + " where id > ? limit ?"
 
   private def asResult(r: ResultSet) = (r.getInt("id"), r.getString("value"), r.getInt("count"))
 
-  def put(key: Int, value: String) { evaluator.execute(putSql, key, value) }
+  def put(key: Int, value: String) {
+    if (readOnly) error("shard is read only!")
+    evaluator.execute(putSql, key, value)
+  }
+
   def putAll(kvs: Seq[(Int, String)]) {
+    if (readOnly) error("shard is read only!")
     evaluator.executeBatch(putSql) { b => for ((k,v) <- kvs) b(k,v) }
   }
 
@@ -204,23 +210,23 @@ extends TestShard {
 
 // Jobs
 
-class PutParser(forwarding: Long => TestShard) extends JsonJobParser {
+class PutParser(forwarding: Long => RoutingNode[TestShard]) extends JsonJobParser {
   def apply(map: Map[String, Any]): JsonJob = {
     new PutJob(map("key").asInstanceOf[Int], map("value").asInstanceOf[String], forwarding)
   }
 }
 
-class PutJob(key: Int, value: String, forwarding: Long => TestShard) extends JsonJob {
+class PutJob(key: Int, value: String, forwarding: Long => RoutingNode[TestShard]) extends JsonJob {
   def toMap = Map("key" -> key, "value" -> value)
-  def apply() { forwarding(key).put(key, value) }
+  def apply() { forwarding(key).write.foreach(_.put(key, value)) }
 }
 
-class TestCopyFactory(ns: NameServer[TestShard], s: JobScheduler[JsonJob])
+class TestCopyFactory(ns: NameServer, s: JobScheduler)
 extends CopyJobFactory[TestShard] {
   def apply(src: ShardId, dest: ShardId) = new TestCopy(src, dest, 0, 500, ns, s)
 }
 
-class TestCopyParser(ns: NameServer[TestShard], s: JobScheduler[JsonJob])
+class TestCopyParser(ns: NameServer, s: JobScheduler)
 extends CopyJobParser[TestShard] {
   def deserialize(m: Map[String, Any], src: ShardId, dest: ShardId, count: Int) = {
     val cursor = m("cursor").asInstanceOf[Int]
@@ -229,16 +235,22 @@ extends CopyJobParser[TestShard] {
   }
 }
 
-class TestCopy(srcId: ShardId, destId: ShardId, cursor: Int, count: Int,
-               ns: NameServer[TestShard], s: JobScheduler[JsonJob])
+class TestCopy(
+  srcId: ShardId,
+  destId: ShardId,
+  cursor: Int,
+  count: Int,
+  ns: NameServer,
+  s: JobScheduler)
 extends CopyJob[TestShard](srcId, destId, count, ns, s) {
-  def copyPage(src: TestShard, dest: TestShard, count: Int) = {
-    val rows = src.getAll(cursor, count).map { case (k,v,c) => (k,v) }
+
+  def copyPage(src: RoutingNode[TestShard], dest: RoutingNode[TestShard], count: Int) = {
+    val rows = src.read.any(_.getAll(cursor, count)) map { case (k,v,c) => (k,v) }
 
     if (rows.isEmpty) {
       None
     } else {
-      dest.putAll(rows)
+      dest.write.foreach(_.putAll(rows))
       Some(new TestCopy(srcId, destId, rows.last._1, count, ns, s))
     }
   }
