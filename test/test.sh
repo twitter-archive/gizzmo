@@ -5,8 +5,12 @@ function g {
   ../bin/gizzmo -Cconfig.yaml "$@" 2>&1
 }
 
+function g_silent {
+  g "$@" > /dev/null
+}
+
 function expect {
-  diff -u - "expected/$1" && echo "    success." || (echo "    failed." && exit 1)
+  diff -u - "expected/$1" && echo -e "    success\t$1." || (echo -e "    failed\t$1." && exit 1)
 }
 
 function expect-string {
@@ -14,21 +18,26 @@ function expect-string {
   expect tmp
 }
 
-g find -hlocalhost | xargs ../bin/gizzmo -Cconfig.yaml delete
+for shard in `g find -hlocalhost`; do
+    for linkline in `g links $shard | awk '{print $1","$2}'`; do
+        g_silent unlink `echo $linkline | awk -F, '{print $1" "$2}'`
+    done
+    g_silent delete $shard
+done
 g find -hlocalhost | expect empty-file.txt
 
 for i in {0..9}
 do
-  g create com.twitter.gizzard.shards.ReplicatingShard localhost/table_repl_$i
-  g create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
-  g addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
+  g_silent create com.twitter.gizzard.shards.ReplicatingShard localhost/table_repl_$i
+  g_silent create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+  g_silent create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+  g_silent addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
+  g_silent addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
 done
 
 for i in `g find -h localhost`; do g info $i; done | expect info.txt
 g find -hlocalhost | expect original-find.txt
-g find -hlocalhost -tSqlShard | expect find-only-sql-shard-type.txt
+g find -hlocalhost -tTestShard | expect find-only-sql-shard-type.txt
 
 
 NOW=`date +%s` # unix timestamp
