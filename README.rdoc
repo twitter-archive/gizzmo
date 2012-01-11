@@ -35,14 +35,26 @@ Contributions are welcome!  Please send a pull request, or if you're internal to
 
 == Running tests
 
-The tests may be somewhat difficult to run outside of Twitter.  They assume the following:
+The tests may be somewhat difficult to run outside of Twitter.  They assume that:
 
-1. You have a running FlockDB development environment exposing a ShardManager over thrift on localhost:7920
-2. You don't mind blowing away the data in your dev environment.
-3. Your MySQL username and password are in the environment variables DB_USERNAME and DB_PASSWORD
+* You don't mind blowing away the data in your dev environment.
+* Your MySQL username and password are in the environment variables DB_USERNAME and DB_PASSWORD
 
-Assuming you've put together the dependencies, ./test/test.sh should run fine.
- 
+To execute the tests:
+
+1. Build the included test server (once):
+
+        // create the database for the local nameserver
+        echo "create database gizzard_test_integration_ns;" | mysql
+        // retrieve test server dependencies
+        cd test_server ; sbt update
+
+2. Start the test server (with service, injector, management ports of 7918, 7919, 7920 respectively):
+
+        cd test_server ; sbt run 7918 7919 7920
+
+3. Run ./test/test.sh
+
 == Copyright
 
 Copyright (c) 2010 Twitter, Inc. See LICENSE for details.
