@@ -51,7 +51,7 @@ To execute the tests:
 
 2. Start the test server (with service, injector, management ports of 7918, 7919, 7920 respectively):
 
-        cd test_server ; sbt run 7918 7919 7920
+        cd test_server ; sbt "run 7918 7919 7920"
 
 3. Run ./test/test.sh
 
