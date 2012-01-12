@@ -306,7 +306,7 @@ subcommands = {
   'repair-tables' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} -T TABLE,... repair-tables [options]"
     separators(opts, DOC_STRINGS["repair-tables"])
-    opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT.") do |c|
+    opts.on("--max-copies=COUNT", "Limit max simultaneous copies to COUNT. (default 100)") do |c|
       subcommand_options.num_copies = c.to_i
     end
   end,
