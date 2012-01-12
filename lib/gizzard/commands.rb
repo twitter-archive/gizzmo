@@ -979,8 +979,8 @@ module Gizzard
       unless be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
-          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+          puts "Applied to #{trees.length} shards"
+          #trees.keys.sort.each {|f| puts "  #{f.inspect}" }
         end
         puts ""
       end
@@ -1035,8 +1035,8 @@ module Gizzard
       unless be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
-          puts "Applied to #{trees.length} shards:"
-          trees.keys.sort.each {|f| puts "  #{f.inspect}" }
+          puts "Applied to #{trees.length} shards"
+          #trees.keys.sort.each {|f| puts "  #{f.inspect}" }
         end
         puts ""
       end

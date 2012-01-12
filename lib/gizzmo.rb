@@ -402,6 +402,7 @@ subcommands = {
   'add-partition' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} add-partition [options] TEMPLATE ..."
     separators(opts, DOC_STRINGS["add-partition"])
+    add_template_opts subcommand_options, opts
 
     add_scheduler_opts subcommand_options, opts
 
@@ -412,6 +413,7 @@ subcommands = {
   'remove-partition' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} remove-partition [options] TEMPLATE ..."
     separators(opts, DOC_STRINGS["remove-partition"])
+    add_template_opts subcommand_options, opts
 
     add_scheduler_opts subcommand_options, opts
 
