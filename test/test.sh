@@ -47,6 +47,9 @@ for i in `g find -h localhost`; do g info $i; done | expect info.txt
 g find -hlocalhost | expect original-find.txt
 g find -hlocalhost -tTestShard | expect find-only-sql-shard-type.txt
 
+# execute a ping (we're connected to "two" identical hosts, so this only tests success)
+g ping | expect empty-file.txt
+
 # TODO: disabled for now: creating links resurrects existing forwardings
 function test_add_forwarding {
     NOW=`date +%s` # unix timestamp

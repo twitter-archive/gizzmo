@@ -399,6 +399,12 @@ module Gizzard
     end
   end
 
+  class PingCommand < Command
+    def run
+      manager.validate_clients_or_raise
+    end
+  end
+
   class ReportCommand < Command
     def run
       things = @argv.map do |shard|
