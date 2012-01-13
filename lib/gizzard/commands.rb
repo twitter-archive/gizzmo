@@ -751,6 +751,9 @@ module Gizzard
 
       scheduler_options[:quiet] = be_quiet
 
+      # confirm that all app servers are relatively consistent
+      manager.validate_clients_or_raise
+
       transformations = get_transformations
       transformations.reject! {|t,trees| t.noop? or trees.empty? }
 

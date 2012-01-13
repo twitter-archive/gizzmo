@@ -149,6 +149,25 @@ module Gizzard
       Manifest.new(self, table_ids)
     end
 
+    # confirm that all clients are connected to the same cluster
+    def validate_clients_or_raise
+      last_client_host = nil
+      last_client_hostset = nil
+      # linear equality comparison for the host sets of each appserver
+      all_clients.map do |client|
+        this_client_hostset = client.list_hostnames.inject({}) do |hostnames, hostname|
+          hostnames[hostname] = true
+          hostnames
+        end
+        if last_client_hostset != nil && this_client_hostset != last_client_hostset
+          raise "App-servers #{last_client_host} and #{client.get_host} disagree on the set" +
+              " of shard hosts: #{last_client_hostset.keys} vs #{this_client_hostset.keys}"
+        end
+        last_client_host = client.get_host
+        last_client_hostset = this_client_hostset
+      end
+    end
+
     private
 
     def client

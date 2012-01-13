@@ -143,6 +143,10 @@ module Gizzard
       end
     end
 
+    def get_host
+      @host
+    end
+
     def printable(method_name, args, timestamp = false)
       ts = timestamp ? "#{Time.now}\t" : ""
       "#{ts}#{method_name}(#{args.map{|a| a.inspect}.join(', ')})"
