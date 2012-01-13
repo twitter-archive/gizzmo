@@ -7,7 +7,8 @@ class GizzmoServerProject(info: ProjectInfo) extends StandardProject(info) {
   override def filterScalaJars = false
 
   val scalaTools = "org.scala-lang" % "scala-compiler" % "2.7.7"
-  val gizzard    = "com.twitter" % "gizzard" % "1.6-fr-SNAPSHOT"
+  val gizzard    = "com.twitter" % "gizzard" % "3.0.0-beta29"
+  val querulous  = "com.twitter" % "querulous" % "2.6.5"
 
   val specs = "org.scala-tools.testing" % "specs" % "1.6.2.1" % "test"
 }
