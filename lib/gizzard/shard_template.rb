@@ -38,6 +38,10 @@ module Gizzard
       Shard::SHARD_SUFFIXES[type.split('.').last]
     end
 
+    def shard_tag
+      Shard::SHARD_TAGS[type.split('.').last]
+    end
+
     def host
       if concrete?
         @host
@@ -135,6 +139,10 @@ module Gizzard
       false
     end
 
+    def contains_shard_type?(other)
+      descendants.map {|d| d.type }.include? other
+    end
+
     def hash
       weight.hash + host.hash + type.hash + children.hash
     end
@@ -165,38 +173,113 @@ module Gizzard
     end
 
     def to_config
+      if ShardTemplate.options[:simple]
+        to_simple_config
+      else
+        to_complex_config
+      end
+    end
+    
+    def to_complex_config
       if children.empty?
         config_definition
       else
-        child_defs = children.map {|c| c.to_config }
+        child_defs = children.map {|c| c.to_complex_config }
         child_defs_s = child_defs.length == 1 ? child_defs.first : "(#{child_defs.join(", ")})"
         "#{config_definition} -> #{child_defs_s}"
       end
     end
 
+    def to_simple_config(tag="")
+      if children.empty? && concrete?
+        tag += "+#{shard_tag}" if shard_tag
+        "#{host}#{tag if !tag.empty?}"
+      elsif !children.empty?
+        if replicating?
+          children.map {|c| c.to_simple_config }.join(", ")
+        else
+          children.map {|c| c.to_simple_config("#{tag}#{'+' + shard_tag.to_s if shard_tag}")}
+        end
+      else
+        ""
+      end
+    end
 
     # Class Methods
 
     class << self
+
+      def configure(options)
+        @@options ||= {}
+        @@options.merge!(options)
+      end
+
+      def options
+        @@options ||= {}
+        @@options[:replicating] ||= "ReplicatingShard"
+        #@@options[:source_type] ||= "BIGINT UNSIGNED"
+        #@@options[:dest_type] ||= "BIGINT UNSIGNED"
+        @@options
+      end
+
       def parse(string)
+        if options[:simple]
+          parse_simple(string)
+        else
+          parse_complex(string)
+        end
+      end
+
+      private
+
+      def parse_simple(definition_s)
+        shards = definition_s.split(",")
+        templates = []
+        shards.each do |s|
+          s.strip!
+          host, *tags = s.split("+")
+          templates << build_nested_template(host, tags)
+        end
+        ShardTemplate.new(options[:replicating], nil, 1, "", "", templates)
+      end
+
+      def build_nested_template(host, tags)
+        if tags.empty?
+          return ShardTemplate.new(options[:concrete], host, 1, options[:source_type], options[:dest_type], [])
+        end
+
+        tag = tags.shift
+        type = Shard::SHARD_TAGS.invert[tag]
+
+        if type == "BlackHoleShard" # end at blackhole shards immediately since they're concrete
+          return ShardTemplate.new(type, ABSTRACT_HOST, 1, "", "", [])
+        end
+
+        if type
+          return ShardTemplate.new(type, nil, 1, "", "", [build_nested_template(host, tags)])
+        end
+
+        []
+      end
+
+
+      def parse_complex(string)
         definition_s, children_s = string.split(/\s*->\s*/, 2)
 
         children =
         if children_s.nil?
           []
         else
-          list = parse_arg_list(children_s).map {|c| parse c }
+          list = parse_arg_list(children_s).map {|c| parse_complex c }
           raise ArgumentError, "invalid shard config. -> given, no children found" if list.empty?
           list
         end
 
-        template_args = parse_definition(definition_s) << children
+        template_args = parse_complex_definition(definition_s) << children
         ShardTemplate.new(*template_args)
       end
 
-      private
-
-      def parse_definition(definition_s)
+      def parse_complex_definition(definition_s)
         type, arg_list = definition_s.split("(", 2)
 
         host, weight, source_type, dest_type =

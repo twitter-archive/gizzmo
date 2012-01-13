@@ -37,7 +37,7 @@ module Gizzard
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
-    INVALID_COPY_TYPES = ["ReadOnlyShard", "WriteOnlyShard", "BlockedShard"]
+    INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard"]
 
     SHARD_SUFFIXES = {
       "FailingOverShard" => 'replicating',
@@ -45,6 +45,14 @@ module Gizzard
       "ReadOnlyShard" => 'read_only',
       "WriteOnlyShard" => 'write_only',
       "BlockedShard" => 'blocked'
+    }
+
+    SHARD_TAGS = {
+      "ReplicatingShard" => 'replicating',
+      "ReadOnlyShard" => 'read_only',
+      "WriteOnlyShard" => 'write_only',
+      "BlockedShard" => 'blocked',
+      "BlackHoleShard" => 'blackhole'
     }
 
     def id; info.id end
@@ -118,9 +126,9 @@ module Gizzard
       end
     end
 
-    def copy_shard(from_shard_id, to_shard_id)
+    def copy_shard(*shards)
       c = random_client
-      with_retry { c.copy_shard(from_shard_id, to_shard_id) }
+      with_retry { c.copy_shard(*shards) }
     end
 
     def repair_shards(*shards)
@@ -194,6 +202,8 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
+      STDERR.puts "\nException: #{e.description rescue "(no description)"}"
+      STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0 
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end
