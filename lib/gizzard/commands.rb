@@ -447,6 +447,12 @@ module Gizzard
     end
   end
 
+  class PingCommand < Command
+    def run
+      manager.validate_clients_or_raise
+    end
+  end
+
   class ReportCommand < Command
     def run
       things = @argv.map do |shard|
@@ -817,6 +823,9 @@ module Gizzard
       be_quiet          = global_options.force && command_options.quiet
 
       scheduler_options[:quiet] = be_quiet
+
+      # confirm that all app servers are relatively consistent
+      manager.validate_clients_or_raise
 
       transformations = get_transformations
       transformations.reject! {|t,trees| t.noop? or trees.empty? }
