@@ -1,12 +1,11 @@
 #!/bin/bash
 cd `dirname $0`
 function g {
-  # echo "> g $@" >&2
   ../bin/gizzmo -Cconfig.yaml "$@" 2>&1
 }
 
 function g_silent {
-  g "$@" > /dev/null
+  ../bin/gizzmo -Cconfig.yaml "$@" > /dev/null
 }
 
 function expect {
