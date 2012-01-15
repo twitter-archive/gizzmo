@@ -21,28 +21,39 @@ TABLE=13
 REPLICATING_SHARD_CLASS="com.twitter.gizzard.shards.ReplicatingShard"
 BLOCKED_SHARD_CLASS="com.twitter.gizzard.shards.BlockedShard"
 
-for shard in `g find -hlocalhost`; do
-    for linkline in `g links $shard | awk '{print $1","$2}'`; do
-        g_silent unlink `echo $linkline | awk -F, '{print $1" "$2}'`
+function cleanup {
+  for shard in `g find -hlocalhost`; do
+    # links
+    for linktuple in `g links $shard | awk '{print $1","$2}'`; do
+      g_silent unlink `echo $linktuple | awk -F, '{print $1" "$2}'`
     done
+    # shards
     g_silent delete $shard
-done
-g find -hlocalhost | expect empty-file.txt
+  done
+  g find -hlocalhost | expect empty-file.txt
+}
 
-for i in {0..9}
-do
-  g_silent create $REPLICATING_SHARD_CLASS localhost/table_repl_$i
-  g_silent create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g_silent create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  REPLICATING_SHARD="localhost/table_repl_$i"
-  g_silent addlink $REPLICATING_SHARD "localhost/table_a_$i" 2
-  g_silent addlink $REPLICATING_SHARD "localhost/table_b_$i" 1
-  g_silent addforwarding $TABLE `date +%s` $REPLICATING_SHARD
-done
+function initialize {
+  for i in {0..9}; do
+    g_silent create $REPLICATING_SHARD_CLASS localhost/table_repl_$i
+    g_silent create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+    g_silent create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
+    REPLICATING_SHARD="localhost/table_repl_$i"
+    g_silent addlink $REPLICATING_SHARD "localhost/table_a_$i" 2
+    g_silent addlink $REPLICATING_SHARD "localhost/table_b_$i" 1
+    g_silent addforwarding $TABLE `date +%s` $REPLICATING_SHARD
+  done
+}
+
+cleanup
+initialize
 
 for i in `g find -h localhost`; do g info $i; done | expect info.txt
 g find -hlocalhost | expect original-find.txt
 g find -hlocalhost -tTestShard | expect find-only-sql-shard-type.txt
+
+# execute a ping (we're connected to "two" identical hosts, so this only tests success)
+g ping | expect empty-file.txt
 
 function simple_transform {
   g -T $TABLE transform \

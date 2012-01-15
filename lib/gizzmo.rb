@@ -35,6 +35,7 @@ DOC_STRINGS = {
   "markbusy" => "Mark a list of shards as busy.",
   "markunbusy" => "Mark a list of shards as not busy.",
   "pair" => "Report the replica pairing structure for a list of hosts.",
+  "ping" => "Confirm that all configured application servers are accessible, and in agreement about the set of shard hosts.",
   "rebalance" => "Restructure and move shards to reflect a new list of tree structures.",
   "reload" => "Instruct application servers to reload the nameserver state.",
   "remove-host" => "Remove a remote cluster host being replicate to.",
@@ -193,6 +194,10 @@ subcommands = {
   'pair' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} pair"
     separators(opts, DOC_STRINGS["pair"])
+  end,
+  'ping' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} ping"
+    separators(opts, DOC_STRINGS["ping"])
   end,
   'subtree' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} subtree SHARD_ID"
