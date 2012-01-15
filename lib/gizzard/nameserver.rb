@@ -220,15 +220,17 @@ module Gizzard
 
       # wraps pre-write validation around manager.manifest
       def validate_for_write_or_raise(ignore_busy, ignore_shard_types)
-        blocked_types = Shard.TRANSITIONAL_SHARD_TYPES - ignore_shard_types 
+        blocked_types = Shard::TRANSITIONAL_SHARD_TYPES - ignore_shard_types 
         return if ignore_busy && !blocked_types.empty?
-        shard_infos.each do |shard_info|
+        shard_infos.each do |shard_id, shard_info|
           if shard_info.busy? && !ignore_busy
-            raise "Aborting due to busy shard #{shard_info}"
+            puts "Aborting due to busy shard #{shard_id.inspect}"
+            exit 1
           end
           shard_type = shard_info.class_name.split('.').last
           if blocked_types.include? shard_type
-            raise "Aborting due to blocked shard #{shard_info}"
+            puts "Aborting due to blocked shard #{shard_id.inspect}"
+            exit 1
           end
         end
       end

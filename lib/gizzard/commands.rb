@@ -117,7 +117,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       ignore_shard_types = scheduler_options[:ignore_types] || []
       ignore_busy = scheduler_options[:ignore_busy] || false
-      manifest = manager.manifest(table_ids)
+      manifest = manager.manifest(*table_ids)
       manifest.validate_for_write_or_raise(ignore_busy, ignore_shard_types)
       manifest
     end

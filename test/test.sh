@@ -17,6 +17,10 @@ function expect-string {
   expect tmp
 }
 
+TABLE=13
+REPLICATING_SHARD_CLASS="com.twitter.gizzard.shards.ReplicatingShard"
+BLOCKED_SHARD_CLASS="com.twitter.gizzard.shards.BlockedShard"
+
 for shard in `g find -hlocalhost`; do
     for linkline in `g links $shard | awk '{print $1","$2}'`; do
         g_silent unlink `echo $linkline | awk -F, '{print $1" "$2}'`
@@ -27,28 +31,36 @@ g find -hlocalhost | expect empty-file.txt
 
 for i in {0..9}
 do
-  g_silent create com.twitter.gizzard.shards.ReplicatingShard localhost/table_repl_$i
+  g_silent create $REPLICATING_SHARD_CLASS localhost/table_repl_$i
   g_silent create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
   g_silent create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-  g_silent addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
-  g_silent addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
+  REPLICATING_SHARD="localhost/table_repl_$i"
+  g_silent addlink $REPLICATING_SHARD "localhost/table_a_$i" 2
+  g_silent addlink $REPLICATING_SHARD "localhost/table_b_$i" 1
+  g_silent addforwarding $TABLE `date +%s` $REPLICATING_SHARD
 done
 
 for i in `g find -h localhost`; do g info $i; done | expect info.txt
 g find -hlocalhost | expect original-find.txt
 g find -hlocalhost -tTestShard | expect find-only-sql-shard-type.txt
 
+function simple_transform {
+  g -T $TABLE transform \
+      "$REPLICATING_SHARD_CLASS(1) -> (TestShard(localhost,2,INT UNSIGNED,INT UNSIGNED), TestShard(localhost,1,INT UNSIGNED,INT UNSIGNED))" \
+      "$REPLICATING_SHARD_CLASS(1) -> (TestShard(localhost,2,INT UNSIGNED,INT UNSIGNED)"
+}
 
-NOW=`date +%s` # unix timestamp
-g addforwarding 13 $NOW localhost/table_a_3
+{ # test-busy-transform
+  g_silent markbusy localhost/table_a_3
+  simple_transform | expect busy-transform-shard.txt
+  g_silent markunbusy localhost/table_a_3
+}
 
-g forwardings | egrep "13.$NOW.localhost/table_a_3" 
-if [ $? -ne 0 ]; then
-  echo "    failed."
-  exit 1
-fi
-
-# g unforward 1 0 localhost/table_a_3
+{ # test-blocked-transform
+  g_silent wrap $BLOCKED_SHARD_CLASS localhost/table_a_3
+  simple_transform | expect blocked-transform-shard.txt
+  g_silent unwrap localhost/table_a_3_blocked
+}
 
 g -D wrap com.twitter.gizzard.shards.ReplicatingShard localhost/table_b_0 | expect dry-wrap-table_b_0.txt
 g wrap com.twitter.gizzard.shards.ReplicatingShard localhost/table_b_0 | expect wrap-table_b_0.txt
