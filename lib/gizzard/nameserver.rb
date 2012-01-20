@@ -37,6 +37,8 @@ module Gizzard
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
+    TRANSITIONAL_SHARD_TYPES = ["BlackHoleShard", "BlockedShard"]
+
     INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard"]
 
     SHARD_SUFFIXES = {
@@ -232,6 +234,23 @@ module Gizzard
 
         @templates = @trees.inject({}) do |h, (forwarding, shard)|
           (h[shard.template] ||= []) << forwarding; h
+        end
+      end
+
+      # wraps pre-write validation around manager.manifest
+      def validate_for_write_or_raise(ignore_busy, ignore_shard_types)
+        blocked_types = Shard::TRANSITIONAL_SHARD_TYPES - ignore_shard_types 
+        return if ignore_busy && !blocked_types.empty?
+        shard_infos.each do |shard_id, shard_info|
+          if shard_info.busy? && !ignore_busy
+            puts "Aborting due to busy shard #{shard_id.inspect}"
+            exit 1
+          end
+          shard_type = shard_info.class_name.split('.').last
+          if blocked_types.include? shard_type
+            puts "Aborting due to blocked shard #{shard_id.inspect}"
+            exit 1
+          end
         end
       end
 

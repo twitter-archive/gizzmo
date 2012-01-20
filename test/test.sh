@@ -1,12 +1,11 @@
 #!/bin/bash
 cd `dirname $0`
 function g {
-  # echo "> g $@" >&2
   ../bin/gizzmo -Cconfig.yaml "$@" 2>&1
 }
 
 function g_silent {
-  g "$@" > /dev/null
+  ../bin/gizzmo -Cconfig.yaml "$@" > /dev/null
 }
 
 function expect {
@@ -17,6 +16,10 @@ function expect-string {
   echo "$1" > expected/tmp
   expect tmp
 }
+
+TABLE=13
+REPLICATING_SHARD_CLASS="com.twitter.gizzard.shards.ReplicatingShard"
+BLOCKED_SHARD_CLASS="com.twitter.gizzard.shards.BlockedShard"
 
 function cleanup {
   for shard in `g find -hlocalhost`; do
@@ -32,11 +35,13 @@ function cleanup {
 
 function initialize {
   for i in {0..9}; do
-    g_silent create com.twitter.gizzard.shards.ReplicatingShard localhost/table_repl_$i
+    g_silent create $REPLICATING_SHARD_CLASS localhost/table_repl_$i
     g_silent create TestShard localhost/table_a_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
     g_silent create TestShard localhost/table_b_$i --source-type="INT UNSIGNED" --destination-type="INT UNSIGNED"
-    g_silent addlink "localhost/table_repl_$i" "localhost/table_a_$i" 2
-    g_silent addlink "localhost/table_repl_$i" "localhost/table_b_$i" 1
+    REPLICATING_SHARD="localhost/table_repl_$i"
+    g_silent addlink $REPLICATING_SHARD "localhost/table_a_$i" 2
+    g_silent addlink $REPLICATING_SHARD "localhost/table_b_$i" 1
+    g_silent addforwarding $TABLE `date +%s` $REPLICATING_SHARD
   done
 }
 
@@ -50,18 +55,22 @@ g find -hlocalhost -tTestShard | expect find-only-sql-shard-type.txt
 # execute a ping (we're connected to "two" identical hosts, so this only tests success)
 g ping | expect empty-file.txt
 
-# TODO: disabled for now: creating links resurrects existing forwardings
-function test_add_forwarding {
-    NOW=`date +%s` # unix timestamp
-    g addforwarding 13 $NOW localhost/table_a_3
+function simple_transform {
+  g -T $TABLE transform \
+      "$REPLICATING_SHARD_CLASS(1) -> (TestShard(localhost,2,INT UNSIGNED,INT UNSIGNED), TestShard(localhost,1,INT UNSIGNED,INT UNSIGNED))" \
+      "$REPLICATING_SHARD_CLASS(1) -> (TestShard(localhost,2,INT UNSIGNED,INT UNSIGNED)"
+}
 
-    g forwardings | egrep "13[^0-9]+$NOW[^0-9]+localhost/table_a_3" 
-    if [ $? -ne 0 ]; then
-    echo "    failed."
-    exit 1
-    fi
+{ # test-busy-transform
+  g_silent markbusy localhost/table_a_3
+  simple_transform | expect busy-transform-shard.txt
+  g_silent markunbusy localhost/table_a_3
+}
 
-    # g unforward 1 0 localhost/table_a_3
+{ # test-blocked-transform
+  g_silent wrap $BLOCKED_SHARD_CLASS localhost/table_a_3
+  simple_transform | expect blocked-transform-shard.txt
+  g_silent unwrap localhost/table_a_3_blocked
 }
 
 g -D wrap com.twitter.gizzard.shards.ReplicatingShard localhost/table_b_0 | expect dry-wrap-table_b_0.txt
