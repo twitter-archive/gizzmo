@@ -37,7 +37,7 @@ module Gizzard
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
-    TRANSITIONAL_SHARD_TYPES = ["BlockedShard"]
+    TRANSITIONAL_SHARD_TYPES = ["BlackHoleShard", "BlockedShard"]
 
     INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard"]
 
