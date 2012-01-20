@@ -111,7 +111,16 @@ module Gizzard
       end
     end
 
-
+    # TODO: since this is transform specific, it should move into BaseTransformCommand
+    # once Add/Remove partition are subclasses (DS-84)
+    def manifest_for_write(*table_ids)
+      scheduler_options = command_options.scheduler_options || {}
+      ignore_shard_types = scheduler_options[:ignore_types] || []
+      ignore_busy = scheduler_options[:ignore_busy] || false
+      manifest = manager.manifest(*table_ids)
+      manifest.validate_for_write_or_raise(ignore_busy, ignore_shard_types)
+      manifest
+    end
   end
 
   class RetryProxy
@@ -871,7 +880,7 @@ module Gizzard
         shard_id       = ShardId.parse(shard_id_s)
         base_name      = shard_id.table_prefix.split('_').first
         forwarding     = manager.get_forwarding_for_shard(shard_id)
-        manifest       = manager.manifest(forwarding.table_id)
+        manifest       = manifest_for_write(forwarding.table_id)
         shard          = manifest.trees[forwarding]
 
         transform_args = [shard.template, to_template, copy_wrapper, skip_copies]
@@ -895,7 +904,7 @@ module Gizzard
       require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
-      manifest          = manager.manifest(*global_options.tables)
+      manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       skip_copies       = scheduler_options[:skip_copies] || false
       transformations   = {}
@@ -920,7 +929,7 @@ module Gizzard
       require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
-      manifest          = manager.manifest(*global_options.tables)
+      manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       transformations   = {}
 
@@ -948,7 +957,7 @@ module Gizzard
       require_template_options
 
       scheduler_options = command_options.scheduler_options || {}
-      manifest          = manager.manifest(*global_options.tables)
+      manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
@@ -1008,7 +1017,7 @@ module Gizzard
       require_tables
 
       scheduler_options = command_options.scheduler_options || {}
-      manifest          = manager.manifest(*global_options.tables)
+      manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
