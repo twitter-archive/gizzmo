@@ -875,12 +875,15 @@ module Gizzard
       transformations   = {}
 
       memoized_transforms = {}
+      memoized_manifests = {}
       @argv.each_slice(2) do |(template_s, shard_id_s)|
         to_template    = ShardTemplate.parse(template_s)
         shard_id       = ShardId.parse(shard_id_s)
         base_name      = shard_id.table_prefix.split('_').first
         forwarding     = manager.get_forwarding_for_shard(shard_id)
-        manifest       = manifest_for_write(forwarding.table_id)
+        manifest       = memoized_manifests.fetch(forwarding.table_id) do |t|
+          memoized_manifests[t] = manifest_for_write(t)
+        end
         shard          = manifest.trees[forwarding]
 
         transform_args = [shard.template, to_template, copy_wrapper, skip_copies]
