@@ -3,6 +3,15 @@ require "set"
 require "digest/md5"
 
 module Gizzard
+  def confirm!(message="Continue?")
+    begin
+      print "#{message} (y/n) "; $stdout.flush
+      resp = $stdin.gets.chomp.downcase
+      puts ""
+    end while resp != 'y' && resp != 'n'
+    exit if resp == 'n'
+  end
+
   class Command
 
     attr_reader :buffer
@@ -100,14 +109,9 @@ module Gizzard
       transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
     end
 
-    def confirm!(message="Continue?")
+    def confirm!
       unless global_options.force
-        begin
-        print "#{message} (y/n) "; $stdout.flush
-        resp = $stdin.gets.chomp.downcase
-        puts ""
-        end while resp != 'y' && resp != 'n'
-        exit if resp == 'n'
+        Gizzard::confirm!("Continue?")
       end
     end
 

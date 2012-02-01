@@ -147,7 +147,7 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true
   end
-  opts.on("--batch-finish", "Wait until all copies are complete before cleaning up unneeded links and shards") do
+  opts.on("--batch-finish", "After copies complete (while wrapped in --copy-wrapper), move shards to a WriteOnly settling state. When all transforms are settling, wait until the operator indicates that it is safe to remove the WriteOnly wrappers. Finally, wait for the operator to indicate that it is safe to execute cleanup.") do
     (subcommand_options.scheduler_options ||= {})[:batch_finish] = true
   end
 end

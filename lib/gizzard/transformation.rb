@@ -37,6 +37,16 @@ module Gizzard
       Op::DiffShards       => 9
     }
 
+    OP_PHASES = {
+      :prepare => "PREPARE",
+      :copy => "COPY",
+      :repair => "REPAIR",
+      :settle_write => "SETTLE_WRITE",
+      :settle_read => "SETTLE_READ",
+      :cleanup => "CLEANUP",
+      :diff => "DIFF"
+    }
+
     DEFAULT_DEST_WRAPPER = 'BlockedShard'
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
@@ -87,6 +97,11 @@ module Gizzard
       from.hash + to.hash + copy_dest_wrapper.hash
     end
 
+    # create a map of empty phase lists
+    def initialize_op_phases
+      Hash[OP_PHASES.keys.map do |phase| [phase, []] end]
+    end
+
     def inspect
       # TODO: Need to limit this to e.g. 10 ops in the list, and show a total
       # count instead of showing the whole thing.
@@ -96,18 +111,19 @@ module Gizzard
 
       # TODO: This seems kind of daft to copy around these long strings.
       # Loop over it once just for display?
-      prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
-      copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
-      repair_inspect  = op_inspect[:repair].empty?  ? "" : "  REPAIR\n#{op_inspect[:repair]}\n"
-      diff_inspect    = op_inspect[:diff].empty?  ? "" : "  DIFF\n#{op_inspect[:diff]}\n"
-      cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
+      def phase_line(phase)
+        op_inspect[phase].empty? ? "" : "  #{OP_PHASES[phase]}\n#{op_inspect[phase]}\n"
+      end
 
+      # display phase lists in a particular order
       op_inspect = [
-        prepare_inspect,
-        copy_inspect,
-        repair_inspect,
-        diff_inspect,
-        cleanup_inspect,
+        phase_line(:prepare),
+        phase_line(:copy),
+        phase_line(:repair),
+        phase_line(:diff),
+        phase_line(:settle_write),
+        phase_line(:settle_read),
+        phase_line(:cleanup)
       ].join
 
       "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
@@ -140,7 +156,7 @@ module Gizzard
     end
 
     def expand_jobs(jobs)
-      expanded = jobs.inject({:prepare => [], :copy => [], :repair => [], :cleanup => [], :diff => []}) do |ops, job|
+      expanded = jobs.inject(initialize_op_phases) do |ops, job|
         job_ops = job.expand(self.copy_source, involved_in_copy?(job.template))
         ops.update(job_ops) {|k,a,b| a + b }
       end
@@ -232,6 +248,8 @@ module Gizzard
       @translations   = shard.canonical_shard_id_map(base_name, @table_id, @enum)
     end
 
+    # TODO: replace with single execute(:nameserver, :phase) method?
+
     def prepare!(nameserver)
       apply_ops(nameserver, transformation.operations[:prepare])
     end
@@ -242,6 +260,14 @@ module Gizzard
 
     def copy!(nameserver)
       apply_ops(nameserver, transformation.operations[:copy])
+    end
+
+    def settle_write!(nameserver)
+      apply_ops(nameserver, transformation.operations[:settle_write])
+    end
+
+    def settle_read!(nameserver)
+      apply_ops(nameserver, transformation.operations[:settle_write])
     end
 
     def cleanup!(nameserver)
