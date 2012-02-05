@@ -51,7 +51,7 @@ module Gizzard
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 
-    def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false)
+    def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false, batch_finish = false)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 
       unless Shard::VIRTUAL_SHARD_TYPES.include? copy_dest_wrapper
@@ -62,6 +62,7 @@ module Gizzard
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper
       @skip_copies = skip_copies
+      @batch_finish = batch_finish
 
       if copies_required? && copy_source.nil?
         raise ArgumentError, "copy required without a valid copy source"
@@ -111,19 +112,19 @@ module Gizzard
 
       # TODO: This seems kind of daft to copy around these long strings.
       # Loop over it once just for display?
-      def phase_line(phase)
+      phase_line = lambda do |phase|
         op_inspect[phase].empty? ? "" : "  #{OP_PHASES[phase]}\n#{op_inspect[phase]}\n"
       end
 
       # display phase lists in a particular order
       op_inspect = [
-        phase_line(:prepare),
-        phase_line(:copy),
-        phase_line(:repair),
-        phase_line(:diff),
-        phase_line(:settle_begin),
-        phase_line(:settle_end),
-        phase_line(:cleanup)
+        phase_line.call(:prepare),
+        phase_line.call(:copy),
+        phase_line.call(:repair),
+        phase_line.call(:diff),
+        phase_line.call(:settle_begin),
+        phase_line.call(:settle_end),
+        phase_line.call(:cleanup)
       ].join
 
       "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
@@ -157,7 +158,7 @@ module Gizzard
 
     def expand_jobs(jobs)
       expanded = jobs.inject(initialize_op_phases) do |ops, job|
-        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template))
+        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template), @batch_finish)
         ops.update(job_ops) {|k,a,b| a + b }
       end
 
@@ -227,7 +228,6 @@ module Gizzard
       end
     end
   end
-
 
   class BoundTransformation
     attr_reader :transformation, :base_name, :forwarding, :shard

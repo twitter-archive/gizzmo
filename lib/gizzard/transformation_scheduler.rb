@@ -1,4 +1,5 @@
 require "set"
+require "gizzard/commands"
 
 module Gizzard
   def self.schedule!(*args)

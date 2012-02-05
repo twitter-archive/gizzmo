@@ -110,11 +110,18 @@ module Gizzard
     end
 
     class AddLink < LinkOp
-      def expand(copy_source, involved_in_copy)
-        if involved_in_copy && @wrapper_type
-          wrapper = ShardTemplate.new(@wrapper_type, to.host, to.weight, '', '', [to])
-          { :prepare => [AddLink.new(from, wrapper)],
-            :cleanup => [self, RemoveLink.new(from, wrapper)] }
+      def expand(copy_source, involved_in_copy, batch_finish)
+        # TODO: enforce that wrapper definitions match everywhere
+        if !batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, to.host, to.weight, '', '', [to])
+          { :prepare => [AddLink.new(from, copy_wrapper)],
+            :cleanup => [self, RemoveLink.new(from, copy_wrapper)] }
+        elsif batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, to.host, to.weight, '', '', [to])
+          settle_wrapper = ShardTemplate.new('WriteOnlyShard', to.host, to.weight, '', '', [to])
+          { :prepare => [AddLink.new(from, copy_wrapper)],
+            :settle_begin => [AddLink.new(from, settle_wrapper), RemoveLink.new(from, copy_wrapper)],
+            :settle_end => [self, RemoveLink.new(from, settle_wrapper)] }
         else
           { :prepare => [self] }
         end
@@ -129,7 +136,7 @@ module Gizzard
     end
 
     class RemoveLink < LinkOp
-      def expand(copy_source, involved_in_copy)
+      def expand(copy_source, involved_in_copy, batch_finish)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
@@ -159,13 +166,23 @@ module Gizzard
     end
 
     class CreateShard < ShardOp
-      def expand(copy_source, involved_in_copy)
-        if involved_in_copy && @wrapper_type
-          wrapper = ShardTemplate.new(@wrapper_type, template.host, template.weight, '', '', [template])
-          { :prepare => [self, CreateShard.new(wrapper), AddLink.new(wrapper, template)],
-            :cleanup => [RemoveLink.new(wrapper, template), DeleteShard.new(wrapper)],
+      def expand(copy_source, involved_in_copy, batch_finish)
+        # TODO: enforce that wrapper definitions match everywhere
+        if !batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, template.host, template.weight, '', '', [template])
+          { :prepare => [self, CreateShard.new(copy_wrapper), AddLink.new(copy_wrapper, template)],
+            :cleanup => [RemoveLink.new(copy_wrapper, template), DeleteShard.new(copy_wrapper)],
+            :copy => [CopyShard.new(copy_source, template)] }
+        elsif batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, template.host, template.weight, '', '', [template])
+          settle_wrapper = ShardTemplate.new('WriteOnlyShard', template.host, template.weight, '', '', [template])
+          { :prepare => [self, CreateShard.new(copy_wrapper), AddLink.new(copy_wrapper, template)],
+            :settle_begin => [RemoveLink.new(copy_wrapper, template), DeleteShard.new(copy_wrapper),
+              CreateShard.new(settle_wrapper), AddLink.new(settle_wrapper, template)],
+            :settle_end => [RemoveLink.new(settle_wrapper, template), DeleteShard.new(settle_wrapper)],
             :copy => [CopyShard.new(copy_source, template)] }
         elsif involved_in_copy
+          # TODO: when would a wrapper type not be defined? should this still be supported?
           { :prepare => [self],
             :copy => [CopyShard.new(copy_source, template)] }
         else
@@ -179,7 +196,7 @@ module Gizzard
     end
 
     class DeleteShard < ShardOp
-      def expand(copy_source, involved_in_copy)
+      def expand(copy_source, involved_in_copy, batch_finish)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
@@ -189,11 +206,18 @@ module Gizzard
     end
 
     class SetForwarding < ShardOp
-      def expand(copy_source, involved_in_copy)
-        if involved_in_copy && @wrapper_type
-          wrapper = ShardTemplate.new(@wrapper_type, nil, 0, '', '', [to])
-          { :prepare => [SetForwarding.new(template, wrapper)],
+      def expand(copy_source, involved_in_copy, batch_finish)
+        # TODO: enforce that wrapper definitions match everywhere
+        if !batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, nil, 0, '', '', [to])
+          { :prepare => [SetForwarding.new(template, copy_wrapper)],
             :cleanup => [self] }
+        elsif batch_finish && involved_in_copy && @wrapper_type
+          copy_wrapper = ShardTemplate.new(@wrapper_type, nil, 0, '', '', [to])
+          settle_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [to])
+          { :prepare => [SetForwarding.new(template, copy_wrapper)],
+            :settle_begin => [SetForwarding.new(template, settle_wrapper)],
+            :settle_end => [self] }
         else
           { :prepare => [self] }
         end
@@ -210,7 +234,7 @@ module Gizzard
     # XXX: A no-op, but needed for setup/teardown symmetry
 
     class RemoveForwarding < ShardOp
-      def expand(copy_source, involved_in_copy)
+      def expand(copy_source, involved_in_copy, batch_finish)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
