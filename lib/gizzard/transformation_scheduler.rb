@@ -129,7 +129,7 @@ module Gizzard
     end
 
     def cleanup_jobs
-      jobs = jobs_settling
+      jobs = @jobs_settling
 
       unless jobs.empty?
         @jobs_settling -= jobs
@@ -150,7 +150,7 @@ module Gizzard
 
     # performs the ":settle_begin" phase, which occurs immediately as each copy finishes
     # note that this may be a noop, but either way, jobs will move from copying to settling
-    def begin_settling_jobs(jobs)
+    def begin_settling_jobs
       jobs = jobs_copied
 
       unless jobs.empty?

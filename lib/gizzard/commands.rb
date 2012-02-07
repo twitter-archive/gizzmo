@@ -9,7 +9,10 @@ module Gizzard
       resp = $stdin.gets.chomp.downcase
       puts ""
     end while resp != 'y' && resp != 'n'
-    exit if resp == 'n'
+    if resp == 'n'
+      puts "Exiting."
+      exit
+    end
   end
 
   class Command
