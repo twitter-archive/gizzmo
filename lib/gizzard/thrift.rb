@@ -32,7 +32,11 @@ module Gizzard
     alias_method :to_unix, :inspect
 
     def self.parse(string)
-      new(*string.match("(.*)/(.*)").values_at(1, 2))
+      if groups = string.match(/(.*)\/([^_]+_\d+_\d{3,}.*)/)
+        new(*groups.values_at(1, 2))
+      else
+        raise "Invalid shard id: " + string
+      end
     end
   end
 
