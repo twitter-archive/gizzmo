@@ -67,7 +67,7 @@ module Gizzard
 
     def require_tables
       if !global_options.tables
-        puts "Please specify tables to repair with the --tables flag" 
+        puts "Please specify tables to repair with the --tables flag"
         exit 1
       end
     end
@@ -565,7 +565,7 @@ module Gizzard
       sleep 2
       while manager.get_busy_shards().size > 0
         sleep 5
-      end 
+      end
     end
   end
 

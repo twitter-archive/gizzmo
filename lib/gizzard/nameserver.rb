@@ -204,8 +204,8 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
-      STDERR.puts "\nException: #{e.description rescue "(no description)"}"
-      STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0 
+      STDERR.puts "\nException: #{e.class}: #{e.description rescue "(no description)"}"
+      STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0
       times -= 1
       (times < 0) ? raise : (sleep 0.1; retry)
     end
@@ -239,7 +239,7 @@ module Gizzard
 
       # wraps pre-write validation around manager.manifest
       def validate_for_write_or_raise(ignore_busy, ignore_shard_types)
-        blocked_types = Shard::TRANSITIONAL_SHARD_TYPES - ignore_shard_types 
+        blocked_types = Shard::TRANSITIONAL_SHARD_TYPES - ignore_shard_types
         return if ignore_busy && !blocked_types.empty?
         shard_infos.each do |shard_id, shard_info|
           if shard_info.busy? && !ignore_busy

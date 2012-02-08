@@ -553,7 +553,7 @@ global = OptionParser.new do |opts|
   opts.on("-f", "--force", "Don't display confirmation dialogs") do |force|
     global_options.force = force
   end
- 
+
   opts.on("--argv=FILE", "Put the contents of FILE onto the command line") do |f|
     ARGV.push *Shellwords.shellwords(File.read(f))
   end
