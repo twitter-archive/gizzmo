@@ -25,7 +25,7 @@ describe Gizzard::Transformation do
     @host_2_template  = mk_template 'SqlShard(host2)'
     @host_3_template  = mk_template 'SqlShard(host3)'
 
-    @trans = Gizzard::Transformation.new(@from_template, @to_template, :batch_finish => false)
+    @trans = Gizzard::Transformation.new(@from_template, @to_template)
   end
 
   describe "initialization" do
