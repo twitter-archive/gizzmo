@@ -356,21 +356,22 @@ localhost/s_0_001_replicating').should == <<-EOF
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
+    create_shard(BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> BlockedShard)
   COPY
-    copy_shard(TestShard/127.0.0.1)
+    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> BlockedShard)
+    delete_shard(BlockedShard)
+Applied to 1 shards
 
 STARTING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 COPIES:
-  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
+  localhost/s_0_001_a <-> 127.0.0.1/s_0_0001
 FINISHING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 1 transformation applied. Total time elapsed: 1 second
@@ -397,34 +398,32 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
+    create_shard(BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> BlockedShard)
   COPY
-    copy_shard(TestShard/127.0.0.1)
+    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-Applied to 2 shards:
-  [0] 1 = localhost/s_0_001_replicating
-  [0] 2 = localhost/s_0_002_replicating
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> BlockedShard)
+    delete_shard(BlockedShard)
+Applied to 2 shards
 
 STARTING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 COPIES:
-  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
-  localhost/s_0_002_a -> 127.0.0.1/s_0_0002
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
 FINISHING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-2 transformations applied. Total time elapsed: 1 second
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+2 transformations applied. Total time elapsed: X second
       EOF
 
       nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
@@ -451,24 +450,22 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should == <<-EOF
+"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int) :
   PREPARE
     add_link(ReplicatingShard -> TestShard/localhost)
     remove_link(ReplicatingShard -> TestShard/localhost)
-Applied to 2 shards:
-  [0] 1 = localhost/s_0_001_replicating
-  [0] 2 = localhost/s_0_002_replicating
+Applied to 2 shards
 
 STARTING:
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
 FINISHING:
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
 STARTING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
 FINISHING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
-2 transformations applied. Total time elapsed: 2 seconds
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int)
+2 transformations applied. Total time elapsed: X second
 EOF
     end
 
@@ -483,37 +480,35 @@ EOF
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
+    create_shard(BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> BlockedShard)
   COPY
-    copy_shard(TestShard/127.0.0.1)
+    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-Applied to 2 shards:
-  [0] 1 = localhost/s_0_001_replicating
-  [0] 2 = localhost/s_0_002_replicating
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> BlockedShard)
+    delete_shard(BlockedShard)
+Applied to 2 shards
 
 STARTING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 COPIES:
-  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
 FINISHING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 STARTING:
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 COPIES:
-  localhost/s_0_002_a -> 127.0.0.1/s_0_0002
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
 FINISHING:
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-2 transformations applied. Total time elapsed: 2 seconds
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+2 transformations applied. Total time elapsed: X second
       EOF
 
       nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
@@ -542,42 +537,38 @@ FINISHING:
 
       gizzmo('-f -T0,1 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should == <<-EOF
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
+    create_shard(BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> BlockedShard)
   COPY
-    copy_shard(TestShard/127.0.0.1)
+    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
-    delete_shard(WriteOnlyShard)
-Applied to 4 shards:
-  [0] 1 = localhost/s_0_001_replicating
-  [0] 2 = localhost/s_0_002_replicating
-  [1] 1 = localhost/s_1_001_replicating
-  [1] 2 = localhost/s_1_002_replicating
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> BlockedShard)
+    delete_shard(BlockedShard)
+Applied to 4 shards
 
 STARTING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [1] 1 = localhost/s_1_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [1] 2 = localhost/s_1_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [1] X = localhost/s_1_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [1] X = localhost/s_1_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
 COPIES:
-  localhost/s_0_001_a -> 127.0.0.1/s_0_0001
-  localhost/s_0_002_a -> 127.0.0.1/s_0_0002
-  localhost/s_1_001_a -> 127.0.0.1/s_1_0001
-  localhost/s_1_002_a -> 127.0.0.1/s_1_0002
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_1_00X_a <-> 127.0.0.1/s_1_000X
+  localhost/s_1_00X_a <-> 127.0.0.1/s_1_000X
 FINISHING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [0] 2 = localhost/s_0_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [1] 1 = localhost/s_1_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-  [1] 2 = localhost/s_1_002_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-4 transformations applied. Total time elapsed: 1 second
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [1] X = localhost/s_1_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+  [1] X = localhost/s_1_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
+4 transformations applied. Total time elapsed: X second
       EOF
 
       nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
@@ -616,27 +607,23 @@ FINISHING:
 
       gizzmo('-f -T0 rebalance --no-progress --poll-interval=1 \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
-1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d")))
+1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
   PREPARE
     create_shard(TestShard/127.0.0.1)
-    create_shard(WriteOnlyShard)
-    add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> WriteOnlyShard)
+    create_shard(BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
+    add_link(ReplicatingShard -> BlockedShard)
   COPY
-    copy_shard(TestShard/127.0.0.1)
+    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> TestShard/localhost)
-    remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> WriteOnlyShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> BlockedShard)
     delete_shard(TestShard/localhost)
-    delete_shard(WriteOnlyShard)
-Applied to 4 shards:
-  [0] X = localhost/s_0_00X_replicating
-  [0] X = localhost/s_0_00X_replicating
-  [0] X = localhost/s_0_00X_replicating
-  [0] X = localhost/s_0_00X_replicating
+    delete_shard(BlockedShard)
+Applied to 4 shards
 
 STARTING:
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
@@ -644,16 +631,16 @@ STARTING:
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
 COPIES:
-  localhost/s_0_00X_a -> 127.0.0.1/s_0_000X
-  localhost/s_0_00X_a -> 127.0.0.1/s_0_000X
-  localhost/s_0_00X_a -> 127.0.0.1/s_0_000X
-  localhost/s_0_00X_a -> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
+  localhost/s_0_00X_a <-> 127.0.0.1/s_0_000X
 FINISHING:
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   [0] X = localhost/s_0_00X_replicating: ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1)
-4 transformations applied. Total time elapsed: 1 second
+4 transformations applied. Total time elapsed: X second
       EOF
     end
   end

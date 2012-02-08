@@ -47,7 +47,7 @@ package object config {
 
     loggers = List(
       new LoggerConfig {
-        level = Level.ERROR
+        level = Level.DEBUG
         handlers = List(new ConsoleHandlerConfig)
       }
     )
