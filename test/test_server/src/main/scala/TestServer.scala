@@ -47,7 +47,7 @@ package object config {
 
     loggers = List(
       new LoggerConfig {
-        level = Level.DEBUG
+        level = Level.INFO
         handlers = List(new ConsoleHandlerConfig)
       }
     )

@@ -25,6 +25,7 @@ module Gizzard
       @copies_per_host    = options[:copies_per_host]
       @poll_interval      = options[:poll_interval]
       @be_quiet           = options[:quiet]
+      @force              = options[:force] || false
       @dont_show_progress = options[:no_progress] || @be_quiet
       @batch_finish       = options[:batch_finish]
 
@@ -171,12 +172,12 @@ module Gizzard
       jobs.each do |j|
         log "  #{j.inspect}"
       end
-      Gizzard::confirm!("Finished copies: destination shards are now receiving writes, but " +
+      Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
       jobs.each do |j|
         j.settle_end!(nameserver)
       end
-      Gizzard::confirm!("Destination shards are now receiving reads and writes. Wait until " +
+      Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
                         "caches are warmed, and then enter 'y' to proceed.")
     end
 

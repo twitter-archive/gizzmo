@@ -3,7 +3,8 @@ require "set"
 require "digest/md5"
 
 module Gizzard
-  def Gizzard::confirm!(message="Continue?")
+  def Gizzard::confirm!(force=false, message="Continue?")
+    return if force
     begin
       print "#{message} (y/n) "; $stdout.flush
       resp = $stdin.gets.chomp.downcase
@@ -113,9 +114,7 @@ module Gizzard
     end
 
     def confirm!
-      unless global_options.force
-        Gizzard::confirm!("Continue?")
-      end
+      Gizzard::confirm!(global_options.force, "Continue?")
     end
 
     # TODO: since this is transform specific, it should move into BaseTransformCommand
@@ -836,8 +835,10 @@ module Gizzard
   class BaseTransformCommand < Command
     def run
       scheduler_options = command_options.scheduler_options || {}
-      be_quiet          = global_options.force && command_options.quiet
+      force             = global_options.force
+      be_quiet          = force && command_options.quiet
 
+      scheduler_options[:force] = force
       scheduler_options[:quiet] = be_quiet
 
       # confirm that all app servers are relatively consistent
