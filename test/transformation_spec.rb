@@ -12,7 +12,7 @@ describe Gizzard::Transformation do
   def remove_forwarding(t); Op::RemoveForwarding.new(mk_template(t)) end
 
   def empty_ops
-    Hash[[:prepare, :copy, :cleanup, :repair, :diff].map {|key| [key, []]}]
+    Hash[[:prepare, :copy, :cleanup, :repair, :diff, :settle_begin, :settle_end].map {|key| [key, []]}]
   end
 
   before do
@@ -71,34 +71,64 @@ describe Gizzard::Transformation do
       })
     end
 
-    it "does a partition migration" do
+    describe "does a partition migration" do
       from = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
       to   = mk_template 'ReplicatingShard -> (SqlShard(host3), SqlShard(host4))'
 
-      Gizzard::Transformation.new(from, to).operations.should == empty_ops.merge({
-        :prepare => [ create_shard('SqlShard(host4)'),
-                      create_shard('WriteOnlyShard'),
-                      create_shard('WriteOnlyShard'),
-                      create_shard('SqlShard(host3)'),
-                      add_link('ReplicatingShard', 'WriteOnlyShard'),
-                      add_link('WriteOnlyShard', 'SqlShard(host4)'),
-                      add_link('WriteOnlyShard', 'SqlShard(host3)'),
-                      add_link('ReplicatingShard', 'WriteOnlyShard') ],
-        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
-                      copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
-        :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host4)'),
-                      add_link('ReplicatingShard', 'SqlShard(host3)'),
-                      remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                      remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                      remove_link('WriteOnlyShard', 'SqlShard(host3)'),
-                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
-                      remove_link('ReplicatingShard', 'SqlShard(host2)'),
-                      remove_link('WriteOnlyShard', 'SqlShard(host4)'),
-                      delete_shard('SqlShard(host1)'),
-                      delete_shard('SqlShard(host2)'),
-                      delete_shard('WriteOnlyShard'),
-                      delete_shard('WriteOnlyShard') ]
-      })
+      it "in standard mode" do
+        Gizzard::Transformation.new(from, to).operations.should == empty_ops.merge({
+          :prepare => [ create_shard('SqlShard(host4)'),
+                        create_shard('WriteOnlyShard'),
+                        create_shard('WriteOnlyShard'),
+                        create_shard('SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard'),
+                        add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        add_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard') ],
+          :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
+                        copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+          :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host4)'),
+                        add_link('ReplicatingShard', 'SqlShard(host3)'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                        remove_link('ReplicatingShard', 'SqlShard(host2)'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        delete_shard('SqlShard(host1)'),
+                        delete_shard('SqlShard(host2)'),
+                        delete_shard('WriteOnlyShard'),
+                        delete_shard('WriteOnlyShard') ]
+        })
+      end
+
+      it "in batch mode" do
+        batch_finish = true
+        Gizzard::Transformation.new(from, to, nil, false, batch_finish).operations.should == empty_ops.merge({
+          :prepare => [ create_shard('SqlShard(host4)'),
+                        create_shard('WriteOnlyShard'),
+                        create_shard('WriteOnlyShard'),
+                        create_shard('SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard'),
+                        add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        add_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard') ],
+          :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
+                        copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+          :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host4)'),
+                        add_link('ReplicatingShard', 'SqlShard(host3)'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                        remove_link('ReplicatingShard', 'SqlShard(host2)'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        delete_shard('SqlShard(host1)'),
+                        delete_shard('SqlShard(host2)'),
+                        delete_shard('WriteOnlyShard'),
+                        delete_shard('WriteOnlyShard') ]
+        })
+      end
     end
 
     it "migrates the top level shard" do
@@ -113,9 +143,7 @@ describe Gizzard::Transformation do
                       remove_forwarding('ReplicatingShard'),
                       remove_link('ReplicatingShard', 'SqlShard(host1)'),
                       remove_link('ReplicatingShard', 'SqlShard(host2)'),
-                      delete_shard('ReplicatingShard') ],
-        :copy =>    [],
-        :cleanup => []
+                      delete_shard('ReplicatingShard') ]
       })
     end
 
@@ -127,9 +155,7 @@ describe Gizzard::Transformation do
         :prepare => [ create_shard('ReadOnlyShard'),
                       add_link('ReadOnlyShard', 'SqlShard(host1)'),
                       add_link('ReplicatingShard', 'ReadOnlyShard'),
-                      remove_link('ReplicatingShard', 'SqlShard(host1)') ],
-        :copy =>    [],
-        :cleanup => []
+                      remove_link('ReplicatingShard', 'SqlShard(host1)') ]
       })
     end
 
