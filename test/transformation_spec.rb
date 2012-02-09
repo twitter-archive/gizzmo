@@ -105,6 +105,28 @@ describe Gizzard::Transformation do
       it "in batch mode" do
         batch_finish = true
         Gizzard::Transformation.new(from, to, nil, false, batch_finish).operations.should == empty_ops.merge({
+          :settle_begin =>
+                      [ create_shard('WriteOnlyShard'),
+                        create_shard('WriteOnlyShard'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard'),
+                        add_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('ReplicatingShard', 'BlockedShard'),
+                        remove_link('BlockedShard', 'SqlShard(host3)'),
+                        remove_link('BlockedShard', 'SqlShard(host4)'),
+                        remove_link('ReplicatingShard', 'BlockedShard'),
+                        delete_shard('BlockedShard'),
+                        delete_shard('BlockedShard')],
+          :settle_end =>
+                      [ add_link('ReplicatingShard', 'SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'SqlShard(host4)'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host3)'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        delete_shard('WriteOnlyShard'),
+                        delete_shard('WriteOnlyShard')],
           :prepare => [ create_shard('SqlShard(host4)'),
                         create_shard('BlockedShard'),
                         create_shard('BlockedShard'),
@@ -113,34 +135,12 @@ describe Gizzard::Transformation do
                         add_link('BlockedShard', 'SqlShard(host4)'),
                         add_link('BlockedShard', 'SqlShard(host3)'),
                         add_link('ReplicatingShard', 'BlockedShard') ],
-          :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
-                        copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
-          :settle_begin =>
-                      [ create_shard('WriteOnlyShard'),
-                        create_shard('WriteOnlyShard'),
-                        add_link('ReplicatingShard', 'WriteOnlyShard'),
-                        add_link('ReplicatingShard', 'WriteOnlyShard'),
-                        remove_link('ReplicatingShard', 'BlockedShard'),
-                        remove_link('ReplicatingShard', 'BlockedShard'),
-                        delete_shard('BlockedShard'),
-                        delete_shard('BlockedShard'),
-                        ],
-          :settle_end =>
-                      [ add_link('ReplicatingShard', 'SqlShard(host3)'),
-                        add_link('ReplicatingShard', 'SqlShard(host4)'),
-                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                        delete_shard('WriteOnlyShard'),
-                        delete_shard('WriteOnlyShard')
-                        ],
-          :cleanup => [ remove_link('WriteOnlyShard', 'SqlShard(host3)'),
+          :cleanup => [ remove_link('ReplicatingShard', 'SqlShard(host2)'),
                         remove_link('ReplicatingShard', 'SqlShard(host1)'),
-                        remove_link('ReplicatingShard', 'SqlShard(host2)'),
-                        remove_link('WriteOnlyShard', 'SqlShard(host4)'),
-                        delete_shard('SqlShard(host1)'),
                         delete_shard('SqlShard(host2)'),
-                        delete_shard('WriteOnlyShard'),
-                        delete_shard('WriteOnlyShard') ]
+                        delete_shard('SqlShard(host1)') ],
+          :copy =>    [ copy_shard('SqlShard(host2)', 'SqlShard(host4)'),
+                        copy_shard('SqlShard(host2)', 'SqlShard(host3)') ]
         })
       end
     end
