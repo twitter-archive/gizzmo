@@ -343,50 +343,13 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
   end
 
   describe "transform-tree" do
-    before :each do
+    it "works" do
       ns.create_shard info("localhost", "s_0_001_a", "TestShard", "Int", "Int")
       ns.create_shard info("localhost", "s_0_001_replicating", "ReplicatingShard")
       ns.add_link id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1
       ns.set_forwarding forwarding(0, 1, id("localhost", "s_0_001_replicating"))
       ns.reload_config
-    end
-    it "works in standard mode" do
-      gizzmo('-f transform-tree --no-progress --poll-interval=1 \
-"ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
-localhost/s_0_001_replicating').should == <<-EOF
-ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
-  PREPARE
-    create_shard(TestShard/127.0.0.1)
-    create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
-    add_link(ReplicatingShard -> BlockedShard)
-  COPY
-    copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
-  CLEANUP
-    add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> BlockedShard)
-    delete_shard(BlockedShard)
-Applied to 1 shards
 
-STARTING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-COPIES:
-  localhost/s_0_001_a <-> 127.0.0.1/s_0_0001
-FINISHING:
-  [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-1 transformation applied. Total time elapsed: 1 second
-      EOF
-
-      nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
-                                        info("localhost", "s_0_001_a", "TestShard", "Int", "Int"),
-                                        info("localhost", "s_0_001_replicating", "ReplicatingShard")]
-
-      nameserver_db[:links].should == [link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),
-                                       link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1)]
-    end
-
-    it "works in batch mode" do
       gizzmo('-f transform-tree --no-progress --poll-interval=1 \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
 localhost/s_0_001_replicating').should == <<-EOF
