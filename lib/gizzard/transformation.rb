@@ -37,11 +37,21 @@ module Gizzard
       Op::DiffShards       => 9
     }
 
+    OP_PHASES = {
+      :prepare => "PREPARE",
+      :copy => "COPY",
+      :repair => "REPAIR",
+      :unblock_writes => "UNBLOCK_WRITES",
+      :unblock_reads => "UNBLOCK_READS",
+      :cleanup => "CLEANUP",
+      :diff => "DIFF"
+    }
+
     DEFAULT_DEST_WRAPPER = 'BlockedShard'
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 
-    def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false)
+    def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false, batch_finish = false)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 
       unless Shard::VIRTUAL_SHARD_TYPES.include? copy_dest_wrapper
@@ -52,6 +62,7 @@ module Gizzard
       @to   = to_template
       @copy_dest_wrapper = copy_dest_wrapper
       @skip_copies = skip_copies
+      @batch_finish = batch_finish
 
       if copies_required? && copy_source.nil?
         raise ArgumentError, "copy required without a valid copy source"
@@ -87,6 +98,11 @@ module Gizzard
       from.hash + to.hash + copy_dest_wrapper.hash
     end
 
+    # create a map of empty phase lists
+    def initialize_op_phases
+      Hash[OP_PHASES.keys.map do |phase| [phase, []] end]
+    end
+
     def inspect
       # TODO: Need to limit this to e.g. 10 ops in the list, and show a total
       # count instead of showing the whole thing.
@@ -96,18 +112,19 @@ module Gizzard
 
       # TODO: This seems kind of daft to copy around these long strings.
       # Loop over it once just for display?
-      prepare_inspect = op_inspect[:prepare].empty? ? "" : "  PREPARE\n#{op_inspect[:prepare]}\n"
-      copy_inspect    = op_inspect[:copy].empty?    ? "" : "  COPY\n#{op_inspect[:copy]}\n"
-      repair_inspect  = op_inspect[:repair].empty?  ? "" : "  REPAIR\n#{op_inspect[:repair]}\n"
-      diff_inspect    = op_inspect[:diff].empty?  ? "" : "  DIFF\n#{op_inspect[:diff]}\n"
-      cleanup_inspect = op_inspect[:cleanup].empty? ? "" : "  CLEANUP\n#{op_inspect[:cleanup]}\n"
+      phase_line = lambda do |phase|
+        op_inspect[phase].empty? ? "" : "  #{OP_PHASES[phase]}\n#{op_inspect[phase]}\n"
+      end
 
+      # display phase lists in a particular order
       op_inspect = [
-        prepare_inspect,
-        copy_inspect,
-        repair_inspect,
-        diff_inspect,
-        cleanup_inspect,
+        phase_line.call(:prepare),
+        phase_line.call(:copy),
+        phase_line.call(:repair),
+        phase_line.call(:diff),
+        phase_line.call(:unblock_writes),
+        phase_line.call(:unblock_reads),
+        phase_line.call(:cleanup)
       ].join
 
       "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
@@ -140,8 +157,8 @@ module Gizzard
     end
 
     def expand_jobs(jobs)
-      expanded = jobs.inject({:prepare => [], :copy => [], :repair => [], :cleanup => [], :diff => []}) do |ops, job|
-        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template))
+      expanded = jobs.inject(initialize_op_phases) do |ops, job|
+        job_ops = job.expand(self.copy_source, involved_in_copy?(job.template), @batch_finish)
         ops.update(job_ops) {|k,a,b| a + b }
       end
 
@@ -212,7 +229,6 @@ module Gizzard
     end
   end
 
-
   class BoundTransformation
     attr_reader :transformation, :base_name, :forwarding, :shard
 
@@ -232,6 +248,8 @@ module Gizzard
       @translations   = shard.canonical_shard_id_map(base_name, @table_id, @enum)
     end
 
+    # TODO: replace with single execute(:nameserver, :phase) method?
+
     def prepare!(nameserver)
       apply_ops(nameserver, transformation.operations[:prepare])
     end
@@ -242,6 +260,18 @@ module Gizzard
 
     def copy!(nameserver)
       apply_ops(nameserver, transformation.operations[:copy])
+    end
+
+    def unblock_required?
+      !transformation.operations[:unblock_writes].empty? || !transformation.operations[:unblock_reads].empty?
+    end
+
+    def unblock_writes!(nameserver)
+      apply_ops(nameserver, transformation.operations[:unblock_writes])
+    end
+
+    def unblock_reads!(nameserver)
+      apply_ops(nameserver, transformation.operations[:unblock_reads])
     end
 
     def cleanup!(nameserver)
