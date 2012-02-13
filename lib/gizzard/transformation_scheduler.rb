@@ -1,4 +1,5 @@
 require "set"
+require "gizzard/commands"
 
 module Gizzard
   def self.schedule!(*args)
@@ -24,10 +25,12 @@ module Gizzard
       @copies_per_host    = options[:copies_per_host]
       @poll_interval      = options[:poll_interval]
       @be_quiet           = options[:quiet]
+      @force              = options[:force] || false
       @dont_show_progress = options[:no_progress] || @be_quiet
       @batch_finish       = options[:batch_finish]
 
-      @jobs_in_progress = []
+      @jobs_copying     = []
+      @jobs_settling    = []
       @jobs_finished    = []
 
       @jobs_pending = Set.new(transformations.map do |transformation, forwardings_to_shards|
@@ -40,13 +43,18 @@ module Gizzard
     # 2. run prepare ops
     # 3. reload app servers
     # 4. schedule copy
-    # 5. put in jobs_in_progress
+    # 5. put in jobs_copying
 
-    # on job completion:
-    # 1. run cleanup ops
-    # 2. remove from jobs_in_progress
-    # 3. put in jos_finished
-    # 4. schedule a new job or reload app servers.
+    # on job copy completion 
+    # 1. (if in batch_finish mode) execute unblock_writes operations
+    # 2. move to jobs_settling
+
+    # on job completion (or when all jobs have completed, in batch finish mode):
+    # 1. run unblock_reads operations
+    # 2. run cleanup ops
+    # 3. remove from jobs_settling
+    # 4. put in jobs_finished
+    # 5. schedule a new job or reload app servers.
 
     def apply!
       @start_time = Time.now
@@ -54,11 +62,16 @@ module Gizzard
       
       loop do
         reload_busy_shards
-        cleanup_jobs if !@batch_finish
+        begin_settling_jobs
+        if !@batch_finish
+          cleanup_jobs
+        end
         schedule_jobs(max_copies - busy_shards.length)
 
-        cleanup_jobs if @batch_finish && @jobs_pending.empty? && jobs_completed == @jobs_in_progress
-        break if @jobs_pending.empty? && @jobs_in_progress.empty?
+        if @batch_finish && @jobs_pending.empty? && @jobs_copying.empty?
+          cleanup_jobs
+        end
+        break if @jobs_pending.empty? && @jobs_copying.empty? && @jobs_settling.empty?
 
         unless nameserver.dryrun?
           if @dont_show_progress
@@ -112,15 +125,19 @@ module Gizzard
           reload_busy_shards
         end
 
-        @jobs_in_progress.concat(jobs)
+        @jobs_copying.concat(jobs)
       end
     end
 
     def cleanup_jobs
-      jobs = jobs_completed
+      jobs = @jobs_settling
 
       unless jobs.empty?
-        @jobs_in_progress -= jobs
+        @jobs_settling -= jobs
+
+        if jobs.any? { |job| job.unblock_required? }
+          end_settling_jobs(jobs)
+        end
 
         log "FINISHING:"
         jobs.each do |j|
@@ -132,8 +149,40 @@ module Gizzard
       end
     end
 
-    def jobs_completed
-      @jobs_in_progress.select {|j| (busy_shards & j.involved_shards).empty? }
+    # performs the ":unblock_writes" phase, which occurs immediately as each copy finishes
+    # note that this may be a noop, but either way, jobs will move from copying to settling
+    def begin_settling_jobs
+      jobs = jobs_copied
+
+      unless jobs.empty?
+        @jobs_copying -= jobs
+        jobs.each do |j|
+          if j.unblock_required?
+            j.unblock_writes!(nameserver)
+          end
+        end
+        @jobs_settling.concat(jobs)
+      end
+    end
+
+    # performs the ":unblock_reads" phase, which is surrounded by operator controlled pauses
+    # to allow for 1) app server queues to drain, 2) caches to warm
+    def end_settling_jobs(jobs)
+      log "SETTLING:"
+      jobs.each do |j|
+        log "  #{j.inspect}"
+      end
+      Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
+                        "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
+      jobs.each do |j|
+        j.unblock_reads!(nameserver)
+      end
+      Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
+                        "caches are warmed, and then enter 'y' to proceed.")
+    end
+
+    def jobs_copied
+      @jobs_copying.select {|j| (busy_shards & j.involved_shards).empty? }
     end
 
     def reload_busy_shards
@@ -186,16 +235,16 @@ module Gizzard
       @i ||= 0
       @i  += 1
 
-      unless @jobs_in_progress.empty? || busy_shards.empty?
+      unless @jobs_copying.empty? || busy_shards.empty?
         spinner         = ['-', '\\', '|', '/'][@i % 4]
         elapsed_txt     = "Time elapsed: #{time_elapsed}"
         pending_txt     = "Pending: #{@jobs_pending.length}"
         finished_txt    = "Finished: #{@jobs_finished.length}"
         in_progress_txt =
-          if busy_shards.length != @jobs_in_progress.length
-            "In progress: #{@jobs_in_progress.length} (Copies: #{busy_shards.length})"
+          if busy_shards.length != @jobs_copying.length
+            "In progress: #{@jobs_copying.length} (Copies: #{busy_shards.length})"
           else
-            "In progress: #{@jobs_in_progress.length}"
+            "In progress: #{@jobs_copying.length}"
           end
 
         clear_progress_string

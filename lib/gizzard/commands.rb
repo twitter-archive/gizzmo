@@ -3,6 +3,19 @@ require "set"
 require "digest/md5"
 
 module Gizzard
+  def Gizzard::confirm!(force=false, message="Continue?")
+    return if force
+    begin
+      print "#{message} (y/n) "; $stdout.flush
+      resp = $stdin.gets.chomp.downcase
+      puts ""
+    end while resp != 'y' && resp != 'n'
+    if resp == 'n'
+      puts "Exiting."
+      exit
+    end
+  end
+
   class Command
 
     attr_reader :buffer
@@ -100,15 +113,8 @@ module Gizzard
       transformations.values.find {|v| v.is_a?(Hash) && !v.values.empty? }.values.find {|v| !v.nil?}.id.table_prefix.split('_').first
     end
 
-    def confirm!(message="Continue?")
-      unless global_options.force
-        begin
-        print "#{message} (y/n) "; $stdout.flush
-        resp = $stdin.gets.chomp.downcase
-        puts ""
-        end while resp != 'y' && resp != 'n'
-        exit if resp == 'n'
-      end
+    def confirm!
+      Gizzard::confirm!(global_options.force, "Continue?")
     end
 
     # TODO: since this is transform specific, it should move into BaseTransformCommand
@@ -829,8 +835,10 @@ module Gizzard
   class BaseTransformCommand < Command
     def run
       scheduler_options = command_options.scheduler_options || {}
-      be_quiet          = global_options.force && command_options.quiet
+      force             = global_options.force
+      be_quiet          = force && command_options.quiet
 
+      scheduler_options[:force] = force
       scheduler_options[:quiet] = be_quiet
 
       # confirm that all app servers are relatively consistent
@@ -872,6 +880,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       copy_wrapper   = scheduler_options[:copy_wrapper]
       skip_copies    = scheduler_options[:skip_copies] || false
+      batch_finish   = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       memoized_transforms = {}
@@ -883,7 +892,7 @@ module Gizzard
         manifest       = manifest_for_write(forwarding.table_id)
         shard          = manifest.trees[forwarding]
 
-        transform_args = [shard.template, to_template, copy_wrapper, skip_copies]
+        transform_args = [shard.template, to_template, copy_wrapper, skip_copies, batch_finish]
         transformation = memoized_transforms.fetch(transform_args) do |args|
           memoized_transforms[args] = Transformation.new(*args)
         end
@@ -907,11 +916,12 @@ module Gizzard
       manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
       skip_copies       = scheduler_options[:skip_copies] || false
+      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper, skip_copies)
+        transformation = Transformation.new(from, to, copy_wrapper, skip_copies, batch_finish)
         forwardings    = Set.new(manifest.templates[from] || [])
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
@@ -931,6 +941,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
+      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       dest_templates_and_weights = {}
@@ -944,7 +955,7 @@ module Gizzard
 
       global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
@@ -959,6 +970,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
+      batch_finish      = scheduler_options[:batch_finish] || false
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
 
@@ -982,7 +994,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
@@ -1019,6 +1031,7 @@ module Gizzard
       scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
       copy_wrapper      = scheduler_options[:copy_wrapper]
+      batch_finish      = scheduler_options[:batch_finish] || false
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
 
@@ -1038,7 +1051,7 @@ module Gizzard
 
       transformations = global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end

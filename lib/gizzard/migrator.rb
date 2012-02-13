@@ -20,13 +20,14 @@ module Gizzard
     # populated via derive_changes
     attr_reader :new_templates, :unrecognized_templates, :similar_templates, :unchanged_templates
 
-    def initialize(existing_map, config_templates, default_total_shards, config)
+    def initialize(existing_map, config_templates, default_total_shards, config, batch_finish)
       @configured_templates = config_templates
       @existing_map = existing_map
 
       @existing_templates = existing_map.keys
       @total_shards = @existing_map.values.map { |a| a.length }.inject { |a, b| a + b } || default_total_shards
       @config = config
+      @batch_finish = batch_finish
 
       derive_changes
     end
@@ -65,6 +66,7 @@ module Gizzard
         # be rebalanced later.
         configured_map.values.first.concat forwardings.values
 
+        # TODO: ForwardingTransformation does not appear to be defined anywhere? dead codepath?
         @transformations << ForwardingTransformation.new(@config.table_id, forwardings.inject({}) {|f, (b, e)| f.update b => @config.shard_name(e) })
       end
 
@@ -140,7 +142,7 @@ module Gizzard
       # transformation for each one.
       (configured_shards.to_a - existing_shards.to_a).inject({}) do |transformations, (shard, to)|
         from = existing_shards[shard]
-        (transformations[[from, to]] ||= Transformation.new(from, to, [])).shards << shard
+        (transformations[[from, to]] ||= Transformation.new(from, to, :batch_finish => @batch_finish)).shards << shard
         transformations
       end.values
     end

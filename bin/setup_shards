@@ -104,7 +104,7 @@ existing_map = manifest.template_map
 puts "\nCalculating changes...\n"
 
 
-migrator = Gizzard::Migrator.new(existing_map, new_templates, total_shards, migrator_config)
+migrator = Gizzard::Migrator.new(existing_map, new_templates, total_shards, migrator_config, false)
 
 puts "\nUNCHANGED:"
 pp migrator.unchanged_templates
