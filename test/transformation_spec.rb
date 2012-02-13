@@ -12,7 +12,7 @@ describe Gizzard::Transformation do
   def remove_forwarding(t); Op::RemoveForwarding.new(mk_template(t)) end
 
   def empty_ops
-    Hash[[:prepare, :copy, :cleanup, :repair, :diff, :settle_begin, :settle_end].map {|key| [key, []]}]
+    Hash[[:prepare, :copy, :cleanup, :repair, :diff, :unblock_writes, :unblock_reads].map {|key| [key, []]}]
   end
 
   before do
@@ -105,7 +105,7 @@ describe Gizzard::Transformation do
       it "in batch mode" do
         batch_finish = true
         Gizzard::Transformation.new(from, to, nil, false, batch_finish).operations.should == empty_ops.merge({
-          :settle_begin =>
+          :unblock_writes =>
                       [ create_shard('WriteOnlyShard'),
                         create_shard('WriteOnlyShard'),
                         add_link('ReplicatingShard', 'WriteOnlyShard'),
@@ -118,7 +118,7 @@ describe Gizzard::Transformation do
                         remove_link('ReplicatingShard', 'BlockedShard'),
                         delete_shard('BlockedShard'),
                         delete_shard('BlockedShard')],
-          :settle_end =>
+          :unblock_reads =>
                       [ add_link('ReplicatingShard', 'SqlShard(host3)'),
                         add_link('ReplicatingShard', 'SqlShard(host4)'),
                         remove_link('ReplicatingShard', 'WriteOnlyShard'),

@@ -118,10 +118,10 @@ module Gizzard
             :cleanup => [self, RemoveLink.new(from, copy_wrapper)] }
         elsif batch_finish && involved_in_copy && @wrapper_type
           copy_wrapper = ShardTemplate.new(@wrapper_type, to.host, to.weight, '', '', [to])
-          settle_wrapper = ShardTemplate.new('WriteOnlyShard', to.host, to.weight, '', '', [to])
+          unblock_write_wrapper = ShardTemplate.new('WriteOnlyShard', to.host, to.weight, '', '', [to])
           { :prepare => [AddLink.new(from, copy_wrapper)],
-            :settle_begin => [AddLink.new(from, settle_wrapper), RemoveLink.new(from, copy_wrapper)],
-            :settle_end => [self, RemoveLink.new(from, settle_wrapper)] }
+            :unblock_writes => [AddLink.new(from, unblock_write_wrapper), RemoveLink.new(from, copy_wrapper)],
+            :unblock_reads => [self, RemoveLink.new(from, unblock_write_wrapper)] }
         else
           { :prepare => [self] }
         end
@@ -175,11 +175,11 @@ module Gizzard
             :copy => [CopyShard.new(copy_source, template)] }
         elsif batch_finish && involved_in_copy && @wrapper_type
           copy_wrapper = ShardTemplate.new(@wrapper_type, template.host, template.weight, '', '', [template])
-          settle_wrapper = ShardTemplate.new('WriteOnlyShard', template.host, template.weight, '', '', [template])
+          unblock_write_wrapper = ShardTemplate.new('WriteOnlyShard', template.host, template.weight, '', '', [template])
           { :prepare => [self, CreateShard.new(copy_wrapper), AddLink.new(copy_wrapper, template)],
-            :settle_begin => [RemoveLink.new(copy_wrapper, template), DeleteShard.new(copy_wrapper),
-              CreateShard.new(settle_wrapper), AddLink.new(settle_wrapper, template)],
-            :settle_end => [RemoveLink.new(settle_wrapper, template), DeleteShard.new(settle_wrapper)],
+            :unblock_writes => [RemoveLink.new(copy_wrapper, template), DeleteShard.new(copy_wrapper),
+              CreateShard.new(unblock_write_wrapper), AddLink.new(unblock_write_wrapper, template)],
+            :unblock_reads => [RemoveLink.new(unblock_write_wrapper, template), DeleteShard.new(unblock_write_wrapper)],
             :copy => [CopyShard.new(copy_source, template)] }
         elsif involved_in_copy
           # TODO: when would a wrapper type not be defined? should this still be supported?
@@ -214,10 +214,10 @@ module Gizzard
             :cleanup => [self] }
         elsif batch_finish && involved_in_copy && @wrapper_type
           copy_wrapper = ShardTemplate.new(@wrapper_type, nil, 0, '', '', [to])
-          settle_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [to])
+          unblock_write_wrapper = ShardTemplate.new('WriteOnlyShard', nil, 0, '', '', [to])
           { :prepare => [SetForwarding.new(template, copy_wrapper)],
-            :settle_begin => [SetForwarding.new(template, settle_wrapper)],
-            :settle_end => [self] }
+            :unblock_writes => [SetForwarding.new(template, unblock_write_wrapper)],
+            :unblock_reads => [self] }
         else
           { :prepare => [self] }
         end

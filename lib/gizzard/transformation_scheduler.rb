@@ -46,11 +46,11 @@ module Gizzard
     # 5. put in jobs_copying
 
     # on job copy completion 
-    # 1. (if in batch_finish mode) execute settle_begin operations
+    # 1. (if in batch_finish mode) execute unblock_writes operations
     # 2. move to jobs_settling
 
     # on job completion (or when all jobs have completed, in batch finish mode):
-    # 1. run settle_end operations
+    # 1. run unblock_reads operations
     # 2. run cleanup ops
     # 3. remove from jobs_settling
     # 4. put in jobs_finished
@@ -135,7 +135,7 @@ module Gizzard
       unless jobs.empty?
         @jobs_settling -= jobs
 
-        if jobs.any? { |job| job.settle_required? }
+        if jobs.any? { |job| job.unblock_required? }
           end_settling_jobs(jobs)
         end
 
@@ -149,7 +149,7 @@ module Gizzard
       end
     end
 
-    # performs the ":settle_begin" phase, which occurs immediately as each copy finishes
+    # performs the ":unblock_writes" phase, which occurs immediately as each copy finishes
     # note that this may be a noop, but either way, jobs will move from copying to settling
     def begin_settling_jobs
       jobs = jobs_copied
@@ -157,15 +157,15 @@ module Gizzard
       unless jobs.empty?
         @jobs_copying -= jobs
         jobs.each do |j|
-          if j.settle_required?
-            j.settle_begin!(nameserver)
+          if j.unblock_required?
+            j.unblock_writes!(nameserver)
           end
         end
         @jobs_settling.concat(jobs)
       end
     end
 
-    # performs the ":settle_end" phase, which is surrounded by operator controlled pauses
+    # performs the ":unblock_reads" phase, which is surrounded by operator controlled pauses
     # to allow for 1) app server queues to drain, 2) caches to warm
     def end_settling_jobs(jobs)
       log "SETTLING:"
@@ -175,7 +175,7 @@ module Gizzard
       Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
       jobs.each do |j|
-        j.settle_end!(nameserver)
+        j.unblock_reads!(nameserver)
       end
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
                         "caches are warmed, and then enter 'y' to proceed.")

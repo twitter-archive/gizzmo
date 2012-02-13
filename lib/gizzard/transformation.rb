@@ -41,8 +41,8 @@ module Gizzard
       :prepare => "PREPARE",
       :copy => "COPY",
       :repair => "REPAIR",
-      :settle_begin => "SETTLE_BEGIN",
-      :settle_end => "SETTLE_END",
+      :unblock_writes => "UNBLOCK_WRITES",
+      :unblock_reads => "UNBLOCK_READS",
       :cleanup => "CLEANUP",
       :diff => "DIFF"
     }
@@ -122,8 +122,8 @@ module Gizzard
         phase_line.call(:copy),
         phase_line.call(:repair),
         phase_line.call(:diff),
-        phase_line.call(:settle_begin),
-        phase_line.call(:settle_end),
+        phase_line.call(:unblock_writes),
+        phase_line.call(:unblock_reads),
         phase_line.call(:cleanup)
       ].join
 
@@ -262,16 +262,16 @@ module Gizzard
       apply_ops(nameserver, transformation.operations[:copy])
     end
 
-    def settle_required?
-      !transformation.operations[:settle_begin].empty? || !transformation.operations[:settle_end].empty?
+    def unblock_required?
+      !transformation.operations[:unblock_writes].empty? || !transformation.operations[:unblock_reads].empty?
     end
 
-    def settle_begin!(nameserver)
-      apply_ops(nameserver, transformation.operations[:settle_begin])
+    def unblock_writes!(nameserver)
+      apply_ops(nameserver, transformation.operations[:unblock_writes])
     end
 
-    def settle_end!(nameserver)
-      apply_ops(nameserver, transformation.operations[:settle_end])
+    def unblock_reads!(nameserver)
+      apply_ops(nameserver, transformation.operations[:unblock_reads])
     end
 
     def cleanup!(nameserver)
