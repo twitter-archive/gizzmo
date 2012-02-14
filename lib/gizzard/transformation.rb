@@ -181,15 +181,15 @@ module Gizzard
     end
 
     def involved_in_copy?(template)
-      copy_source?(template) || copy_destination?(template)
+      in_copied_subtree?(template) || copy_destination?(template)
     end
 
     def copy_destination?(template)
       copies_required? && template.concrete? && !from.shared_host?(template)
     end
 
-    def copy_source?(template)
-      copies_required? && !!from.copy_sources.find {|s| s.shard_eql? template }
+    def in_copied_subtree?(template)
+      copies_required? && !!from.descendants.find {|s| s.shard_eql? template }
     end
 
     def copy_source
