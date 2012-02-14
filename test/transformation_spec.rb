@@ -167,32 +167,32 @@ describe Gizzard::Transformation do
       rebalancer.transformations.size.should == 1
       transformation = rebalancer.transformations.clone.shift[0]
       transformation.operations.should == empty_ops.merge({
-        :prepare => [ create_shard('WriteOnlyShard'),
+        :prepare => [ create_shard('SqlShard(host4)'),
                       create_shard('BlockedShard'),
-                      create_shard('SqlShard(host4)'),
                       create_shard('BlockedShard'),
                       create_shard('SqlShard(host3)'),
-                      add_link('WriteOnlyShard', 'BlockedShard'),
-                      add_link('BlockedShard', 'SqlShard(host3)'),
+                      create_shard('WriteOnlyShard'),
                       add_link('ReplicatingShard', 'WriteOnlyShard'),
+                      add_link('WriteOnlyShard', 'BlockedShard'),
                       add_link('BlockedShard', 'SqlShard(host4)'),
+                      add_link('BlockedShard', 'SqlShard(host3)'),
                       add_link('ReplicatingShard', 'BlockedShard') ],
-        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host3)'),
-                      copy_shard('SqlShard(host1)', 'SqlShard(host4)') ],
-        :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host3)'),
-                      add_link('WriteOnlyShard', 'SqlShard(host4)'),
-                      remove_link('ReplicatingShard', 'BlockedShard'),
+        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
+                      copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+        :cleanup => [ add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                      add_link('ReplicatingShard', 'SqlShard(host3)'),
+                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                      remove_link('BlockedShard', 'SqlShard(host3)'),
+                      remove_link('ReplicatingShard', 'WriteOnlyShard'),
                       remove_link('WriteOnlyShard', 'BlockedShard'),
                       remove_link('BlockedShard', 'SqlShard(host4)'),
-                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
                       remove_link('WriteOnlyShard', 'SqlShard(host2)'),
-                      remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                      delete_shard('BlockedShard'),
-                      delete_shard('BlockedShard'),
+                      remove_link('ReplicatingShard', 'BlockedShard'),
                       delete_shard('SqlShard(host1)'),
-                      # FIXME: DATASERV-40: these deletes are currently occurring in :prepare
                       delete_shard('WriteOnlyShard'),
-                      delete_shard('SqlShard(host2)') ]
+                      delete_shard('BlockedShard'),
+                      delete_shard('SqlShard(host2)'),
+                      delete_shard('BlockedShard') ]
       })
     end
 
@@ -279,6 +279,21 @@ describe Gizzard::Transformation do
 
     it "returns false if the given template is not concrete" do
       @trans.copy_destination?(@to_template).should == false
+    end
+  end
+
+  describe "in_copied_subtree?" do
+    it "returns true for copy sources" do
+      @trans.in_copied_subtree?(@host_2_template).should == true
+    end
+
+    it "returns true for members of a subtree that contains copy sources, but who are not copy sources" do
+      @trans.in_copied_subtree?(@host_1_template).should == true
+      @trans.in_copied_subtree?(@blocked_template).should == true
+    end
+
+    it "returns false for templates added in the destination" do
+      @trans.in_copied_subtree?(@host_3_template).should == false
     end
   end
 end
