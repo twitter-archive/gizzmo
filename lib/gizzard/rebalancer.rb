@@ -6,14 +6,15 @@ module Gizzard
     Bucket          = Struct.new(:template, :approx_shards, :set)
 
     class Bucket
-      def length; set.length end
+      def balance; set.length - approx_shards end
       def add!(es); set.merge(es) end
       def merge!(es); set.merge(es) end
       # removes n 'random' elements without set lookups
       def take!(n)
         removed = []
+        inn = n
         set.reject! do |e|
-          if (n = n-1) > 0
+          if (n = n-1) >= 0
             # remove first n elements
             removed << e
             true
@@ -79,7 +80,7 @@ module Gizzard
           end
         end
 
-        dest_bucket = most_similar_buckets.min_by {|b| b.length }
+        dest_bucket = most_similar_buckets.min_by {|b| b.balance }
 
         dest_bucket.merge! shards
       end
@@ -118,7 +119,7 @@ module Gizzard
 
     # a tuple of the minimum and maximum buckets (which might be the same bucket)
     def min_and_max_buckets
-      @result.minmax_by {|bucket| bucket.length }
+      @result.minmax_by {|bucket| bucket.balance }
     end
 
     def memoized_concrete_descendants(t)
@@ -127,7 +128,7 @@ module Gizzard
     end
 
     def bucket_disparity(min_and_max)
-      (min_and_max.last.length - min_and_max.first.length) / 2
+      (min_and_max.last.balance - min_and_max.first.balance) / 2
     end
 
     def move_shards!(shards_to_move, src_bucket, dest_bucket)
