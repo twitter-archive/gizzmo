@@ -88,9 +88,9 @@ module Gizzard
 
     def rebalance!
       count = 0
-      while bucket_disparity(ordered = ordered_buckets) > 1
-        dest_bucket = ordered.first
-        src_bucket = ordered.last
+      while bucket_disparity(min_and_max = min_and_max_buckets) > 1
+        dest_bucket = min_and_max.first
+        src_bucket = min_and_max.last
         move_shard! src_bucket, dest_bucket
       end
     end
@@ -115,9 +115,9 @@ module Gizzard
       @transformations
     end
 
-    def ordered_buckets
-      # TODO: re-sorting the buckets every time is a waste, but usually there are only a few dozen buckets
-      @result.sort_by {|bucket| bucket.balance }
+    # a tuple of the minimum and maximum buckets (which might be the same bucket)
+    def min_and_max_buckets
+      @result.minmax_by {|bucket| bucket.balance }
     end
 
     def memoized_concrete_descendants(t)
@@ -125,8 +125,8 @@ module Gizzard
       @memoized_concrete_descendants[t] ||= t.concrete_descendants
     end
 
-    def bucket_disparity(ordered)
-      ordered.last.balance - ordered.first.balance
+    def bucket_disparity(min_and_max)
+      min_and_max.last.balance - min_and_max.first.balance
     end
 
     def move_shard!(src_bucket, dest_bucket)
