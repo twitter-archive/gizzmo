@@ -12,22 +12,31 @@ module Gizzard
     def initialize(type, host, weight, source_type, dest_type, children)
       @type, @host, @weight, @source_type, @dest_type, @children =
         type, host, weight, source_type || '', dest_type || '', children
+      @type_name = ShardTemplate.type_to_type_name(type)
+    end
+
+    def self.type_to_type_name(type)
+      if (dot_index = type.rindex('.'))
+        type[dot_index+1 .. -1]
+      else
+        type
+      end
     end
 
     def self.concrete?(type)
-      !Shard::VIRTUAL_SHARD_TYPES.include? type.split('.').last
+      !Shard::VIRTUAL_SHARD_TYPES.include?(type_to_type_name(type))
     end
 
     def concrete?
-      self.class.concrete? type
+      !Shard::VIRTUAL_SHARD_TYPES.include? @type_name
     end
 
     def replicating?
-      Shard::REPLICATING_SHARD_TYPES.include? type.split('.').last
+      Shard::REPLICATING_SHARD_TYPES.include? @type_name
     end
 
     def valid_copy_source?
-      !Shard::INVALID_COPY_TYPES.include? type.split('.').last
+      !Shard::INVALID_COPY_TYPES.include? @type_name
     end
 
     def identifier
@@ -35,11 +44,11 @@ module Gizzard
     end
 
     def table_name_suffix
-      Shard::SHARD_SUFFIXES[type.split('.').last]
+      Shard::SHARD_SUFFIXES[@type_name]
     end
 
     def shard_tag
-      Shard::SHARD_TAGS[type.split('.').last]
+      Shard::SHARD_TAGS[@type_name]
     end
 
     def host
