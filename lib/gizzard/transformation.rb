@@ -82,20 +82,18 @@ module Gizzard
     end
 
     def eql?(o)
-      o.is_a?(self.class) &&
-      from.eql?(o.from) &&
-      to.eql?(o.to) &&
-      copy_dest_wrapper.eql?(o.copy_dest_wrapper)
+      o.is_a?(self.class) && (self <=> o) == 0
     end
 
     def <=>(o)
-      to_a = lambda {|t| [t.from, t.to, t.copy_dest_wrapper] }
-
-      to_a.call(self) <=> to_a.call(o)
+      if ((cmp = self.from <=> o.from) != 0); return cmp end
+      if ((cmp = self.to <=> o.to) != 0); return cmp end
+      self.copy_dest_wrapper <=> o.copy_dest_wrapper
     end
 
     def hash
-      from.hash + to.hash + copy_dest_wrapper.hash
+      return @hash if @hash
+      @hash = from.hash + to.hash + copy_dest_wrapper.hash
     end
 
     # create a map of empty phase lists
