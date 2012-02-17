@@ -7,9 +7,23 @@ module Gizzard
 
     class Bucket
       def balance; set.length - approx_shards end
-      def add(e); set.add(e) end
-      def merge(es); set.merge(es) end
-      def delete(e); set.delete(e) end
+      def add!(e); set.add(e) end
+      def merge!(es); set.merge(es) end
+      # removes a 'random' element without any set lookups
+      def remove!
+        removed = nil
+        set.reject! do |e|
+          if removed == nil
+            # remove first element
+            removed = e
+            true
+          else
+            # preserve remainder
+            false
+          end
+        end
+        removed
+      end
     end
 
     # steps for rebalancing.
@@ -66,16 +80,18 @@ module Gizzard
           end
         end
 
-        dest_bucket = most_similar_buckets.sort_by {|b| b.balance }.first
+        dest_bucket = most_similar_buckets.min_by {|b| b.balance }
 
-        dest_bucket.merge shards
+        dest_bucket.merge! shards
       end
     end
 
     def rebalance!
-      while bucket_disparity > 1
-        ordered = ordered_buckets
-        move_shard ordered.first.template, ordered.last.set.each {|e| break e }
+      count = 0
+      while bucket_disparity(ordered = ordered_buckets) > 1
+        dest_bucket = ordered.first
+        src_bucket = ordered.last
+        move_shard! src_bucket, dest_bucket
       end
     end
 
@@ -100,6 +116,7 @@ module Gizzard
     end
 
     def ordered_buckets
+      # TODO: re-sorting the buckets every time is a waste, but usually there are only a few dozen buckets
       @result.sort_by {|bucket| bucket.balance }
     end
 
@@ -108,19 +125,13 @@ module Gizzard
       @memoized_concrete_descendants[t] ||= t.concrete_descendants
     end
 
-    def bucket_disparity
-      ordered = ordered_buckets
+    def bucket_disparity(ordered)
       ordered.last.balance - ordered.first.balance
     end
 
-    def move_shard(template, shard)
-      @result.each do |bucket|
-        if bucket.template == template
-          bucket.add shard
-        else
-          bucket.delete shard
-        end
-      end
+    def move_shard!(src_bucket, dest_bucket)
+      shard = src_bucket.remove!
+      dest_bucket.add! shard
     end
   end
 end
