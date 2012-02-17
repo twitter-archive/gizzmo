@@ -99,13 +99,12 @@ module Gizzard
     def <=>(other)
       raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
 
-      to_a = lambda {|t| [t.host, t.type, t.source_type.to_s, t.dest_type.to_s, t.weight] }
-
-      if (cmp = to_a.call(self) <=> to_a.call(other)) == 0
-        children <=> other.children
-      else
-        cmp
-      end
+      if ((cmp = self.host <=> other.host) != 0); return cmp end
+      if ((cmp = self.type <=> other.type) != 0); return cmp end
+      if ((cmp = self.source_type.to_s <=> other.source_type.to_s) != 0); return cmp end
+      if ((cmp = self.dest_type.to_s <=> other.dest_type.to_s) != 0); return cmp end
+      if ((cmp = self.weight <=> other.weight) != 0); return cmp end
+      return self.children <=> other.children
     end
 
     def eql?(other)
@@ -144,7 +143,8 @@ module Gizzard
     end
 
     def hash
-      weight.hash + host.hash + type.hash + children.hash
+      return @hash if @hash
+      @hash = weight.hash + host.hash + type.hash + children.hash
     end
 
 
