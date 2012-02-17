@@ -152,8 +152,7 @@ module Gizzard
     end
 
     def hash
-      return @hash if @hash
-      @hash = weight.hash + host.hash + type.hash + children.hash
+      weight.hash + host.hash + type.hash + children.hash
     end
 
 
