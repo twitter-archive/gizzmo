@@ -12,7 +12,6 @@ module Gizzard
       # removes n 'random' elements without set lookups
       def take!(n)
         removed = []
-        inn = n
         set.reject! do |e|
           if (n = n-1) >= 0
             # remove first n elements
