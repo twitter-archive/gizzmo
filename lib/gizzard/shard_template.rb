@@ -12,22 +12,31 @@ module Gizzard
     def initialize(type, host, weight, source_type, dest_type, children)
       @type, @host, @weight, @source_type, @dest_type, @children =
         type, host, weight, source_type || '', dest_type || '', children
+      @type_name = ShardTemplate.type_to_type_name(type)
+    end
+
+    def self.type_to_type_name(type)
+      if (dot_index = type.rindex('.'))
+        type[dot_index+1 .. -1]
+      else
+        type
+      end
     end
 
     def self.concrete?(type)
-      !Shard::VIRTUAL_SHARD_TYPES.include? type.split('.').last
+      !Shard::VIRTUAL_SHARD_TYPES.include?(type_to_type_name(type))
     end
 
     def concrete?
-      self.class.concrete? type
+      !Shard::VIRTUAL_SHARD_TYPES.include? @type_name
     end
 
     def replicating?
-      Shard::REPLICATING_SHARD_TYPES.include? type.split('.').last
+      Shard::REPLICATING_SHARD_TYPES.include? @type_name
     end
 
     def valid_copy_source?
-      !Shard::INVALID_COPY_TYPES.include? type.split('.').last
+      !Shard::INVALID_COPY_TYPES.include? @type_name
     end
 
     def identifier
@@ -35,11 +44,11 @@ module Gizzard
     end
 
     def table_name_suffix
-      Shard::SHARD_SUFFIXES[type.split('.').last]
+      Shard::SHARD_SUFFIXES[@type_name]
     end
 
     def shard_tag
-      Shard::SHARD_TAGS[type.split('.').last]
+      Shard::SHARD_TAGS[@type_name]
     end
 
     def host
@@ -99,13 +108,12 @@ module Gizzard
     def <=>(other)
       raise ArgumentError, "other is not a ShardTemplate" unless other.is_a? ShardTemplate
 
-      to_a = lambda {|t| [t.host, t.type, t.source_type.to_s, t.dest_type.to_s, t.weight] }
-
-      if (cmp = to_a.call(self) <=> to_a.call(other)) == 0
-        children <=> other.children
-      else
-        cmp
-      end
+      if ((cmp = self.host <=> other.host) != 0); return cmp end
+      if ((cmp = self.type <=> other.type) != 0); return cmp end
+      if ((cmp = self.source_type.to_s <=> other.source_type.to_s) != 0); return cmp end
+      if ((cmp = self.dest_type.to_s <=> other.dest_type.to_s) != 0); return cmp end
+      if ((cmp = self.weight <=> other.weight) != 0); return cmp end
+      return self.children <=> other.children
     end
 
     def eql?(other)
