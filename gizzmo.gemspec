@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.13.1"
+  s.version = "0.14.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2012-01-12}
+  s.date = %q{2012-02-17}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{kmaxwell@twitter.com}
   s.executables = ["setup_shards", "gizzmo"]
@@ -18,6 +18,7 @@ Gem::Specification.new do |s|
     "README.rdoc"
   ]
   s.files = [
+    "Gemfile",
     "LICENSE",
     "README.rdoc",
     "Rakefile",
@@ -39,6 +40,8 @@ Gem::Specification.new do |s|
     "lib/gizzmo.rb",
     "lib/vendor/thrift_client/simple.rb",
     "test/config.yaml",
+    "test/expected/blocked-transform-shard.txt",
+    "test/expected/busy-transform-shard.txt",
     "test/expected/deep.txt",
     "test/expected/dry-wrap-table_b_0.txt",
     "test/expected/empty-file.txt",
@@ -75,16 +78,32 @@ Gem::Specification.new do |s|
   ]
   s.homepage = %q{http://github.com/twitter/gizzmo}
   s.require_paths = ["lib"]
-  s.rubygems_version = %q{1.4.1}
+  s.rubygems_version = %q{1.3.6}
   s.summary = %q{Gizzmo is a command-line client for managing gizzard clusters.}
 
   if s.respond_to? :specification_version then
+    current_version = Gem::Specification::CURRENT_SPECIFICATION_VERSION
     s.specification_version = 3
 
-    if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
+    if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
+      s.add_runtime_dependency(%q<jeweler>, [">= 0"])
+      s.add_runtime_dependency(%q<mysql>, [">= 0"])
+      s.add_runtime_dependency(%q<rspec>, ["~> 1.3.2"])
+      s.add_runtime_dependency(%q<rr>, [">= 0"])
+      s.add_runtime_dependency(%q<diff-lcs>, [">= 0"])
     else
+      s.add_dependency(%q<jeweler>, [">= 0"])
+      s.add_dependency(%q<mysql>, [">= 0"])
+      s.add_dependency(%q<rspec>, ["~> 1.3.2"])
+      s.add_dependency(%q<rr>, [">= 0"])
+      s.add_dependency(%q<diff-lcs>, [">= 0"])
     end
   else
+    s.add_dependency(%q<jeweler>, [">= 0"])
+    s.add_dependency(%q<mysql>, [">= 0"])
+    s.add_dependency(%q<rspec>, ["~> 1.3.2"])
+    s.add_dependency(%q<rr>, [">= 0"])
+    s.add_dependency(%q<diff-lcs>, [">= 0"])
   end
 end
 
