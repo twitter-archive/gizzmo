@@ -227,8 +227,11 @@ describe Gizzard::Transformation do
     it "raises an argument error if the transformation requires a copy without a valid source" do
       to = mk_template 'ReplicatingShard -> (SqlShard(host1), SqlShard(host2))'
 
+      fulfill = lambda {|type| if type == "BlackHoleShard"; "#{type}(hostz)"; else type end}
+
       Gizzard::Shard::INVALID_COPY_TYPES.each do |invalid_type|
-        from = mk_template "ReplicatingShard -> #{invalid_type} -> SqlShard(host1)"
+        fulfilled = fulfill.call(invalid_type)
+        from = mk_template "ReplicatingShard -> #{fulfilled} -> SqlShard(host1)"
         lambda { Gizzard::Transformation.new(from, to) }.should raise_error(ArgumentError)
       end
     end
