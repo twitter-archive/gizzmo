@@ -86,13 +86,10 @@ module Gizzard
     end
 
     def rebalance!
-      while (disparity = bucket_disparity(min_and_max = min_and_max_buckets)) > 1
-        shards_to_move = disparity.floor
-        # 'disparity' is the distance in optimal bucket count between the max and min
-        # buckets: move that many shards from max to min
+      while (to_move = shards_to_move(min_and_max = min_and_max_buckets)) >= 1
         dest_bucket = min_and_max.first
         src_bucket = min_and_max.last
-        move_shards! shards_to_move, src_bucket, dest_bucket
+        move_shards! to_move.floor, src_bucket, dest_bucket
       end
     end
 
@@ -126,8 +123,13 @@ module Gizzard
       @memoized_concrete_descendants[t] ||= t.concrete_descendants
     end
 
-    def bucket_disparity(min_and_max)
-      (min_and_max.last.balance - min_and_max.first.balance) / 2
+    def shards_to_move(min_and_max)
+      min_balance = min_and_max.first.balance
+      max_balance = min_and_max.last.balance
+      [
+        -min_balance, # number of shards the min bucket needs
+        max_balance   # number of shards the max bucket can spare
+      ].min
     end
 
     def move_shards!(shards_to_move, src_bucket, dest_bucket)
