@@ -246,34 +246,13 @@ module Gizzard
       @translations   = shard.canonical_shard_id_map(base_name, @table_id, @enum)
     end
 
-    # TODO: replace with single execute(:nameserver, :phase) method?
-
-    def prepare!(nameserver)
-      apply_ops(nameserver, transformation.operations[:prepare])
+    def apply!(nameserver, phase, rollback_log)
+      apply_ops(nameserver, transformation.operations[phase], rollback_log)
     end
 
-    def copy_required?
-      !transformation.operations[:copy].empty?
-    end
-
-    def copy!(nameserver)
-      apply_ops(nameserver, transformation.operations[:copy])
-    end
-
-    def unblock_required?
-      !transformation.operations[:unblock_writes].empty? || !transformation.operations[:unblock_reads].empty?
-    end
-
-    def unblock_writes!(nameserver)
-      apply_ops(nameserver, transformation.operations[:unblock_writes])
-    end
-
-    def unblock_reads!(nameserver)
-      apply_ops(nameserver, transformation.operations[:unblock_reads])
-    end
-
-    def cleanup!(nameserver)
-      apply_ops(nameserver, transformation.operations[:cleanup])
+    # true if any of the given phases contain operations
+    def required?(*phases)
+      phases.any?{|phase| !transformation.operations[phase].empty?}
     end
 
     def involved_shards(phase = :copy)
@@ -310,9 +289,10 @@ module Gizzard
 
     private
 
-    def apply_ops(nameserver, ops)
+    def apply_ops(nameserver, ops, rollback_log)
       ops.each do |op|
         op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
+        rollback_log.push!(Marshal.dump(op)) if rollback_log
       end
     end
   end

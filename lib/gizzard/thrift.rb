@@ -121,6 +121,17 @@ module Gizzard
     end
   end
 
+  LogEntry = T.make_struct(:LogEntry,
+    T::Field.new(:id, T::I32, 1),
+    T::Field.new(:binary_content, T::STRING, 2)
+  )
+
+  class LogEntry
+    def inspect
+      "(id:#{id})"
+    end
+  end
+
   class GizzmoService < T::ThriftService
     def initialize(host, port, log_path, framed, dry_run = false)
       super(host, port, framed)
@@ -222,6 +233,18 @@ module Gizzard
     thrift_method :list_remote_clusters, list(string), :throws => exception(GizzardException)
     thrift_method :list_remote_hosts, list(struct(Host)), :throws => exception(GizzardException)
     thrift_method :list_remote_hosts_in_cluster, list(struct(Host)), field(:cluster, string, 1), :throws => exception(GizzardException)
+
+
+    # Command log management
+    # (log entries are binary, but this client doesn't support labeling them as such)
+
+    # create or get a log, returning an id for the log
+    thrift_method :log_create, i32, field(:log_name, string, 1)
+    thrift_method :log_get, i32, field(:log_name, string, 1)
+    # given a log id, push/pop/peek data on that log
+    thrift_method :log_entry_push, i32, field(:log_id, i32, 1), field(:binary_content, string, 2)
+    thrift_method :log_entry_peek, struct(LogEntry), field(:log_id, i32, 1)
+    thrift_method :log_entry_pop, void, field(:log_id, i32, 1), field(:log_entry_id, i32, 2)
   end
 
 

@@ -29,6 +29,14 @@ module Gizzard
       @dont_show_progress = options[:no_progress] || @be_quiet
       @batch_finish       = options[:batch_finish]
 
+      @rollback_log  =
+        if log_name = options[:rollback_log_name]
+          # create a new rollback log on the server
+          NameServer::CommandLog(@nameserver, log_name, true)
+        else
+          nil
+        end
+
       @jobs_copying     = []
       @jobs_settling    = []
       @jobs_finished    = []
@@ -108,18 +116,18 @@ module Gizzard
         log "STARTING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.prepare!(nameserver)
+          j.apply!(@nameserver, :prepare, @rollback_log)
         end
 
         nameserver.reload_updated_forwardings
 
-        copy_jobs = jobs.select {|j| j.copy_required? }
+        copy_jobs = jobs.select {|j| j.required?(:copy) }
 
         unless copy_jobs.empty?
           log "COPIES:"
           copy_jobs.each do |j|
             j.copy_descs.each {|d| log "  #{d}" }
-            j.copy!(nameserver)
+            j.apply!(@nameserver, :copy, @rollback_log)
           end
 
           reload_busy_shards
@@ -133,16 +141,13 @@ module Gizzard
       jobs = @jobs_settling
 
       unless jobs.empty?
+        end_settling_jobs(jobs)
         @jobs_settling -= jobs
-
-        if jobs.any? { |job| job.unblock_required? }
-          end_settling_jobs(jobs)
-        end
 
         log "FINISHING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.cleanup!(nameserver)
+          j.apply!(@nameserver, :cleanup, @rollback_log)
         end
 
         @jobs_finished.concat(jobs)
@@ -157,8 +162,8 @@ module Gizzard
       unless jobs.empty?
         @jobs_copying -= jobs
         jobs.each do |j|
-          if j.unblock_required?
-            j.unblock_writes!(nameserver)
+          if j.required?(:unblock_writes)
+            j.apply!(@nameserver, :unblock_writes, @rollback_log)
           end
         end
         @jobs_settling.concat(jobs)
@@ -168,6 +173,8 @@ module Gizzard
     # performs the ":unblock_reads" phase, which is surrounded by operator controlled pauses
     # to allow for 1) app server queues to drain, 2) caches to warm
     def end_settling_jobs(jobs)
+      return if jobs.none? { |job| job.required?(:unblock_reads) }
+
       log "SETTLING:"
       jobs.each do |j|
         log "  #{j.inspect}"
@@ -175,7 +182,7 @@ module Gizzard
       Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
       jobs.each do |j|
-        j.unblock_reads!(nameserver)
+        j.apply!(@nameserver, :unblock_reads, @rollback_log)
       end
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
                         "caches are warmed, and then enter 'y' to proceed.")

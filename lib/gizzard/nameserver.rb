@@ -277,5 +277,33 @@ module Gizzard
         Shard.new(info, children, link_weight)
       end
     end
+
+    class CommandLog
+      def initialize(nameserver, log_name, create)
+        @nameserver = nameserver
+        @name = log_name
+        @log_id =
+          if create
+            nameserver.log_create(log_name)
+          else
+            nameserver.log_get(log_name)
+          end
+      end
+
+      # pushes binary content to the end of the log, returns a new log_entry_id
+      def push!(binary_content)
+        @nameserver.log_entry_push(@log_id, binary_content)
+      end
+
+      # returns the top LogEntry tuple for the log
+      def peek
+        @nameserver.log_entry_peek(@log_id)
+      end
+
+      # pops the given log_entry_id (which must be at the top of the log)
+      def pop!(log_entry_id)
+        @nameserver.log_entry_pop(@log_id, log_entry_id)
+      end
+    end
   end
 end
