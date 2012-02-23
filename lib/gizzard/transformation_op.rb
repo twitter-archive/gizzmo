@@ -2,6 +2,7 @@ module Gizzard
   module Transformation::Op
     class BaseOp
       def inverse?(other)
+        # FIXME: move inverses onto ops themselves
         Transformation::OP_INVERSES[self.class] == other.class
       end
 
@@ -235,8 +236,7 @@ module Gizzard
     end
 
 
-    # XXX: A no-op, but needed for setup/teardown symmetry
-
+    # a no-op, but needed for setup/teardown symmetry
     class RemoveForwarding < ShardOp
       def expand(copy_source, involved_in_copy, batch_finish)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
@@ -248,5 +248,18 @@ module Gizzard
         # nameserver.remove_forwarding(forwarding)
       end
     end
+
+    # a no-op that indicates a position that rollback cannot move past
+    class Commit < BaseOp
+      def expand(copy_source, from_template, batch_finish)
+        { :cleanup => [self] }
+      end
+
+      def apply(nameserver, table_id, base_id, table_prefix, translations)
+        # noop
+      end
+    end
+    class CommitBegin < Commit; end
+    class CommitEnd < Commit; end
   end
 end
