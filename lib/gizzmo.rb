@@ -150,6 +150,9 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--batch-finish", "After copies complete (while wrapped in --copy-wrapper), move shards to a WriteOnly settling state. When all transforms are settling, wait until the operator indicates that it is safe to remove the WriteOnly wrappers. Finally, wait for the operator to indicate that it is safe to execute cleanup.") do
     (subcommand_options.scheduler_options ||= {})[:batch_finish] = true
   end
+  opts.on("--rollback-log=LOG_NAME", "A named log of applied operations which will be stored in the nameserver, and can later be rolled back with the `rollback` command. A log with the given name must not already exist.") do |rl|
+    (subcommand_options.scheduler_options ||= {})[:rollback_log] = rl.to_s
+  end
 end
 
 def add_template_opts(subcommand_options, opts)

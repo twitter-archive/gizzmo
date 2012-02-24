@@ -104,6 +104,7 @@ module Gizzard
     alias dryrun? dryrun
 
     def initialize(*hosts)
+      # TODO: waaaaaat
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
       @retries = options[:retries] || DEFAULT_RETRIES
       @logfile = options[:log]     || "/tmp/gizzmo.log"
@@ -157,6 +158,10 @@ module Gizzard
 
     def manifest(*table_ids)
       Manifest.new(self, table_ids)
+    end
+
+    def command_log(name, create)
+      CommandLog.new(self, name, create)
     end
 
     # confirm that all clients are connected to the same cluster

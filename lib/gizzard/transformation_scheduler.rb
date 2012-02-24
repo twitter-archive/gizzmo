@@ -30,9 +30,9 @@ module Gizzard
       @batch_finish       = options[:batch_finish]
 
       @rollback_log  =
-        if log_name = options[:rollback_log_name]
+        if log_name = options[:rollback_log]
           # create a new rollback log on the server
-          NameServer::CommandLog(@nameserver, log_name, true)
+          @nameserver.command_log(log_name, true)
         else
           nil
         end

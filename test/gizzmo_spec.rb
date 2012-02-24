@@ -344,15 +344,16 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
 
   describe "transform-tree" do
     it "works" do
+      logname = 'test_log_name'
       ns.create_shard info("localhost", "s_0_001_a", "TestShard", "Int", "Int")
       ns.create_shard info("localhost", "s_0_001_replicating", "ReplicatingShard")
       ns.add_link id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1
       ns.set_forwarding forwarding(0, 1, id("localhost", "s_0_001_replicating"))
       ns.reload_config
 
-      gizzmo('-f transform-tree --no-progress --poll-interval=1 \
+      gizzmo('-f transform-tree --no-progress --poll-interval=1 --rollback-log="%s" \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
-localhost/s_0_001_replicating').should == <<-EOF
+localhost/s_0_001_replicating' % logname).should == <<-EOF
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(BlockedShard)
@@ -379,12 +380,17 @@ FINISHING:
 1 transformation applied. Total time elapsed: 1 second
       EOF
 
+      # access the nameserver db directly for shard information
       nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
                                         info("localhost", "s_0_001_a", "TestShard", "Int", "Int"),
                                         info("localhost", "s_0_001_replicating", "ReplicatingShard")]
 
       nameserver_db[:links].should == [link(id("localhost", "s_0_001_replicating"), id("127.0.0.1", "s_0_0001"), 1),
                                        link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1)]
+
+      # confirm that the last entry was recorded in a log of the correct name
+      lastentry = ns.command_log(logname, false).peek()
+      Marshal.load(lastentry.binary_content).class.should == Gizzard::Transformation::Op::CommitEnd
     end
   end
 
