@@ -253,12 +253,12 @@ describe Gizzard::Transformation do
 
       collapse(@trans.create_tree(@from_template) + @trans.destroy_tree(@from_template)).should == []
 
-      collapse(@trans.create_tree(@to_template) + @trans.destroy_tree(@from_template)).should ==
+      collapse(@trans.create_tree(@to_template) + @trans.destroy_tree(@from_template)).sort!.should ==
         [ Op::CreateShard.new(@host_3_template),
           Op::AddLink.new(@to_template, @host_3_template),
           Op::RemoveLink.new(@blocked_template, @host_1_template),
-          Op::DeleteShard.new(@host_1_template),
           Op::RemoveLink.new(@from_template, @blocked_template),
+          Op::DeleteShard.new(@host_1_template),
           Op::DeleteShard.new(@blocked_template) ]
     end
   end

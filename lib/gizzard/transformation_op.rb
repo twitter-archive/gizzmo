@@ -18,7 +18,11 @@ module Gizzard
       end
 
       def <=>(other)
-        Transformation::OP_PRIORITIES[self.class] <=> Transformation::OP_PRIORITIES[other.class]
+        self_class = Transformation::OP_PRIORITIES[self.class]
+        other_class = Transformation::OP_PRIORITIES[other.class]
+        if ((cmp = self_class <=> other_class) != 0); return cmp end
+        # comparing the template is not strictly necessary, but gives us a stable sort
+        self.template <=> other.template
       end
 
       def involved_shards(table_prefix, translations)

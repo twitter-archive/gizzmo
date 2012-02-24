@@ -355,16 +355,16 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
 localhost/s_0_001_replicating').should == <<-EOF
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
 Applied to 1 shards
 
@@ -401,16 +401,16 @@ FINISHING:
 "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
 Applied to 2 shards
 
@@ -483,16 +483,16 @@ EOF
 "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
 Applied to 2 shards
 
@@ -540,16 +540,16 @@ FINISHING:
 "ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
 Applied to 4 shards
 
@@ -610,19 +610,19 @@ FINISHING:
 1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
 ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> TestShard/localhost)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> BlockedShard)
-    delete_shard(TestShard/localhost)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> TestShard/localhost)
     delete_shard(BlockedShard)
+    delete_shard(TestShard/localhost)
 Applied to 4 shards
 
 STARTING:
@@ -660,12 +660,12 @@ Create tables 0, 1:
     864691128455135232
     0
 
-create_shard(ReplicatingShard): s_0_0003
 create_shard(TestShard/127.0.0.1): s_0_0003
+create_shard(ReplicatingShard): s_0_0003
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_0_0003
 set_forwarding(ReplicatingShard): s_0_0003
-create_shard(ReplicatingShard): s_0_0002
 create_shard(TestShard/127.0.0.1): s_0_0002
+create_shard(ReplicatingShard): s_0_0002
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_0_0002
 set_forwarding(ReplicatingShard): s_0_0002
 create_shard(ReplicatingShard): s_0_0001
@@ -676,12 +676,12 @@ create_shard(ReplicatingShard): s_0_0000
 create_shard(TestShard/localhost): s_0_0000
 add_link(ReplicatingShard -> TestShard/localhost): s_0_0000
 set_forwarding(ReplicatingShard): s_0_0000
-create_shard(ReplicatingShard): s_1_0003
 create_shard(TestShard/127.0.0.1): s_1_0003
+create_shard(ReplicatingShard): s_1_0003
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_1_0003
 set_forwarding(ReplicatingShard): s_1_0003
-create_shard(ReplicatingShard): s_1_0002
 create_shard(TestShard/127.0.0.1): s_1_0002
+create_shard(ReplicatingShard): s_1_0002
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_1_0002
 set_forwarding(ReplicatingShard): s_1_0002
 create_shard(ReplicatingShard): s_1_0001
