@@ -14,7 +14,9 @@ module Gizzard
       Op::SetForwarding    => "set_forwarding",
       Op::CopyShard        => "copy_shard",
       Op::RepairShards     => "repair_shards",
-      Op::DiffShards       => "diff_shards"
+      Op::DiffShards       => "diff_shards",
+      Op::CommitBegin      => "commit_begin",
+      Op::CommitEnd        => "commit_end"
     }
 
     OP_INVERSES = {
@@ -140,11 +142,13 @@ module Gizzard
     end
 
     def collapse_jobs(jobs)
-      jobs.reject do |job1|
+      collapsed = jobs.reject do |job1|
         jobs.find do |job2|
           job1.inverse? job2
         end
       end
+      # if all non-noop jobs have collapsed, entire transform was a noop
+      collapsed.all?{|job| job.noop? } ? [] : collapsed
     end
 
     def expand_jobs(jobs)
@@ -210,7 +214,7 @@ module Gizzard
         [Op::RemoveLink.new(parent, child), Op::DeleteShard.new(child)]
       end
       jobs.concat [Op::RemoveForwarding.new(root), Op::DeleteShard.new(root)]
-      jobs.concat [Op::CommitBegin.new, Op::CommitEnd.new]
+      jobs.concat [Op::CommitBegin.new(root), Op::CommitEnd.new(root)]
     end
 
     private

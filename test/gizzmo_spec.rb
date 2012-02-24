@@ -363,9 +363,11 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
     remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 1 shards
 
 STARTING:
@@ -409,9 +411,11 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
     remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -454,7 +458,9 @@ FINISHING:
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int) :
   PREPARE
     add_link(ReplicatingShard -> TestShard/localhost)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> TestShard/localhost)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -491,9 +497,11 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
     remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -548,9 +556,11 @@ ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> 
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
     remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 4 shards
 
 STARTING:
@@ -604,7 +614,6 @@ FINISHING:
         ns.set_forwarding forwarding(0,i,id("localhost", "s_0_00#{i}_replicating"))
       end
       ns.reload_config
-
       gizzmo('-f -T0 rebalance --no-progress --poll-interval=1 \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
 1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
@@ -618,11 +627,13 @@ ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShar
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
     remove_link(BlockedShard -> TestShard/127.0.0.1)
     remove_link(ReplicatingShard -> TestShard/localhost)
     delete_shard(BlockedShard)
     delete_shard(TestShard/localhost)
+    commit_end(ReplicatingShard)
 Applied to 4 shards
 
 STARTING:

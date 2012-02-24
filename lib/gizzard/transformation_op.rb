@@ -29,6 +29,10 @@ module Gizzard
       def involved_shards(table_prefix, translations)
         []
       end
+
+      def noop?
+        false
+      end
     end
 
     class CopyShard < BaseOp
@@ -247,16 +251,24 @@ module Gizzard
         # forwarding = Forwarding.new(table_id, base_id, shard_id)
         # nameserver.remove_forwarding(forwarding)
       end
+
+      def noop?
+        true
+      end
     end
 
     # a no-op that indicates a position that rollback cannot move past
-    class Commit < BaseOp
-      def expand(copy_source, from_template, batch_finish)
-        { :cleanup => [self] }
+    class Commit < ShardOp
+      def expand(copy_source, involved_in_copy, batch_finish)
+        { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         # noop
+      end
+
+      def noop?
+        true
       end
     end
     class CommitBegin < Commit; end
