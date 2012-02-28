@@ -123,8 +123,8 @@ def load_config(options, filename)
 end
 
 def add_scheduler_opts(subcommand_options, opts)
-  opts.on("--ignore-types=SHARD_TYPE_LIST", "Allow transformations to begin despite shards of the given types existing in the topology.") do |t|
-    (subcommand_options.scheduler_options ||= {})[:ignore_types] = split(t)
+  opts.on("--ignore-types=SHARD_TYPE_LIST", "Allow transformations to begin despite shards of the given types (a comma-separated list) existing in the topology.") do |t|
+    (subcommand_options.scheduler_options ||= {})[:ignore_types] = t.to_s.split(',')
   end
   opts.on("--ignore-busy", "Allow transformations to begin despite busy shards existing in the topology.") do
     (subcommand_options.scheduler_options ||= {})[:ignore_busy] = true
