@@ -499,7 +499,8 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator "Global options:"
   opts.on("-H", "--hosts=HOST[,HOST,...]", "Comma-delimited list of application servers") do |hosts|
-    global_options.hosts = hosts.split(",").map {|h| h.strip }
+    global_options.hosts ||= []
+    global_options.hosts  += hosts.split(",").map {|h| h.strip }
   end
 
   opts.on("-P", "--port=PORT", "PORT of remote manager service (default 7920)") do |port|
@@ -511,7 +512,8 @@ global = OptionParser.new do |opts|
   end
 
   opts.on("-T", "--tables=TABLE[,TABLE,...]", "TABLE ids of forwardings to affect") do |tables|
-    global_options.tables = tables.split(",").map {|t| t.to_i }
+    global_options.tables ||= []
+    global_options.tables  += tables.split(",").map {|t| t.to_i }
   end
 
   opts.on("-F", "--framed", "Use the thrift framed transport") do |framed|
