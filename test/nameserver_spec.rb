@@ -137,3 +137,12 @@ describe Gizzard::Nameserver::Manifest do
     }
   end
 end
+
+describe Gizzard::Nameserver::CommandLog do
+  it "creates and gets a log" do
+    name = "test1"
+    log_created = ns.command_log(name, true)
+    log_gotten = ns.command_log(name, false)
+    log_created.log_id.should == log_gotten.log_id
+  end
+end

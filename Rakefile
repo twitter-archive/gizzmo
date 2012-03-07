@@ -28,7 +28,7 @@ Spec::Rake::SpecTask.new(:spec) do |t|
   if File.exist? spec_opts
     t.spec_opts = ['--options', "\"#{spec_opts}\""]
   end
-  t.spec_files = FileList['test/**/*_spec.rb']
+  t.spec_files = FileList['test/**/nameserver_spec.rb']
 end
 
 Rake::RDocTask.new do |rdoc|

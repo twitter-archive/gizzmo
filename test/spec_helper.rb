@@ -85,6 +85,8 @@ def reset_nameserver(db = NAMESERVER_DATABASE)
   $mysql.query("delete from `#{db}`.shard_children")
   $mysql.query("delete from `#{db}`.forwardings")
   $mysql.query("delete from `#{db}`.hosts")
+  $mysql.query("delete from `#{db}`.logs")
+  $mysql.query("delete from `#{db}`.log_entries")
 
   nameserver.reload_config rescue nil
 end

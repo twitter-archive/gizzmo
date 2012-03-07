@@ -284,9 +284,11 @@ module Gizzard
     end
 
     class CommandLog
+      attr_reader :name, :log_id
       def initialize(nameserver, log_name, create)
         @nameserver = nameserver
         @name = log_name
+        @next_entry_id = 0
         @log_id =
           if create
             nameserver.log_create(log_name)
@@ -297,7 +299,8 @@ module Gizzard
 
       # pushes binary content to the end of the log, returns a new log_entry_id
       def push!(binary_content)
-        @nameserver.log_entry_push(@log_id, binary_content)
+        entry = LogEntry.new((@next_entry_id += 1), binary_content)
+        @nameserver.log_entry_push(@log_id, entry)
       end
 
       # returns the top LogEntry tuple for the log
