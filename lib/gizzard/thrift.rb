@@ -243,7 +243,7 @@ module Gizzard
     thrift_method :log_create, string, field(:log_name, string, 1)
     thrift_method :log_get, string, field(:log_name, string, 1)
     # given a log id, push/pop/peek binary data on that log
-    thrift_method :log_entry_push, void, field(:log_id, string, 1), field(:log_entry, LogEntry, 2)
+    thrift_method :log_entry_push, void, field(:log_id, string, 1), field(:log_entry, struct(LogEntry), 2)
     thrift_method :log_entry_peek, struct(LogEntry), field(:log_id, string, 1)
     thrift_method :log_entry_pop, void, field(:log_id, string, 1), field(:log_entry_id, i32, 2)
   end

@@ -145,4 +145,25 @@ describe Gizzard::Nameserver::CommandLog do
     log_gotten = ns.command_log(name, false)
     log_created.log_id.should == log_gotten.log_id
   end
+
+  it "it appends to and peeks at a log" do
+    log = ns.command_log("test2", true)
+    ["it's", "better than bad", "log!"].map do |entry|
+      log.push!(entry)
+      log.peek().content.should == entry
+    end
+  end
+
+  it "it pops from a log, and ignores popped in peek" do
+    log = ns.command_log("test3", true)
+    entries = ["un", "deux", "trois"]
+    entries.each do |entry|
+      log.push!(entry)
+    end
+    entries.reverse_each do |entry|
+      peeked = log.peek()
+      peeked.content.should == entry
+      log.pop!(peeked.id)
+    end
+  end
 end
