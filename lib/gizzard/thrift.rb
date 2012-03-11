@@ -35,7 +35,7 @@ module Gizzard
       if groups = string.match(/(.*)\/([^_]+_\d+_\d{3,}.*)/)
         new(*groups.values_at(1, 2))
       else
-        raise "Invalid shard id: " + string
+        raise "Invalid shard id '#{string}': shard ids are composed of '<table-prefix>_<table-id>_<three-or-more-digit-id>[_<optional-suffix>]'"
       end
     end
   end
