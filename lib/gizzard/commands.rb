@@ -1085,7 +1085,6 @@ module Gizzard
   end
 
   class CreateTableCommand < Command
-
     DEFAULT_NUM_SHARDS   = 1024
     DEFAULT_BASE_NAME    = "shard"
 
@@ -1183,6 +1182,31 @@ module Gizzard
             end
           end
         end
+      end
+    end
+  end
+
+  class RollbackCommand < Command
+    def run
+      help!("must specify a logger") unless @logger
+      be_quiet     = global_options.force && command_options.quiet
+      lc = @logger.last_command.map { |op| {:op => op[:operation].inverse, :param => op[:extras] }}.compact
+
+      unless be_quiet
+        puts "Rolling back to would cause the following actions:"
+        lc.each do |op|
+          puts "#{op[:op].inspect}"
+        end
+      end
+
+      unless global_options.force
+        print "Continue? (y/n) "; $stdout.flush
+        exit unless $stdin.gets.chomp == "y"
+        puts ""
+      end
+
+      lc.each do |op|
+        op[:op].apply(manager, *(op[:param]))
       end
     end
   end
