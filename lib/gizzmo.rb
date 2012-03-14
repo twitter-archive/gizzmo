@@ -31,6 +31,7 @@ DOC_STRINGS = {
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "links" => "List parent and child links for shards.",
   "list-hosts" => "List remote cluster hosts being replicated to.",
+  "log-rollback" => "Allows a log of performed transforms to be reversed, 'undoing' the changes it originally executed.",
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
   "markbusy" => "Mark a list of shards as busy.",
   "markunbusy" => "Mark a list of shards as not busy.",

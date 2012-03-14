@@ -1188,9 +1188,11 @@ module Gizzard
 
   class RollbackCommand < Command
     def run
-      help!("must specify a logger") unless @logger
-      be_quiet     = global_options.force && command_options.quiet
-      lc = @logger.last_command.map { |op| {:op => op[:operation].inverse, :param => op[:extras] }}.compact
+      help!("must specify exactly one argument: a rollback-log name") if @argv.size != 1
+      rollback_log = @argv[0]
+
+
+      #lc = @logger.last_command.map { |op| {:op => op[:operation].inverse, :param => op[:extras] }}.compact
 
       unless be_quiet
         puts "Rolling back to would cause the following actions:"
