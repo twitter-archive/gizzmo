@@ -389,7 +389,7 @@ FINISHING:
                                        link(id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1)]
 
       # confirm that the last entry was recorded in a log of the correct name
-      lastentry = ns.command_log(logname, false).peek()
+      lastentry = ns.command_log(logname, false).peek(1)[0]
       Marshal.load(lastentry.binary_content).class.should == Gizzard::Transformation::Op::CommitEnd
     end
   end

@@ -303,9 +303,9 @@ module Gizzard
         @nameserver.log_entry_push(@log_id, entry)
       end
 
-      # returns the top LogEntry tuple for the log
-      def peek
-        @nameserver.log_entry_peek(@log_id)
+      # returns the top 'count' LogEntries for the log
+      def peek(count)
+        @nameserver.log_entry_peek(@log_id, count)
       end
 
       # pops the given log_entry_id (which must be at the top of the log)

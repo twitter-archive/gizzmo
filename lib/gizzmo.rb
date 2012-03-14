@@ -462,15 +462,8 @@ subcommands = {
     end
   end
   'log-rollback' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} log-rollback [options] TEMPLATE ..."
-    separators(opts, DOC_STRINGS["remove-partition"])
-    add_template_opts subcommand_options, opts
-
-    add_scheduler_opts subcommand_options, opts
-
-    opts.on("-q", "--quiet", "Do not display transformation info (only valid with --force)") do
-      subcommand_options.quiet = true
-    end
+    opts.banner = "Usage: #{zero} --rollback-log=LOG_NAME log-rollback"
+    separators(opts, DOC_STRINGS["log-rollback"])
   end,
 }
 

@@ -150,7 +150,7 @@ describe Gizzard::Nameserver::CommandLog do
     log = ns.command_log("test2", true)
     ["it's", "better than bad", "log!"].map do |entry|
       log.push!(entry)
-      log.peek().content.should == entry
+      log.peek(1)[0].content.should == entry
     end
   end
 
@@ -160,8 +160,9 @@ describe Gizzard::Nameserver::CommandLog do
     entries.each do |entry|
       log.push!(entry)
     end
+    log.peek(3).reverse.map{|e| e.content}.should == entries
     entries.reverse_each do |entry|
-      peeked = log.peek()
+      peeked = log.peek(1)[0]
       peeked.content.should == entry
       log.pop!(peeked.id)
     end
