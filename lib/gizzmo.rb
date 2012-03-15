@@ -38,6 +38,7 @@ DOC_STRINGS = {
   "ping" => "Confirm that all configured application servers are accessible, and in agreement about the set of shard hosts.",
   "rebalance" => "Restructure and move shards to reflect a new list of tree structures.",
   "reload" => "Instruct application servers to reload the nameserver state.",
+  "reload-updated" => "Instruct application servers to partially reload the nameserver state - only the entries that have been updated since the last reload.",
   "remove-host" => "Remove a remote cluster host being replicate to.",
   "remove-partition" => "Rebalance the cluster by removing the provided partitions from the current topology.",
   "repair-tables" => "Reconcile all the shards in the given tables (supplied with -T) by detecting differences and writing them back to shards as needed.",
@@ -280,6 +281,10 @@ subcommands = {
   'reload' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} reload"
     separators(opts, DOC_STRINGS["reload"])
+  end,
+  'reload-updated' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} reload-updated"
+    separators(opts, DOC_STRINGS["reload-updated"])
   end,
   'drill' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} drill SIGNATURE"

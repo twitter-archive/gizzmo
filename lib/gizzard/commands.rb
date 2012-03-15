@@ -250,6 +250,21 @@ module Gizzard
     end
   end
 
+  class ReloadUpdatedCommand < Command
+    def run
+      if global_options.force || ask
+        manager.reload_updated_forwardings
+      else
+        STDERR.puts "aborted"
+      end
+    end
+
+    def ask
+      output "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
+      gets.chomp == "yes"
+    end
+  end
+
   class DeleteCommand < Command
     def run
       argv.each do |arg|
