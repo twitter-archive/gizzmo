@@ -238,22 +238,11 @@ module Gizzard
   class ReloadCommand < Command
     def run
       if global_options.force || ask
-        manager.reload_config
-      else
-        STDERR.puts "aborted"
-      end
-    end
-
-    def ask
-      output "Are you sure? Reloading will affect production services immediately! (Type 'yes')"
-      gets.chomp == "yes"
-    end
-  end
-
-  class ReloadUpdatedCommand < Command
-    def run
-      if global_options.force || ask
-        manager.reload_updated_forwardings
+        if command_options.fast
+          manager.reload_updated_forwardings
+        else
+          manager.reload_config
+        end
       else
         STDERR.puts "aborted"
       end
