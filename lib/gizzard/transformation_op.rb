@@ -12,6 +12,10 @@ module Gizzard
 
       alias == eql?
 
+      def inverse
+        return nil
+      end
+
       def inspect
         templates = (is_a?(LinkOp) ? [from, to] : [*template]).map {|t| t.identifier }.join(" -> ")
         name      = Transformation::OP_NAMES[self.class]
@@ -113,6 +117,12 @@ module Gizzard
         super && self.from.link_eql?(other.from) && self.to.link_eql?(other.to)
       end
 
+      def inverse
+        inv_class = Transformation::OP_INVERSES[self.class]
+        return nil if inv_class.nil?
+        inv_class.new(@from, @to)
+      end
+
       def eql?(other)
         super && self.from.link_eql?(other.from) && self.to.link_eql?(other.to)
       end
@@ -167,6 +177,12 @@ module Gizzard
 
       def inverse?(other)
         super && self.template.shard_eql?(other.template)
+      end
+
+      def inverse
+        inv_class = Transformation::OP_INVERSES[self.class]
+        return nil if inv_class.nil?
+        inv_class.new(@template, @wrapper_type)
       end
 
       def eql?(other)

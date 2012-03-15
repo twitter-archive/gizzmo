@@ -667,6 +667,29 @@ FINISHING:
     end
   end
 
+  describe "log-rollback" do
+    before do
+      ns.create_shard info("localhost", "s_0_001_a", "TestShard", "Int", "Int")
+      ns.create_shard info("localhost", "s_0_001_replicating", "ReplicatingShard")
+      ns.add_link id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1
+      ns.set_forwarding forwarding(0, 1, id("localhost", "s_0_001_replicating"))
+      ns.reload_config
+    end
+
+    it "will not roll back a successfully completed transform" do
+      logname = 'test_log_name'
+      gizzmo('-f transform-tree --no-progress --poll-interval=1 --rollback-log="%s" \
+"ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
+localhost/s_0_001_replicating' % logname)
+
+      res = gizzmo('-f log-rollback "%s"' % logname)
+      res.should match(fuzzily(<<-EOF))
+Rolling back test_log_name will reverse the following operations:
+Nothing to do.
+      EOF
+    end
+  end
+
   describe "create-table" do
     it "works" do
       gizzmo('-f -T0,1 create-table --shards=4 --base-name=s \

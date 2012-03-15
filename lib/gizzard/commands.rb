@@ -1186,29 +1186,84 @@ module Gizzard
     end
   end
 
-  class RollbackCommand < Command
+  class LogRollbackCommand < Command
     def run
       help!("must specify exactly one argument: a rollback-log name") if @argv.size != 1
-      rollback_log = @argv[0]
 
+      rollback_log_name = @argv[0]
+      rl = manager.command_log(rollback_log_name, false)
+      unless rl
+        puts "The given rollback-log name could not be found on the server: '#{rollback_log_name}'"
+        puts
+        exit 1
+      end
 
-      #lc = @logger.last_command.map { |op| {:op => op[:operation].inverse, :param => op[:extras] }}.compact
+      # fetch a preview of the batch
+      batch, might_have_more_batches = fetch_and_truncate(rl, 32)
+      puts "Rolling back #{rollback_log_name} will reverse the following operations:"
+      if might_have_more_batches
+        head_id = batch.first.first
+        puts "(WARNING: Showing only the first #{batch.size} (of up to #{head_id} possible) operations!)"
+      end
+      batch.each do |_, operation|
+        puts "\t#{operation.inspect}"
+      end
+      if might_have_more_batches
+        puts "\t..."
+      end
 
-      unless be_quiet
-        puts "Rolling back to would cause the following actions:"
-        lc.each do |op|
-          puts "#{op[:op].inspect}"
+      # make it so
+      confirm!
+      rollback(rl)
+    end
+
+    private
+
+    # fetch a batch of LogEntries, deserialize, and return a truncated list of
+    # (id, Transformation::Op) exclusive of the first 'commit_*' entry, and a
+    # boolean indicating whether there might be more batches
+    def fetch_and_truncate(rl, count)
+      batch = rl.peek(count)
+      operations = batch.map do |log_entry|
+        operation = Marshal.load(log_entry.content)
+        unless operation.kind_of? Transformation::Op::BaseOp
+          puts "Invalid operation persisted in rollback-log! #{operation}"
+          puts
+          exit 1
         end
+        [log_entry.id, operation]
+      end
+      truncated = operations.take_while do |id,operation|
+        !(operation.kind_of? Transformation::Op::Commit)
+      end
+      [truncated, count == truncated.size]
+    end
+
+    # takes a rollback log, and executes the inverse of its contents, up to the first
+    # instance of 'Op::Commit'
+    def rollback(rl)
+      batch_size = 128
+
+      batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
+      if batch.empty? && !might_have_more_batches
+        puts "Nothing to do."
+        return
       end
 
-      unless global_options.force
-        print "Continue? (y/n) "; $stdout.flush
-        exit unless $stdin.gets.chomp == "y"
-        puts ""
-      end
-
-      lc.each do |op|
-        op[:op].apply(manager, *(op[:param]))
+      puts "Rolling back #{rollback_log_name}:"
+      while !batch.empty? || might_have_more_batches
+        if batch.empty?
+          batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
+          next
+        end
+        batch.each do |id, operation|
+          inverse = operation.inverse
+          next if inverse.nil?
+          puts "#{inverse.inspect}"
+          # fixme: parameters? inverse.apply(manager, *(op[:param]))
+          rl.pop!(id)
+        end
+        batch = []
       end
     end
   end
