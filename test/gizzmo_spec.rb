@@ -5,6 +5,11 @@ describe "gizzmo (cli)" do
     @nameserver_db ||= read_nameserver_db
   end
 
+  # returns a regex that will fuzzily match the given string
+  def fuzzily(str)
+    Regexp.new(Regexp.escape(str).gsub("X", "\\d").gsub("second", "seconds?"))
+  end
+
   before do
     reset_nameserver
     @nameserver_db = nil
@@ -353,7 +358,7 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
 
       gizzmo('-f transform-tree --no-progress --poll-interval=1 --rollback-log="%s" \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
-localhost/s_0_001_replicating' % logname).should == <<-EOF
+localhost/s_0_001_replicating' % logname).should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(BlockedShard)
@@ -377,7 +382,7 @@ COPIES:
   localhost/s_0_001_a <-> 127.0.0.1/s_0_0001
 FINISHING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-1 transformation applied. Total time elapsed: 1 second
+1 transformation applied. Total time elapsed: X second
       EOF
 
       # access the nameserver db directly for shard information
@@ -390,7 +395,7 @@ FINISHING:
 
       # confirm that the last entry was recorded in a log of the correct name
       lastentry = ns.command_log(logname, false).peek(1)[0]
-      Marshal.load(lastentry.binary_content).class.should == Gizzard::Transformation::Op::CommitEnd
+      Marshal.load(lastentry.content).class.should == Gizzard::Transformation::Op::CommitEnd
     end
   end
 
@@ -406,7 +411,7 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(BlockedShard)
@@ -460,7 +465,7 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int) :
   PREPARE
     add_link(ReplicatingShard -> TestShard/localhost)
@@ -492,7 +497,7 @@ EOF
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(BlockedShard)
@@ -551,7 +556,7 @@ FINISHING:
 
       gizzmo('-f -T0,1 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
     create_shard(BlockedShard)
@@ -622,7 +627,7 @@ FINISHING:
       ns.reload_config
       gizzmo('-f -T0 rebalance --no-progress --poll-interval=1 \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
-1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+1 "ReplicatingShard -> TestShard(localhost,1)"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
   PREPARE
     create_shard(BlockedShard)
@@ -666,7 +671,7 @@ FINISHING:
     it "works" do
       gizzmo('-f -T0,1 create-table --shards=4 --base-name=s \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
-1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d")))
+1 "ReplicatingShard -> TestShard(localhost,1)"').should match(fuzzily(<<-EOF))
 Create tables 0, 1:
   ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   for 2 base ids:
