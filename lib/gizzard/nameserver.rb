@@ -37,7 +37,7 @@ module Gizzard
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
-    TRANSITIONAL_SHARD_TYPES = ["BlackHoleShard", "BlockedShard"]
+    TRANSITIONAL_SHARD_TYPES = ["BlockedShard"]
 
     INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard"]
 
@@ -253,7 +253,7 @@ module Gizzard
           end
           shard_type = shard_info.class_name.split('.').last
           if blocked_types.include? shard_type
-            puts "Aborting due to blocked shard #{shard_id.inspect}"
+            puts "Aborting due to #{shard_type} shard: #{shard_id.inspect}"
             exit 1
           end
         end

@@ -124,8 +124,8 @@ def load_config(options, filename)
 end
 
 def add_scheduler_opts(subcommand_options, opts)
-  opts.on("--ignore-types=SHARD_TYPE_LIST", "Allow transformations to begin despite shards of the given types existing in the topology.") do |t|
-    (subcommand_options.scheduler_options ||= {})[:ignore_types] = split(t)
+  opts.on("--ignore-types=SHARD_TYPE_LIST", "Allow transformations to begin despite shards of the given types (a comma-separated list) existing in the topology.") do |t|
+    (subcommand_options.scheduler_options ||= {})[:ignore_types] = t.to_s.split(',')
   end
   opts.on("--ignore-busy", "Allow transformations to begin despite busy shards existing in the topology.") do
     (subcommand_options.scheduler_options ||= {})[:ignore_busy] = true
@@ -507,7 +507,8 @@ global = OptionParser.new do |opts|
   opts.separator ""
   opts.separator "Global options:"
   opts.on("-H", "--hosts=HOST[,HOST,...]", "Comma-delimited list of application servers") do |hosts|
-    global_options.hosts = hosts.split(",").map {|h| h.strip }
+    global_options.hosts ||= []
+    global_options.hosts  += hosts.split(",").map {|h| h.strip }
   end
 
   opts.on("-P", "--port=PORT", "PORT of remote manager service (default 7920)") do |port|
@@ -519,7 +520,8 @@ global = OptionParser.new do |opts|
   end
 
   opts.on("-T", "--tables=TABLE[,TABLE,...]", "TABLE ids of forwardings to affect") do |tables|
-    global_options.tables = tables.split(",").map {|t| t.to_i }
+    global_options.tables ||= []
+    global_options.tables  += tables.split(",").map {|t| t.to_i }
   end
 
   opts.on("-F", "--framed", "Use the thrift framed transport") do |framed|
