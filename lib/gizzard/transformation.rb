@@ -249,7 +249,11 @@ module Gizzard
     end
 
     def apply!(nameserver, phase, rollback_log)
-      apply_ops(nameserver, transformation.operations[phase], rollback_log)
+      transformation.operations[phase].each do |op|
+        op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
+        full = [op, @table_id, @base_id, @table_prefix, @translations]
+        rollback_log.push!(Marshal.dump(full)) if rollback_log
+      end
     end
 
     # true if any of the given phases contain operations
@@ -287,15 +291,6 @@ module Gizzard
         desc.chomp " <-> "
       end
       
-    end
-
-    private
-
-    def apply_ops(nameserver, ops, rollback_log)
-      ops.each do |op|
-        op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
-        rollback_log.push!(Marshal.dump(op)) if rollback_log
-      end
     end
   end
 end

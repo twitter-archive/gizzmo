@@ -1217,18 +1217,20 @@ module Gizzard
     private
 
     # fetch a batch of LogEntries, deserialize, and return a truncated list of
-    # (id, Transformation::Op) exclusive of the first 'commit_*' entry, and a
+    # (id, Transformation::Op, args) exclusive of the first 'commit_*' entry, and a
     # boolean indicating whether there might be more batches
     def fetch_and_truncate(rl, count)
       batch = rl.peek(count)
       operations = batch.map do |log_entry|
-        operation = Marshal.load(log_entry.content)
+        op_and_args = Marshal.load(log_entry.content)
+        operation = op_and_args.first
+        args = op_and_args.drop(1)
         unless operation.kind_of? Transformation::Op::BaseOp
           puts "Invalid operation persisted in rollback-log! #{operation}"
           puts
           exit 1
         end
-        [log_entry.id, operation]
+        [log_entry.id, operation, args]
       end
       truncated = operations.take_while do |id,operation|
         !(operation.kind_of? Transformation::Op::Commit)
@@ -1253,11 +1255,11 @@ module Gizzard
           batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
           next
         end
-        batch.each do |id, operation|
+        batch.each do |id, operation, args|
           inverse = operation.inverse
           if !inverse.nil?
             puts "#{inverse.inspect}"
-            # fixme: parameters? inverse.apply(manager, *(op[:param]))
+            inverse.apply(manager, *args)
           end
           rl.pop!(id)
         end
