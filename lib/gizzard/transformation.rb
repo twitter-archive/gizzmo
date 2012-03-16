@@ -51,11 +51,13 @@ module Gizzard
       [:cleanup, "CLEANUP"],
     ]
     OP_PHASES = Hash[ORDERED_OP_PHASES]
+    OP_PHASES_BY_NAME = OP_PHASES.invert
 
     DEFAULT_DEST_WRAPPER = 'BlockedShard'
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 
+    # TODO: the skip_copies parameter should move out into the code that executes transforms
     def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false, batch_finish = false)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 

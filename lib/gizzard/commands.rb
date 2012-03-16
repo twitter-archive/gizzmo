@@ -835,11 +835,17 @@ module Gizzard
   class BaseTransformCommand < Command
     def run
       scheduler_options = command_options.scheduler_options || {}
-      force             = global_options.force
-      be_quiet          = force && command_options.quiet
+      @force             = global_options.force
+      @be_quiet          = @force && command_options.quiet
+      # TODO: remove Transformation's 'skip_copies' parameter
+      @skip_copies       = (scheduler_options[:skip_phases] || []).any? do |p|
+        Transformation::OP_PHASES_BY_NAME[p] == :copy
+      end
+      @batch_finish      = scheduler_options[:batch_finish] || false
+      @copy_wrapper      = scheduler_options[:copy_wrapper]
 
-      scheduler_options[:force] = force
-      scheduler_options[:quiet] = be_quiet
+      scheduler_options[:force] = @force
+      scheduler_options[:quiet] = @be_quiet
 
       # confirm that all app servers are relatively consistent
       manager.validate_clients_or_raise
@@ -854,7 +860,7 @@ module Gizzard
 
       base_name = get_base_name(transformations)
 
-      unless be_quiet
+      unless @be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
           puts "Applied to #{trees.length} shards"
@@ -877,10 +883,6 @@ module Gizzard
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
-      copy_wrapper   = scheduler_options[:copy_wrapper]
-      skip_copies    = scheduler_options[:skip_copies] || false
-      batch_finish   = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       memoized_transforms = {}
@@ -895,7 +897,7 @@ module Gizzard
         end
         shard          = manifest.trees[forwarding]
 
-        transform_args = [shard.template, to_template, copy_wrapper, skip_copies, batch_finish]
+        transform_args = [shard.template, to_template, @copy_wrapper, @skip_copies, @batch_finish]
         transformation = memoized_transforms.fetch(transform_args) do |args|
           memoized_transforms[args] = Transformation.new(*args)
         end
@@ -915,16 +917,12 @@ module Gizzard
       require_tables
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
-      copy_wrapper      = scheduler_options[:copy_wrapper]
-      skip_copies       = scheduler_options[:skip_copies] || false
-      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper, skip_copies, batch_finish)
+        transformation = Transformation.new(from, to, @copy_wrapper, @skip_copies, @batch_finish)
         forwardings    = Set.new(manifest.templates[from] || [])
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
@@ -941,10 +939,7 @@ module Gizzard
       require_tables
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
-      copy_wrapper      = scheduler_options[:copy_wrapper]
-      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       dest_templates_and_weights = {}
@@ -958,13 +953,14 @@ module Gizzard
 
       global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, @copy_wrapper, @batch_finish)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
     end
   end
 
+  # TODO: should extend BaseTransformCommand
   class AddPartitionCommand < Command
     def run
       require_tables

@@ -142,8 +142,15 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--copy-wrapper=SHARD_TYPE", "Wrap copy destination shards with SHARD_TYPE. default BlockedShard") do |t|
     (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
   end
-  opts.on("--skip-copies", "Do transformation without copying. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do
-    (subcommand_options.scheduler_options ||= {})[:skip_copies] = true
+  opts.on("--skip-phases=PHASE_LIST", "Executes transformations without the given phases. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do |phase_list|
+    s_opts = (subcommand_options.scheduler_options ||= {})
+    s_opts[:skip_phases] ||= []
+    s_opts[:skip_phases] += phase_list.split(",").map{|phase| phase.upcase}
+  end
+  opts.on("--skip-copies", "Deprecated: use 'skip-phases=copy' instead.") do
+    s_opts = (subcommand_options.scheduler_options ||= {})
+    s_opts[:skip_phases] ||= []
+    s_opts[:skip_phases] << "COPY"
   end
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true

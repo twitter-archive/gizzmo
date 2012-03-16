@@ -23,6 +23,9 @@ module Gizzard
       @transformations    = transformations
       @max_copies         = options[:max_copies]
       @copies_per_host    = options[:copies_per_host]
+      @skip_phases        = (options[:skip_phases] || []).map do |p|
+        Transformation::OP_PHASES_BY_NAME[p]
+      end.compact
       @poll_interval      = options[:poll_interval]
       @be_quiet           = options[:quiet]
       @force              = options[:force] || false
@@ -95,6 +98,12 @@ module Gizzard
       log "#{@jobs_finished.length} transformation#{'s' if @jobs_finished.length > 1} applied. Total time elapsed: #{time_elapsed}"
     end
 
+    def apply_job(job, phase)
+      if !(@skip_phases.include? phase)
+        job.apply!(@nameserver, phase, @rollback_log)
+      end
+    end
+
     def schedule_jobs(num_to_schedule)
       to_be_busy_hosts = []
       jobs             = []
@@ -116,7 +125,7 @@ module Gizzard
         log "STARTING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.apply!(@nameserver, :prepare, @rollback_log)
+          apply_job(j, :prepare)
         end
 
         nameserver.reload_updated_forwardings
@@ -127,7 +136,7 @@ module Gizzard
           log "COPIES:"
           copy_jobs.each do |j|
             j.copy_descs.each {|d| log "  #{d}" }
-            j.apply!(@nameserver, :copy, @rollback_log)
+            apply_job(j, :copy)
           end
 
           reload_busy_shards
@@ -147,7 +156,7 @@ module Gizzard
         log "FINISHING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.apply!(@nameserver, :cleanup, @rollback_log)
+          apply_job(j, :cleanup)
         end
 
         @jobs_finished.concat(jobs)
@@ -163,7 +172,7 @@ module Gizzard
         @jobs_copying -= jobs
         jobs.each do |j|
           if j.required?(:unblock_writes)
-            j.apply!(@nameserver, :unblock_writes, @rollback_log)
+            apply_job(j, :unblock_writes)
           end
         end
         @jobs_settling.concat(jobs)
@@ -182,7 +191,7 @@ module Gizzard
       Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
       jobs.each do |j|
-        j.apply!(@nameserver, :unblock_reads, @rollback_log)
+        apply_job(j, :unblock_reads)
       end
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
                         "caches are warmed, and then enter 'y' to proceed.")
