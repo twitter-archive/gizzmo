@@ -688,6 +688,49 @@ Rolling back test_log_name will reverse the following operations:
 Nothing to do.
       EOF
     end
+
+    it "rolls back a transform that was not committed" do
+      logname = 'test_log_name'
+      # skip the 'cleanup' phase, which will prevent commit
+      gizzmo('-f transform-tree --no-progress --poll-interval=1 --batch-finish --skip-phases=CLEANUP --rollback-log="%s" \
+"ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
+localhost/s_0_001_replicating' % logname)
+
+      # should be able to roll back everything that was executed
+      gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
+Rolling back test_log_name will reverse the following operations:
+	delete_shard(WriteOnlyShard)
+	remove_link(ReplicatingShard -> WriteOnlyShard)
+	remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
+	add_link(ReplicatingShard -> TestShard/127.0.0.1)
+	delete_shard(BlockedShard)
+	remove_link(BlockedShard -> TestShard/127.0.0.1)
+	remove_link(ReplicatingShard -> BlockedShard)
+	add_link(ReplicatingShard -> WriteOnlyShard)
+	add_link(WriteOnlyShard -> TestShard/127.0.0.1)
+	create_shard(WriteOnlyShard)
+	copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
+	add_link(BlockedShard -> TestShard/127.0.0.1)
+	add_link(ReplicatingShard -> BlockedShard)
+	create_shard(TestShard/127.0.0.1)
+	create_shard(BlockedShard)
+Rolling back test_log_name:
+create_shard(WriteOnlyShard)
+add_link(ReplicatingShard -> WriteOnlyShard)
+add_link(WriteOnlyShard -> TestShard/127.0.0.1)
+remove_link(ReplicatingShard -> TestShard/127.0.0.1)
+create_shard(BlockedShard)
+add_link(BlockedShard -> TestShard/127.0.0.1)
+add_link(ReplicatingShard -> BlockedShard)
+remove_link(ReplicatingShard -> WriteOnlyShard)
+remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
+delete_shard(WriteOnlyShard)
+remove_link(BlockedShard -> TestShard/127.0.0.1)
+remove_link(ReplicatingShard -> BlockedShard)
+delete_shard(TestShard/127.0.0.1)
+delete_shard(BlockedShard)
+      EOF
+    end
   end
 
   describe "create-table" do

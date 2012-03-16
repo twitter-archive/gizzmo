@@ -1196,7 +1196,7 @@ module Gizzard
 
       # fetch a preview of the batch
       batch, might_have_more_batches = fetch_and_truncate(rl, 32)
-      puts "Rolling back #{rollback_log_name} will reverse the following operations:"
+      puts "Rolling back #{rl.name} will reverse the following operations:"
       if might_have_more_batches
         head_id = batch.first.first
         puts "(WARNING: Showing only the first #{batch.size} (of up to #{head_id} possible) operations!)"
@@ -1211,6 +1211,7 @@ module Gizzard
       # make it so
       confirm!
       rollback(rl)
+      manager.reload_config
     end
 
     private
@@ -1246,7 +1247,7 @@ module Gizzard
         return
       end
 
-      puts "Rolling back #{rollback_log_name}:"
+      puts "Rolling back #{rl.name}:"
       while !batch.empty? || might_have_more_batches
         if batch.empty?
           batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
