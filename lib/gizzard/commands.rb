@@ -1255,9 +1255,10 @@ module Gizzard
         end
         batch.each do |id, operation|
           inverse = operation.inverse
-          next if inverse.nil?
-          puts "#{inverse.inspect}"
-          # fixme: parameters? inverse.apply(manager, *(op[:param]))
+          if !inverse.nil?
+            puts "#{inverse.inspect}"
+            # fixme: parameters? inverse.apply(manager, *(op[:param]))
+          end
           rl.pop!(id)
         end
         batch = []

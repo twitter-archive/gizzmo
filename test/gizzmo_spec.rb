@@ -730,6 +730,12 @@ remove_link(ReplicatingShard -> BlockedShard)
 delete_shard(TestShard/127.0.0.1)
 delete_shard(BlockedShard)
       EOF
+
+      # then confirm that the log is now 'empty' (aka, entries all marked deleted)
+      gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
+Rolling back test_log_name will reverse the following operations:
+Nothing to do.
+      EOF
     end
   end
 
