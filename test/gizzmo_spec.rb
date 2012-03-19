@@ -193,7 +193,7 @@ describe "gizzmo (cli)" do
 
     describe "subtree" do
       it "prints the tree for a shard" do
-        results = "localhost/t_0_000_replicating\n  127.0.0.1/t_0_000_b\n  localhost/t_0_000_a\n"
+        results = "localhost/t_0_000_replicating\n  localhost/t_0_000_a\n  127.0.0.1/t_0_000_b\n"
         gizzmo("subtree localhost/t_0_000_replicating").should == results
         gizzmo("subtree localhost/t_0_000_a").should == results
         gizzmo("subtree 127.0.0.1/t_0_000_b").should == results
@@ -721,12 +721,12 @@ set_forwarding(ReplicatingShard): s_1_0000
                                        link(id("localhost", "s_1_0003_replicating"), id("127.0.0.1", "s_1_0003"), 1)]
 
       nameserver_db[:forwardings].should == [forwarding(0, 0, id("localhost", "s_0_0000_replicating")),
-                                             forwarding(1, 0, id("localhost", "s_1_0000_replicating")),
                                              forwarding(0, 288230376151711744, id("localhost", "s_0_0003_replicating")),
-                                             forwarding(1, 288230376151711744, id("localhost", "s_1_0003_replicating")),
                                              forwarding(0, 576460752303423488, id("localhost", "s_0_0002_replicating")),
-                                             forwarding(1, 576460752303423488, id("localhost", "s_1_0002_replicating")),
                                              forwarding(0, 864691128455135232, id("localhost", "s_0_0001_replicating")),
+                                             forwarding(1, 0, id("localhost", "s_1_0000_replicating")),
+                                             forwarding(1, 288230376151711744, id("localhost", "s_1_0003_replicating")),
+                                             forwarding(1, 576460752303423488, id("localhost", "s_1_0002_replicating")),
                                              forwarding(1, 864691128455135232, id("localhost", "s_1_0001_replicating"))]
 
     end
