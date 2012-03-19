@@ -1,15 +1,4 @@
 module Gizzard
-  module ParallelMap
-    def parallel_map(enumerable, &block)
-      enumerable.map do |elem|
-        Thread.new { Thread.current[:result] = block.call(elem) }
-      end.map do |thread|
-        thread.join
-        thread[:result]
-      end
-    end
-  end
-
   class Shard < Struct.new(:info, :children, :weight)
     class << self
       def canonical_table_prefix(enum, table_id = nil, base_prefix = "shard")
@@ -94,10 +83,9 @@ module Gizzard
   end
 
   class Nameserver
-    include ParallelMap
-
     DEFAULT_PORT    = 7920
     DEFAULT_RETRIES = 10
+    MAX_ATTEMPT_SECS = 10
     PARALLELISM     = 10
 
     attr_reader :hosts, :logfile, :dryrun, :framed
@@ -117,13 +105,13 @@ module Gizzard
     end
 
     def reload_updated_forwardings
-      parallel_map all_clients do |c|
+      on_all_servers "reload_updated_forwardings" do |c|
         with_retry { c.reload_updated_forwardings }
       end
     end
 
     def reload_config
-      parallel_map all_clients do |c|
+      on_all_servers "reload_config" do |c|
         with_retry { c.reload_config }
       end
     end
@@ -180,6 +168,41 @@ module Gizzard
 
     private
 
+    # executes the given block in parallel with a client for each server: in the face of failure,
+    # may return less results than there are clients
+    def on_all_servers(operation_name, &block)
+      # fork into many threads, and then join with exception handling
+      clients_and_threads = all_clients.map do |client|
+        [client, Thread.new { Thread.current[:result] = block.call(client) }]
+      end
+      clients_and_results_or_exceptions = clients_and_threads.map do |client, thread|
+        begin
+          thread.join
+          [client, thread[:result], nil]
+        rescue Exception => e
+          [client, nil, e]
+        end
+      end
+
+      successful_clients, failed_clients =
+        clients_and_results_or_exceptions.partition{|_, _, exception| exception.nil? }
+      if failed_clients.size > 0
+        # if there were failed clients, but a client would like to proceed anyway,
+        # mutate @all_clients to remove the failed clients
+        puts "#{failed_clients.size} of #{all_clients.size} clients failed to execute '#{operation_name}':"
+        failed_clients.each do |client, _, exception|
+          puts "\t#{client.get_host} failed with: #{exception}"
+        end
+        # TODO: propagate 'force' parameter here, and kill-if-force
+        Gizzard::confirm!(false, "Proceed without these hosts?")
+        # we're still alive: user wanted to proceed
+        @all_clients.reject!(failed_clients.map{|client, _, _| client })
+      end
+
+      # return only successful results
+      successful_clients.map{|_, result, _| result }
+    end
+
     def client
       @client ||= create_client(hosts.first)
     end
@@ -207,12 +230,11 @@ module Gizzard
       STDERR.puts "\nException: #{e.class}: #{e.description rescue "(no description)"}"
       STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0
       times -= 1
-      (times < 0) ? raise : (sleep 0.1; retry)
+      sleep_time = MAX_ATTEMPT_SECS / [times, 1].max
+      (times < 0) ? raise : (sleep(sleep_time); retry)
     end
 
     class Manifest
-      include ParallelMap
-
       attr_reader :forwardings, :links, :shard_infos, :trees, :templates
 
       def initialize(nameserver, table_ids)
