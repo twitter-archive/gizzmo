@@ -101,7 +101,7 @@ module Gizzard
     end
 
     def get_shards(ids)
-      ids.map {|id| with_retry { client.get_shard(id) } }
+      ids.map {|id| with_retry { random_client.get_shard(id) } }
     end
 
     def reload_updated_forwardings
@@ -117,18 +117,15 @@ module Gizzard
     end
 
     def copy_shard(*shards)
-      c = random_client
-      with_retry { c.copy_shard(*shards) }
+      with_retry { random_client.copy_shard(*shards) }
     end
 
     def repair_shards(*shards)
-      c = random_client
-      with_retry { c.repair_shard(*shards) }
+      with_retry { random_client.repair_shard(*shards) }
     end
 
     def diff_shards(*shards)
-      c = random_client
-      with_retry { c.diff_shards(*shards) }
+      with_retry { random_client.diff_shards(*shards) }
     end
 
     def respond_to?(method)
@@ -137,7 +134,7 @@ module Gizzard
 
     def method_missing(method, *args, &block)
       if client.respond_to?(method)
-        with_retry { client.send(method, *args, &block) }
+        with_retry { random_client.send(method, *args, &block) }
       else
         super
       end
