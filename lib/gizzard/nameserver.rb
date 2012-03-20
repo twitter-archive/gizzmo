@@ -184,7 +184,7 @@ module Gizzard
       successful_clients, failed_clients =
         clients_and_results_or_exceptions.partition{|_, _, exception| exception.nil? }
       if failed_clients.size > 0
-        # if there were failed clients, but a client would like to proceed anyway,
+        # if there were failed clients, but the user would like to proceed anyway,
         # mutate @all_clients to remove the failed clients
         puts "#{failed_clients.size} of #{all_clients.size} clients failed to execute '#{operation_name}':"
         failed_clients.each do |client, _, exception|
