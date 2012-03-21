@@ -11,7 +11,8 @@ describe "gizzmo (cli)" do
   end
 
   before do
-    reset_nameserver
+    reset_databases!
+    rebuild_nameserver!
     @nameserver_db = nil
   end
 

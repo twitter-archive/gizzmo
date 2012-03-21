@@ -80,29 +80,29 @@ def create_database(*ds)
   ds.each {|d| $mysql.query("create database if not exists `#{d}`") }
 end
 
-def reset_nameserver(db = NAMESERVER_DATABASE)
-  $mysql.query("delete from `#{db}`.shards")
-  $mysql.query("delete from `#{db}`.shard_children")
-  $mysql.query("delete from `#{db}`.forwardings")
-  $mysql.query("delete from `#{db}`.hosts")
-  $mysql.query("delete from `#{db}`.logs")
-  $mysql.query("delete from `#{db}`.log_entries")
-
-  nameserver.reload_config rescue nil
-end
-
+# clear the nameserver database, without touching the nameserver
 def reset_databases!
   drop_database SERVICE_DATABASE
   create_database NAMESERVER_DATABASE, SERVICE_DATABASE
 
   begin
-    reset_nameserver
+    db = NAMESERVER_DATABASE
+    $mysql.query("delete from `#{db}`.shards")
+    $mysql.query("delete from `#{db}`.shard_children")
+    $mysql.query("delete from `#{db}`.forwardings")
+    $mysql.query("delete from `#{db}`.hosts")
+    $mysql.query("delete from `#{db}`.logs")
+    $mysql.query("delete from `#{db}`.log_entries")
   rescue MysqlError
+  end
+end
 
-    begin
-      nameserver.rebuild_schema
-    rescue Errno::ECONNREFUSED
-    end
+# assuming a cleared nameserver database, reload or rebuild the nameserver schema
+def rebuild_nameserver!
+  begin
+    nameserver.reload_config
+  rescue Errno::ECONNREFUSED
+    nameserver.rebuild_schema
   end
 end
 
@@ -155,8 +155,8 @@ alias ns nameserver
 
 mysql_connect!("localhost", 'root', '')
 reset_databases!
-
 unless ENV['EXTERNAL_TEST_SERVER']
   start_test_server!
   at_exit { stop_test_server! }
 end
+rebuild_nameserver!
