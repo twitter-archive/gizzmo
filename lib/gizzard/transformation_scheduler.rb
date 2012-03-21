@@ -193,6 +193,7 @@ module Gizzard
       jobs.each do |j|
         apply_job(j, :unblock_reads)
       end
+      nameserver.reload_updated_forwardings
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
                         "caches are warmed, and then enter 'y' to proceed.")
     end
