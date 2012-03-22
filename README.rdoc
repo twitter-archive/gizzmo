@@ -42,18 +42,19 @@ The tests may be somewhat difficult to run outside of Twitter.  They assume that
 
 To execute the tests:
 
-1. Build the included test server (once):
+1. Set up a nameserver database (once):
 
         // create the database for the local nameserver
         echo "create database gizzard_test_integration_ns;" | mysql
-        // retrieve test server dependencies
-        cd test_server ; sbt update
 
-2. Start the test server (with service, injector, management ports of 7918, 7919, 7920 respectively):
+2. Pull in test server dependencies (once, or whenever you want to change the Gizzard version):
 
-        cd test_server ; sbt "run 7918 7919 7920"
+        cd test/test_server ; sbt clean-lib update
 
-3. Run ./test/test.sh
+3. Run rake (the default target is the test suite: all files ending in '_spec' in the test directory):
+
+        rake
+
 
 == Copyright
 
