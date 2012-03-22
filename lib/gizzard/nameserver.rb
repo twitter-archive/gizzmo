@@ -316,9 +316,10 @@ module Gizzard
           end
       end
 
-      # pushes binary content to the end of the log, returns a new log_entry_id
-      def push!(binary_content)
-        entry = LogEntry.new((@next_entry_id += 1), binary_content)
+      # pushes a TransformOperation to the end of the log, returns a new log_entry_id
+      def push!(transform_operation)
+        puts "pushing #{transform_operation}"
+        entry = LogEntry.new((@next_entry_id += 1), transform_operation)
         @nameserver.log_entry_push(@log_id, entry)
       end
 

@@ -129,24 +129,33 @@ module Gizzard
 
   RemoveLinkRequest = T.make_struct(:RemoveLinkRequest,
     T::Field.new(:up_id, struct(ShardId), 1),
-    T::Field.new(:down_id, struct(ShardId), 2),
+    T::Field.new(:down_id, struct(ShardId), 2)
   )
 
   # a union: exactly one entry should be set
-  TransformCommand = T.make_struct(:TransformCommand,
+  TransformOperation = T.make_struct(:TransformOperation,
     T::Field.new(:create_shard, struct(ShardInfo), 1),
     T::Field.new(:delete_shard, struct(ShardId), 2),
     T::Field.new(:add_link, struct(AddLinkRequest), 3),
     T::Field.new(:remove_link, struct(RemoveLinkRequest), 4),
     T::Field.new(:set_forwarding, struct(Forwarding), 5),
     T::Field.new(:remove_forwarding, struct(Forwarding), 6),
-    T::Field.new(:commit, T::BOOL, 7),
+    T::Field.new(:commit, T::BOOL, 7)
   )
+
+  class TransformOperation
+    # build a TransformOperation for the given field and content
+    def TransformOperation.with(field_symbol, field_content)
+      tc = TransformOperation.new()
+      tc[field_symbol] = field_content
+      tc
+    end
+  end
 
   LogEntry = T.make_struct(:LogEntry,
     T::Field.new(:id, T::I32, 1),
     # this is a binary field
-    T::Field.new(:command, struct(TransformCommand), 2)
+    T::Field.new(:command, struct(TransformOperation), 2)
   )
 
   class LogEntry

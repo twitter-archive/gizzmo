@@ -1,4 +1,7 @@
 module Gizzard
+  # the 'apply' method of a Transformation::Op should return a Thrift TransformOperation
+  # object, representing the fully specified operation, or 'Nil' if the operation is
+  # not intended for serialization
   module Transformation::Op
     class BaseOp
       def inverse?(other)
@@ -58,6 +61,7 @@ module Gizzard
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         involved_shards(table_prefix, translations).each { |sid| nameserver.mark_shard_busy(sid, BUSY) }
         nameserver.copy_shard(involved_shards(table_prefix, translations))
+        nil
       end
     end
 
@@ -77,6 +81,7 @@ module Gizzard
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         nameserver.repair_shards(involved_shards(table_prefix, translations))
+        nil
       end
     end
 
@@ -100,6 +105,7 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.diff_shards(from_shard_id, to_shard_id)
+        nil
       end
     end
 
@@ -151,6 +157,7 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.add_link(from_shard_id, to_shard_id, to.weight)
+        TransformOperation.with(:add_link, AddLinkRequest.new(from_shard_id, to_shard_id, to.weight))
       end
     end
 
@@ -164,6 +171,7 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.remove_link(from_shard_id, to_shard_id)
+        TransformOperation.with(:remove_link, RemoveLinkRequest.new(from_shard_id, to_shard_id))
       end
     end
 
@@ -216,7 +224,9 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        nameserver.create_shard(template.to_shard_info(table_prefix, translations))
+        shard_info = template.to_shard_info(table_prefix, translations)
+        nameserver.create_shard(shard_info)
+        TransformOperation.with(:create_shard, shard_info)
       end
     end
 
@@ -226,7 +236,9 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        nameserver.delete_shard(template.to_shard_id(table_prefix, translations))
+        shard_id = template.to_shard_id(table_prefix, translations)
+        nameserver.delete_shard(shard_id)
+        TransformOperation.with(:delete_shard, shard_id)
       end
     end
 
@@ -252,20 +264,27 @@ module Gizzard
         shard_id   = template.to_shard_id(table_prefix, translations)
         forwarding = Forwarding.new(table_id, base_id, shard_id)
         nameserver.set_forwarding(forwarding)
+        TransformOperation.with(:set_forwarding, forwarding)
       end
     end
 
 
-    # a no-op, but needed for setup/teardown symmetry
     class RemoveForwarding < ShardOp
       def expand(copy_source, involved_in_copy, batch_finish)
         { (involved_in_copy ? :cleanup : :prepare) => [self] }
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        # shard_id   = template.to_shard_id(table_prefix, translations)
-        # forwarding = Forwarding.new(table_id, base_id, shard_id)
+        shard_id   = template.to_shard_id(table_prefix, translations)
+        forwarding = Forwarding.new(table_id, base_id, shard_id)
+=begin
+        # This is a no-op in gizzard deployments, because we do not support
+        # splitting/merging forwardings: thus, forwardings are always 'updated' via
+        # overwriting with AddForwarding: the op exists solely for setup/teardown
+        # symmetry
         # nameserver.remove_forwarding(forwarding)
+=end
+        TransformOperation.with(:remove_forwarding, forwarding)
       end
 
       def noop?
@@ -280,7 +299,8 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        # noop
+        # logged noop
+        TransformOperation.new(:commit, true)
       end
 
       def noop?

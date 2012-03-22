@@ -149,8 +149,9 @@ describe Gizzard::Nameserver::CommandLog do
   it "it appends to and peeks at a log" do
     log = ns.command_log("test2", true)
     ["it's", "better than bad", "log!"].map do |entry|
-      log.push!(entry)
-      log.peek(1)[0].content.should == entry
+      to = mkTO(entry)
+      log.push!(to)
+      log.peek(1)[0].command.should == to
     end
   end
 
@@ -158,13 +159,18 @@ describe Gizzard::Nameserver::CommandLog do
     log = ns.command_log("test3", true)
     entries = ["un", "deux", "trois"]
     entries.each do |entry|
-      log.push!(entry)
+      log.push!(mkTO(entry))
     end
     log.peek(3).reverse.map{|e| e.content}.should == entries
     entries.reverse_each do |entry|
       peeked = log.peek(1)[0]
-      peeked.content.should == entry
+      peeked.command.should == mkTO(entry)
       log.pop!(peeked.id)
     end
+  end
+
+  # makes a simple transform op containing a string
+  def mkTO(string)
+    TransformOperation.with(:delete_shard, ShardId.new(string, string))
   end
 end

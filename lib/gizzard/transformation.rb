@@ -250,9 +250,9 @@ module Gizzard
 
     def apply!(nameserver, phase, rollback_log)
       transformation.operations[phase].each do |op|
-        op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
-        full = [op, @table_id, @base_id, @table_prefix, @translations]
-        rollback_log.push!(Marshal.dump(full)) if rollback_log
+        transform_command =
+          op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
+        rollback_log.push!(transform_command) if rollback_log
       end
     end
 
