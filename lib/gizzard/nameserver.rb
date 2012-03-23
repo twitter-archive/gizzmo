@@ -97,6 +97,7 @@ module Gizzard
       @retries = options[:retries] || DEFAULT_RETRIES
       @logfile = options[:log]     || "/tmp/gizzmo.log"
       @dryrun  = options[:dry_run] || false
+      @force   = options[:force]   || false
       @framed  = options[:framed]  || false
       @hosts   = hosts.flatten
     end
@@ -195,10 +196,17 @@ module Gizzard
         failed_clients.each do |client, _, exception|
           puts "\t#{client.get_host} failed with: #{exception}"
         end
-        # TODO: propagate 'force' parameter here, and kill-if-force
+        if @force
+          puts "Cannot proceed past exceptions while force=true: exiting."
+          exit 1
+        end
         Gizzard::confirm!(false, "Proceed without these hosts?")
         # we're still alive: user wanted to proceed
         @all_clients.reject!(failed_clients.map{|client, _, _| client })
+      end
+      if @all_clients.size < 1
+        puts "No viable clients remain: exiting."
+        exit 1
       end
 
       # return only successful results
@@ -318,7 +326,6 @@ module Gizzard
 
       # pushes a TransformOperation to the end of the log, returns a new log_entry_id
       def push!(transform_operation)
-        puts "pushing #{transform_operation}"
         entry = LogEntry.new((@next_entry_id += 1), transform_operation)
         @nameserver.log_entry_push(@log_id, entry)
       end

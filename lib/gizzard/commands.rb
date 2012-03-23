@@ -46,7 +46,8 @@ module Gizzard
         Nameserver.new(hosts, :retries => global_options.retry,
                               :log     => log,
                               :framed  => global_options.framed,
-                              :dry_run => global_options.dry)
+                              :dry_run => global_options.dry,
+                              :force   => global_options.force)
       end
 
       def make_job_injector(global_options, log)

@@ -157,20 +157,20 @@ describe Gizzard::Nameserver::CommandLog do
 
   it "it pops from a log, and ignores popped in peek" do
     log = ns.command_log("test3", true)
-    entries = ["un", "deux", "trois"]
+    entries = ["un", "deux", "trois"].map{|e| mkTO(e) }
     entries.each do |entry|
-      log.push!(mkTO(entry))
+      log.push!(entry)
     end
-    log.peek(3).reverse.map{|e| e.content}.should == entries
+    log.peek(3).reverse.map{|e| e.command}.should == entries
     entries.reverse_each do |entry|
       peeked = log.peek(1)[0]
-      peeked.command.should == mkTO(entry)
+      peeked.command.should == entry
       log.pop!(peeked.id)
     end
   end
 
   # makes a simple transform op containing a string
   def mkTO(string)
-    TransformOperation.with(:delete_shard, ShardId.new(string, string))
+    Gizzard::TransformOperation.with(:delete_shard, Gizzard::ShardId.new(string, string))
   end
 end

@@ -680,13 +680,13 @@ localhost/s_0_001_replicating' % logname)
 
       res = gizzmo('-f log-rollback "%s"' % logname)
       res.should match(fuzzily(<<-EOF))
-Rolling back test_log_name will reverse the following operations:
+Rolling back #{logname} will reverse the following operations:
 Nothing to do.
       EOF
     end
 
     it "rolls back a transform that was not committed" do
-      logname = 'test_log_name'
+      logname = 'test_log_name2'
       # skip the 'cleanup' phase, which will prevent commit
       gizzmo('-f transform-tree --no-progress --poll-interval=1 --batch-finish --skip-phases=CLEANUP --rollback-log="%s" \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
@@ -694,7 +694,7 @@ localhost/s_0_001_replicating' % logname)
 
       # should be able to roll back everything that was executed
       gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
-Rolling back test_log_name will reverse the following operations:
+Rolling back #{logname} will reverse the following operations:
 	delete_shard(WriteOnlyShard)
 	remove_link(ReplicatingShard -> WriteOnlyShard)
 	remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
@@ -710,7 +710,7 @@ Rolling back test_log_name will reverse the following operations:
 	add_link(ReplicatingShard -> BlockedShard)
 	create_shard(TestShard/127.0.0.1)
 	create_shard(BlockedShard)
-Rolling back test_log_name:
+Rolling back #{logname}:
 create_shard(WriteOnlyShard)
 add_link(ReplicatingShard -> WriteOnlyShard)
 add_link(WriteOnlyShard -> TestShard/127.0.0.1)
@@ -729,7 +729,7 @@ delete_shard(BlockedShard)
 
       # then confirm that the log is now 'empty' (aka, entries all marked deleted)
       gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
-Rolling back test_log_name will reverse the following operations:
+Rolling back #{logname} will reverse the following operations:
 Nothing to do.
       EOF
     end
