@@ -154,7 +154,6 @@ module Gizzard
 
   LogEntry = T.make_struct(:LogEntry,
     T::Field.new(:id, T::I32, 1),
-    # this is a binary field
     T::Field.new(:command, struct(TransformOperation), 2)
   )
 

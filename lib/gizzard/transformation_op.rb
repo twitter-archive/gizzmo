@@ -300,7 +300,7 @@ module Gizzard
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         # logged noop
-        TransformOperation.new(:commit, true)
+        TransformOperation.with(:commit, true)
       end
 
       def noop?
