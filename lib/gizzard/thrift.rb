@@ -152,6 +152,7 @@ module Gizzard
     end
   end
 
+  # FIXME: rename command -> operation here and in the server
   LogEntry = T.make_struct(:LogEntry,
     T::Field.new(:id, T::I32, 1),
     T::Field.new(:command, struct(TransformOperation), 2)
@@ -239,6 +240,7 @@ module Gizzard
 
     thrift_method :dump_nameserver, list(struct(NameServerState)), field(:table_ids, list(i32), 1), :throws => exception(GizzardException)
 
+    thrift_method :batch_execute, void, field(:commands, list(struct(TransformOperation)), 1), :throws => exception(GizzardException)
 
     # Job Scheduler Management
 

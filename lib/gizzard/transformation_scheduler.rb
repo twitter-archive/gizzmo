@@ -77,6 +77,7 @@ module Gizzard
         if !@batch_finish
           cleanup_jobs
         end
+
         schedule_jobs(max_copies - busy_shards.length)
 
         if @batch_finish && @jobs_pending.empty? && @jobs_copying.empty?

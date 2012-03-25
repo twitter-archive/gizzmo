@@ -1197,7 +1197,7 @@ module Gizzard
 
       # fetch a preview of the batch
       batch, might_have_more_batches = fetch_and_truncate(rl, 32)
-      puts "Rolling back #{rl.name} will reverse the following operations:"
+      puts "Rolling back #{rl.name} will execute the following operations:"
       if might_have_more_batches
         head_id = batch.first.first
         puts "(WARNING: Showing only the first #{batch.size} (of up to #{head_id} possible) operations!)"
@@ -1217,24 +1217,23 @@ module Gizzard
 
     private
 
-    # fetch a batch of LogEntries, deserialize, and return a truncated list of
-    # (id, Transformation::Op, args) exclusive of the first 'commit_*' entry, and a
-    # boolean indicating whether there might be more batches
+    # fetch a batch of LogEntries, and return a truncated list of (id, TransformOperation),
+    # exclusive of the first 'Commit' entry, and a boolean indicating whether there might be
+    # more batches
     def fetch_and_truncate(rl, count)
       batch = rl.peek(count)
       operations = batch.map do |log_entry|
-        op_and_args = Marshal.load(log_entry.content)
-        operation = op_and_args.first
-        args = op_and_args.drop(1)
-        unless operation.kind_of? Transformation::Op::BaseOp
-          puts "Invalid operation persisted in rollback-log! #{operation}"
+        op = log_entry.command
+        unless op.kind_of? Gizzard::TransformOperation
+          puts "Invalid operation persisted in rollback-log! #{op}"
           puts
           exit 1
         end
-        [log_entry.id, operation, args]
+        [log_entry.id, op]
       end
+      # take the prefix up to the first 'commit' operation
       truncated = operations.take_while do |id,operation|
-        !(operation.kind_of? Transformation::Op::Commit)
+        !(operation[:commit].nil?)
       end
       [truncated, count == truncated.size]
     end
@@ -1256,12 +1255,10 @@ module Gizzard
           batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
           next
         end
-        batch.each do |id, operation, args|
-          inverse = operation.inverse
-          if !inverse.nil?
-            puts "#{inverse.inspect}"
-            inverse.apply(manager, *args)
-          end
+        # TODO: update log execution to pop! batches of ids
+        batch.each do |id, op|
+          puts "#{op.inspect}"
+          manager.batch_execute([op])
           rl.pop!(id)
         end
         batch = []

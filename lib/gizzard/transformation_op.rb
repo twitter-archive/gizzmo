@@ -1,7 +1,9 @@
 module Gizzard
   # the 'apply' method of a Transformation::Op should return a Thrift TransformOperation
-  # object, representing the fully specified operation, or 'Nil' if the operation is
-  # not intended for serialization
+  # object, representing the INVERSE of the applied operation, or 'Nil' if the operation is
+  # not intended to be rolled back
+  # TODO: over time, the batch_execute method should be utilized more fully by the
+  # scheduler to compose multiple operations where safe/possible
   module Transformation::Op
     class BaseOp
       def inverse?(other)
@@ -157,7 +159,8 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.add_link(from_shard_id, to_shard_id, to.weight)
-        TransformOperation.with(:add_link, AddLinkRequest.new(from_shard_id, to_shard_id, to.weight))
+        # return inverse
+        TransformOperation.with(:remove_link, RemoveLinkRequest.new(from_shard_id, to_shard_id))
       end
     end
 
@@ -171,7 +174,8 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.remove_link(from_shard_id, to_shard_id)
-        TransformOperation.with(:remove_link, RemoveLinkRequest.new(from_shard_id, to_shard_id))
+        # return inverse
+        TransformOperation.with(:add_link, AddLinkRequest.new(from_shard_id, to_shard_id, to.weight))
       end
     end
 
@@ -226,7 +230,8 @@ module Gizzard
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         shard_info = template.to_shard_info(table_prefix, translations)
         nameserver.create_shard(shard_info)
-        TransformOperation.with(:create_shard, shard_info)
+        # return inverse
+        TransformOperation.with(:delete_shard, shard_info.id)
       end
     end
 
@@ -238,7 +243,9 @@ module Gizzard
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         shard_id = template.to_shard_id(table_prefix, translations)
         nameserver.delete_shard(shard_id)
-        TransformOperation.with(:delete_shard, shard_id)
+        # return inverse
+        shard_info = template.to_shard_info(table_prefix, translations)
+        TransformOperation.with(:create_shard, shard_info)
       end
     end
 
@@ -264,6 +271,10 @@ module Gizzard
         shard_id   = template.to_shard_id(table_prefix, translations)
         forwarding = Forwarding.new(table_id, base_id, shard_id)
         nameserver.set_forwarding(forwarding)
+        # return inverse
+        # NB: since forwarding changes are update-only, inverting a forwarding means
+        # restoring whatever we think we're overwriting now. VERY much assumes that
+        # there are no concurrent operations, which is terrifying yay!
         TransformOperation.with(:set_forwarding, forwarding)
       end
     end
@@ -275,16 +286,12 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        shard_id   = template.to_shard_id(table_prefix, translations)
-        forwarding = Forwarding.new(table_id, base_id, shard_id)
-=begin
         # This is a no-op in gizzard deployments, because we do not support
         # splitting/merging forwardings: thus, forwardings are always 'updated' via
         # overwriting with AddForwarding: the op exists solely for setup/teardown
         # symmetry
         # nameserver.remove_forwarding(forwarding)
-=end
-        TransformOperation.with(:remove_forwarding, forwarding)
+        nil
       end
 
       def noop?
@@ -299,7 +306,7 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        # logged noop
+        # the inverse of a commit is still a commit
         TransformOperation.with(:commit, true)
       end
 
