@@ -238,7 +238,11 @@ module Gizzard
   class ReloadCommand < Command
     def run
       if global_options.force || ask
-        manager.reload_config
+        if command_options.fast
+          manager.reload_updated_forwardings
+        else
+          manager.reload_config
+        end
       else
         STDERR.puts "aborted"
       end
