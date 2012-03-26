@@ -137,3 +137,40 @@ describe Gizzard::Nameserver::Manifest do
     }
   end
 end
+
+describe Gizzard::Nameserver::CommandLog do
+  it "creates and gets a log" do
+    name = "test1"
+    log_created = ns.command_log(name, true)
+    log_gotten = ns.command_log(name, false)
+    log_created.log_id.should == log_gotten.log_id
+  end
+
+  it "it appends to and peeks at a log" do
+    log = ns.command_log("test2", true)
+    ["it's", "better than bad", "log!"].map do |entry|
+      to = mkTO(entry)
+      log.push!(to)
+      log.peek(1)[0].command.should == to
+    end
+  end
+
+  it "it pops from a log, and ignores popped in peek" do
+    log = ns.command_log("test3", true)
+    entries = ["un", "deux", "trois"].map{|e| mkTO(e) }
+    entries.each do |entry|
+      log.push!(entry)
+    end
+    log.peek(3).reverse.map{|e| e.command}.should == entries
+    entries.reverse_each do |entry|
+      peeked = log.peek(1)[0]
+      peeked.command.should == entry
+      log.pop!(peeked.id)
+    end
+  end
+
+  # makes a simple transform op containing a string
+  def mkTO(string)
+    Gizzard::TransformOperation.with(:delete_shard, Gizzard::ShardId.new(string, string))
+  end
+end

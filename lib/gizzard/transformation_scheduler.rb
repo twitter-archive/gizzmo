@@ -23,11 +23,22 @@ module Gizzard
       @transformations    = transformations
       @max_copies         = options[:max_copies]
       @copies_per_host    = options[:copies_per_host]
+      @skip_phases        = (options[:skip_phases] || []).map do |p|
+        Transformation::OP_PHASES_BY_NAME[p]
+      end.compact
       @poll_interval      = options[:poll_interval]
       @be_quiet           = options[:quiet]
       @force              = options[:force] || false
       @dont_show_progress = options[:no_progress] || @be_quiet
       @batch_finish       = options[:batch_finish]
+
+      @rollback_log  =
+        if log_name = options[:rollback_log]
+          # create a new rollback log on the server
+          @nameserver.command_log(log_name, true)
+        else
+          nil
+        end
 
       @jobs_copying     = []
       @jobs_settling    = []
@@ -66,6 +77,7 @@ module Gizzard
         if !@batch_finish
           cleanup_jobs
         end
+
         schedule_jobs(max_copies - busy_shards.length)
 
         if @batch_finish && @jobs_pending.empty? && @jobs_copying.empty?
@@ -85,6 +97,12 @@ module Gizzard
       nameserver.reload_updated_forwardings
 
       log "#{@jobs_finished.length} transformation#{'s' if @jobs_finished.length > 1} applied. Total time elapsed: #{time_elapsed}"
+    end
+
+    def apply_job(job, phase)
+      if !(@skip_phases.include? phase)
+        job.apply!(@nameserver, phase, @rollback_log)
+      end
     end
 
     def schedule_jobs(num_to_schedule)
@@ -108,18 +126,18 @@ module Gizzard
         log "STARTING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.prepare!(nameserver)
+          apply_job(j, :prepare)
         end
 
         nameserver.reload_updated_forwardings
 
-        copy_jobs = jobs.select {|j| j.copy_required? }
+        copy_jobs = jobs.select {|j| j.required?(:copy) }
 
         unless copy_jobs.empty?
           log "COPIES:"
           copy_jobs.each do |j|
             j.copy_descs.each {|d| log "  #{d}" }
-            j.copy!(nameserver)
+            apply_job(j, :copy)
           end
 
           reload_busy_shards
@@ -133,16 +151,13 @@ module Gizzard
       jobs = @jobs_settling
 
       unless jobs.empty?
+        end_settling_jobs(jobs)
         @jobs_settling -= jobs
-
-        if jobs.any? { |job| job.unblock_required? }
-          end_settling_jobs(jobs)
-        end
 
         log "FINISHING:"
         jobs.each do |j|
           log "  #{j.inspect}"
-          j.cleanup!(nameserver)
+          apply_job(j, :cleanup)
         end
 
         @jobs_finished.concat(jobs)
@@ -157,8 +172,8 @@ module Gizzard
       unless jobs.empty?
         @jobs_copying -= jobs
         jobs.each do |j|
-          if j.unblock_required?
-            j.unblock_writes!(nameserver)
+          if j.required?(:unblock_writes)
+            apply_job(j, :unblock_writes)
           end
         end
         @jobs_settling.concat(jobs)
@@ -168,6 +183,8 @@ module Gizzard
     # performs the ":unblock_reads" phase, which is surrounded by operator controlled pauses
     # to allow for 1) app server queues to drain, 2) caches to warm
     def end_settling_jobs(jobs)
+      return if jobs.none? { |job| job.required?(:unblock_reads) }
+
       log "SETTLING:"
       jobs.each do |j|
         log "  #{j.inspect}"
@@ -175,7 +192,7 @@ module Gizzard
       Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
       jobs.each do |j|
-        j.unblock_reads!(nameserver)
+        apply_job(j, :unblock_reads)
       end
       nameserver.reload_updated_forwardings
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +

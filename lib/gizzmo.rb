@@ -31,6 +31,7 @@ DOC_STRINGS = {
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "links" => "List parent and child links for shards.",
   "list-hosts" => "List remote cluster hosts being replicated to.",
+  "log-rollback" => "Allows a log of performed transforms to be reversed, 'undoing' the changes it originally executed.",
   "lookup" => "Lookup the shard id that holds the record for a given table / source_id.",
   "markbusy" => "Mark a list of shards as busy.",
   "markunbusy" => "Mark a list of shards as not busy.",
@@ -141,14 +142,24 @@ def add_scheduler_opts(subcommand_options, opts)
   opts.on("--copy-wrapper=SHARD_TYPE", "Wrap copy destination shards with SHARD_TYPE. default BlockedShard") do |t|
     (subcommand_options.scheduler_options ||= {})[:copy_wrapper] = t
   end
-  opts.on("--skip-copies", "Do transformation without copying. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do
-    (subcommand_options.scheduler_options ||= {})[:skip_copies] = true
+  opts.on("--skip-phases=PHASE_LIST", "Executes transformations without the given phases. WARNING: This is VERY DANGEROUS if you don't know what you're doing!") do |phase_list|
+    s_opts = (subcommand_options.scheduler_options ||= {})
+    s_opts[:skip_phases] ||= []
+    s_opts[:skip_phases] += phase_list.split(",").map{|phase| phase.upcase}
+  end
+  opts.on("--skip-copies", "Deprecated: use 'skip-phases=copy' instead.") do
+    s_opts = (subcommand_options.scheduler_options ||= {})
+    s_opts[:skip_phases] ||= []
+    s_opts[:skip_phases] << "COPY"
   end
   opts.on("--no-progress", "Do not show progress bar at bottom.") do
     (subcommand_options.scheduler_options ||= {})[:no_progress] = true
   end
   opts.on("--batch-finish", "After copies complete (while wrapped in --copy-wrapper), move shards to a WriteOnly settling state. When all transforms are settling, wait until the operator indicates that it is safe to remove the WriteOnly wrappers. Finally, wait for the operator to indicate that it is safe to execute cleanup.") do
     (subcommand_options.scheduler_options ||= {})[:batch_finish] = true
+  end
+  opts.on("--rollback-log=LOG_NAME", "A named log of applied operations which will be stored in the nameserver, and can later be rolled back with the `rollback` command. A log with the given name must not already exist.") do |rl|
+    (subcommand_options.scheduler_options ||= {})[:rollback_log] = rl.to_s
   end
 end
 
@@ -462,7 +473,11 @@ subcommands = {
     opts.on("-q", "--quiet", "Do not display table creation info (only valid with --force)") do
       subcommand_options.quiet = true
     end
-  end
+  end,
+  'log-rollback' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} --rollback-log=LOG_NAME log-rollback"
+    separators(opts, DOC_STRINGS["log-rollback"])
+  end,
 }
 
 rc_path = ENV['GIZZMORC'] || "#{ENV["HOME"]}/.gizzmorc"

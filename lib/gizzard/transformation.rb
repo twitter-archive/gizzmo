@@ -14,7 +14,9 @@ module Gizzard
       Op::SetForwarding    => "set_forwarding",
       Op::CopyShard        => "copy_shard",
       Op::RepairShards     => "repair_shards",
-      Op::DiffShards       => "diff_shards"
+      Op::DiffShards       => "diff_shards",
+      Op::CommitBegin      => "commit_begin",
+      Op::CommitEnd        => "commit_end"
     }
 
     OP_INVERSES = {
@@ -29,28 +31,33 @@ module Gizzard
       Op::CreateShard      => 1,
       Op::AddLink          => 2,
       Op::SetForwarding    => 3,
-      Op::RemoveForwarding => 4,
-      Op::RemoveLink       => 5,
-      Op::DeleteShard      => 6,
-      Op::CopyShard        => 7,
-      Op::RepairShards     => 8,
-      Op::DiffShards       => 9
+      Op::CommitBegin      => 4,
+      Op::RemoveForwarding => 5,
+      Op::RemoveLink       => 6,
+      Op::DeleteShard      => 7,
+      Op::CopyShard        => 8,
+      Op::RepairShards     => 9,
+      Op::DiffShards       => 10,
+      Op::CommitEnd        => 10000
     }
 
-    OP_PHASES = {
-      :prepare => "PREPARE",
-      :copy => "COPY",
-      :repair => "REPAIR",
-      :unblock_writes => "UNBLOCK_WRITES",
-      :unblock_reads => "UNBLOCK_READS",
-      :cleanup => "CLEANUP",
-      :diff => "DIFF"
-    }
+    ORDERED_OP_PHASES = [
+      [:prepare, "PREPARE"],
+      [:copy, "COPY"],
+      [:repair, "REPAIR"],
+      [:diff, "DIFF"],
+      [:unblock_writes, "UNBLOCK_WRITES"],
+      [:unblock_reads, "UNBLOCK_READS"],
+      [:cleanup, "CLEANUP"],
+    ]
+    OP_PHASES = Hash[ORDERED_OP_PHASES]
+    OP_PHASES_BY_NAME = OP_PHASES.invert
 
     DEFAULT_DEST_WRAPPER = 'BlockedShard'
 
     attr_reader :from, :to, :copy_dest_wrapper, :skip_copies
 
+    # TODO: the skip_copies parameter should move out into the code that executes transforms
     def initialize(from_template, to_template, copy_dest_wrapper = nil, skip_copies = false, batch_finish = false)
       copy_dest_wrapper ||= DEFAULT_DEST_WRAPPER
 
@@ -108,22 +115,12 @@ module Gizzard
         h.update phase => ops.map {|job| "    #{job.inspect}" }.join("\n")
       end
 
-      # TODO: This seems kind of daft to copy around these long strings.
-      # Loop over it once just for display?
-      phase_line = lambda do |phase|
-        op_inspect[phase].empty? ? "" : "  #{OP_PHASES[phase]}\n#{op_inspect[phase]}\n"
-      end
-
       # display phase lists in a particular order
-      op_inspect = [
-        phase_line.call(:prepare),
-        phase_line.call(:copy),
-        phase_line.call(:repair),
-        phase_line.call(:diff),
-        phase_line.call(:unblock_writes),
-        phase_line.call(:unblock_reads),
-        phase_line.call(:cleanup)
-      ].join
+      op_inspect = ORDERED_OP_PHASES.map do |phase_tuple|
+        phase_name = phase_tuple.last
+        inspect_phase = op_inspect[phase_tuple.first]
+        inspect_phase.empty? ? "" : "  #{phase_name}\n#{inspect_phase}\n"
+      end.join
 
       "#{from.inspect} => #{to.inspect} :\n#{op_inspect}"
     end
@@ -147,11 +144,13 @@ module Gizzard
     end
 
     def collapse_jobs(jobs)
-      jobs.reject do |job1|
+      collapsed = jobs.reject do |job1|
         jobs.find do |job2|
           job1.inverse? job2
         end
       end
+      # if all non-noop jobs have collapsed, entire transform was a noop
+      collapsed.all?{|job| job.noop? } ? [] : collapsed
     end
 
     def expand_jobs(jobs)
@@ -162,6 +161,7 @@ module Gizzard
 
       # if there are no copies that need to take place, we can do all
       # nameserver changes in one step
+      # TODO: unnecessary optimization, considering that all ops are roundtrips anyway
       if expanded[:copy].empty?
         expanded[:prepare].concat expanded[:cleanup]
         expanded[:cleanup] = []
@@ -207,14 +207,16 @@ module Gizzard
       jobs = visit_collect(root, get_wrapper_type, @copy_dest_wrapper) do |parent, child, wrapper|
         [Op::CreateShard.new(child, wrapper), Op::AddLink.new(parent, child, wrapper)]
       end
-      [Op::CreateShard.new(root, @copy_dest_wrapper)].concat jobs << Op::SetForwarding.new(root, @copy_dest_wrapper)
+      jobs.concat [Op::CreateShard.new(root, @copy_dest_wrapper), Op::SetForwarding.new(root, @copy_dest_wrapper)]
     end
 
     def destroy_tree(root)
+      # reminder: order doesn't matter here, since ops are sorted by priority
       jobs = visit_collect(root) do |parent, child|
         [Op::RemoveLink.new(parent, child), Op::DeleteShard.new(child)]
       end
-      [Op::RemoveForwarding.new(root)].concat jobs << Op::DeleteShard.new(root)
+      jobs.concat [Op::RemoveForwarding.new(root), Op::DeleteShard.new(root)]
+      jobs.concat [Op::CommitBegin.new(root), Op::CommitEnd.new(root)]
     end
 
     private
@@ -246,34 +248,18 @@ module Gizzard
       @translations   = shard.canonical_shard_id_map(base_name, @table_id, @enum)
     end
 
-    # TODO: replace with single execute(:nameserver, :phase) method?
-
-    def prepare!(nameserver)
-      apply_ops(nameserver, transformation.operations[:prepare])
+    def apply!(nameserver, phase, rollback_log)
+      transformation.operations[phase].each do |op|
+        # execute the operation, and log the inverse
+        transform_operation =
+          op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
+        rollback_log.push!(transform_operation) if rollback_log && transform_operation
+      end
     end
 
-    def copy_required?
-      !transformation.operations[:copy].empty?
-    end
-
-    def copy!(nameserver)
-      apply_ops(nameserver, transformation.operations[:copy])
-    end
-
-    def unblock_required?
-      !transformation.operations[:unblock_writes].empty? || !transformation.operations[:unblock_reads].empty?
-    end
-
-    def unblock_writes!(nameserver)
-      apply_ops(nameserver, transformation.operations[:unblock_writes])
-    end
-
-    def unblock_reads!(nameserver)
-      apply_ops(nameserver, transformation.operations[:unblock_reads])
-    end
-
-    def cleanup!(nameserver)
-      apply_ops(nameserver, transformation.operations[:cleanup])
+    # true if any of the given phases contain operations
+    def required?(*phases)
+      phases.any?{|phase| !transformation.operations[phase].empty?}
     end
 
     def involved_shards(phase = :copy)
@@ -306,14 +292,6 @@ module Gizzard
         desc.chomp " <-> "
       end
       
-    end
-
-    private
-
-    def apply_ops(nameserver, ops)
-      ops.each do |op|
-        op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
-      end
     end
   end
 end

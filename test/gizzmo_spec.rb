@@ -5,6 +5,11 @@ describe "gizzmo (cli)" do
     @nameserver_db ||= read_nameserver_db
   end
 
+  # returns a regex that will fuzzily match the given string
+  def fuzzily(str)
+    Regexp.new(Regexp.escape(str).gsub("X", "\\d").gsub("second", "seconds?"))
+  end
+
   before do
     reset_databases!
     rebuild_nameserver!
@@ -353,20 +358,22 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
 
       gizzmo('-f transform-tree --no-progress --poll-interval=1 \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
-localhost/s_0_001_replicating').should == <<-EOF
+localhost/s_0_001_replicating').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 1 shards
 
 STARTING:
@@ -375,9 +382,10 @@ COPIES:
   localhost/s_0_001_a <-> 127.0.0.1/s_0_0001
 FINISHING:
   [0] 1 = localhost/s_0_001_replicating: ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1))
-1 transformation applied. Total time elapsed: 1 second
+1 transformation applied. Total time elapsed: X second
       EOF
 
+      # access the nameserver db directly for shard information
       nameserver_db[:shards].should == [info("127.0.0.1", "s_0_0001", "TestShard"),
                                         info("localhost", "s_0_001_a", "TestShard", "Int", "Int"),
                                         info("localhost", "s_0_001_replicating", "ReplicatingShard")]
@@ -399,20 +407,22 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -451,11 +461,13 @@ FINISHING:
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> TestShard(localhost,3,Int,Int)"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> TestShard(localhost,3,Int,Int) :
   PREPARE
     add_link(ReplicatingShard -> TestShard/localhost)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> TestShard/localhost)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -481,20 +493,22 @@ EOF
 
       gizzmo('-f -T0 transform --no-progress --poll-interval=1 --max-copies=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 2 shards
 
 STARTING:
@@ -538,20 +552,22 @@ FINISHING:
 
       gizzmo('-f -T0,1 transform --no-progress --poll-interval=1 \
 "ReplicatingShard -> TestShard(localhost,1,Int,Int)" \
-"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+"ReplicatingShard -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
     delete_shard(BlockedShard)
+    commit_end(ReplicatingShard)
 Applied to 4 shards
 
 STARTING:
@@ -605,25 +621,26 @@ FINISHING:
         ns.set_forwarding forwarding(0,i,id("localhost", "s_0_00#{i}_replicating"))
       end
       ns.reload_config
-
       gizzmo('-f -T0 rebalance --no-progress --poll-interval=1 \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
-1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d").gsub("second", "seconds?")))
+1 "ReplicatingShard -> TestShard(localhost,1)"').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1) => ReplicatingShard(1) -> TestShard(127.0.0.1,1) :
   PREPARE
-    create_shard(TestShard/127.0.0.1)
     create_shard(BlockedShard)
-    add_link(BlockedShard -> TestShard/127.0.0.1)
+    create_shard(TestShard/127.0.0.1)
     add_link(ReplicatingShard -> BlockedShard)
+    add_link(BlockedShard -> TestShard/127.0.0.1)
   COPY
     copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
   CLEANUP
     add_link(ReplicatingShard -> TestShard/127.0.0.1)
-    remove_link(ReplicatingShard -> TestShard/localhost)
-    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    commit_begin(ReplicatingShard)
     remove_link(ReplicatingShard -> BlockedShard)
-    delete_shard(TestShard/localhost)
+    remove_link(BlockedShard -> TestShard/127.0.0.1)
+    remove_link(ReplicatingShard -> TestShard/localhost)
     delete_shard(BlockedShard)
+    delete_shard(TestShard/localhost)
+    commit_end(ReplicatingShard)
 Applied to 4 shards
 
 STARTING:
@@ -646,11 +663,82 @@ FINISHING:
     end
   end
 
+  describe "log-rollback" do
+    before do
+      ns.create_shard info("localhost", "s_0_001_a", "TestShard", "Int", "Int")
+      ns.create_shard info("localhost", "s_0_001_replicating", "ReplicatingShard")
+      ns.add_link id("localhost", "s_0_001_replicating"), id("localhost", "s_0_001_a"), 1
+      ns.set_forwarding forwarding(0, 1, id("localhost", "s_0_001_replicating"))
+      ns.reload_config
+    end
+
+    it "will not roll back a successfully completed transform" do
+      logname = 'test_log_name'
+      gizzmo('-f transform-tree --no-progress --poll-interval=1 --rollback-log="%s" \
+"ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
+localhost/s_0_001_replicating' % logname)
+
+      res = gizzmo('-f log-rollback "%s"' % logname)
+      res.should match(fuzzily(<<-EOF))
+Rolling back #{logname} will execute the following operations:
+Nothing to do.
+      EOF
+    end
+
+    it "rolls back a transform that was not committed" do
+      logname = 'test_log_name2'
+      # skip the 'cleanup' phase, which will prevent commit
+      gizzmo('-f transform-tree --no-progress --poll-interval=1 --batch-finish --skip-phases=CLEANUP --rollback-log="%s" \
+"ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
+localhost/s_0_001_replicating' % logname)
+
+      # should be able to roll back everything that was executed
+      gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
+Rolling back #{logname} will execute the following operations:
+	create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_write_only, class_name="WriteOnlyShard", source_type="", destination_type="", busy=0>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only, weight=1>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001, weight=1>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001>)
+	create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_blocked, class_name="BlockedShard", source_type="", destination_type="", busy=0>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001, weight=1>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked, weight=1>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001>)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_write_only">)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked>)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001">)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_blocked">)
+Rolling back #{logname}:
+create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_write_only, class_name="WriteOnlyShard", source_type="", destination_type="", busy=0>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only, weight=1>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001, weight=1>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001>)
+create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_blocked, class_name="BlockedShard", source_type="", destination_type="", busy=0>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001, weight=1>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked, weight=1>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001>)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_write_only">)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked>)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001">)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_blocked">)
+      EOF
+
+      # then confirm that the log is now 'empty' (aka, entries all marked deleted)
+      gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
+Rolling back #{logname} will execute the following operations:
+Nothing to do.
+      EOF
+    end
+  end
+
   describe "create-table" do
     it "works" do
       gizzmo('-f -T0,1 create-table --shards=4 --base-name=s \
 1 "ReplicatingShard -> TestShard(127.0.0.1,1)" \
-1 "ReplicatingShard -> TestShard(localhost,1)"').should match(Regexp.new(Regexp.escape(<<-EOF).gsub("X", "\\d")))
+1 "ReplicatingShard -> TestShard(localhost,1)"').should match(fuzzily(<<-EOF))
 Create tables 0, 1:
   ReplicatingShard(1) -> TestShard(127.0.0.1,1)
   for 2 base ids:
@@ -661,12 +749,12 @@ Create tables 0, 1:
     864691128455135232
     0
 
-create_shard(ReplicatingShard): s_0_0003
 create_shard(TestShard/127.0.0.1): s_0_0003
+create_shard(ReplicatingShard): s_0_0003
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_0_0003
 set_forwarding(ReplicatingShard): s_0_0003
-create_shard(ReplicatingShard): s_0_0002
 create_shard(TestShard/127.0.0.1): s_0_0002
+create_shard(ReplicatingShard): s_0_0002
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_0_0002
 set_forwarding(ReplicatingShard): s_0_0002
 create_shard(ReplicatingShard): s_0_0001
@@ -677,12 +765,12 @@ create_shard(ReplicatingShard): s_0_0000
 create_shard(TestShard/localhost): s_0_0000
 add_link(ReplicatingShard -> TestShard/localhost): s_0_0000
 set_forwarding(ReplicatingShard): s_0_0000
-create_shard(ReplicatingShard): s_1_0003
 create_shard(TestShard/127.0.0.1): s_1_0003
+create_shard(ReplicatingShard): s_1_0003
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_1_0003
 set_forwarding(ReplicatingShard): s_1_0003
-create_shard(ReplicatingShard): s_1_0002
 create_shard(TestShard/127.0.0.1): s_1_0002
+create_shard(ReplicatingShard): s_1_0002
 add_link(ReplicatingShard -> TestShard/127.0.0.1): s_1_0002
 set_forwarding(ReplicatingShard): s_1_0002
 create_shard(ReplicatingShard): s_1_0001

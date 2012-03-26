@@ -1,7 +1,13 @@
 module Gizzard
+  # the 'apply' method of a Transformation::Op should return a Thrift TransformOperation
+  # object, representing the INVERSE of the applied operation, or 'Nil' if the operation is
+  # not intended to be rolled back
+  # TODO: over time, the batch_execute method should be utilized more fully by the
+  # scheduler to compose multiple operations where safe/possible
   module Transformation::Op
     class BaseOp
       def inverse?(other)
+        # FIXME: move inverses onto ops themselves
         Transformation::OP_INVERSES[self.class] == other.class
       end
 
@@ -11,6 +17,10 @@ module Gizzard
 
       alias == eql?
 
+      def inverse
+        return nil
+      end
+
       def inspect
         templates = (is_a?(LinkOp) ? [from, to] : [*template]).map {|t| t.identifier }.join(" -> ")
         name      = Transformation::OP_NAMES[self.class]
@@ -18,11 +28,19 @@ module Gizzard
       end
 
       def <=>(other)
-        Transformation::OP_PRIORITIES[self.class] <=> Transformation::OP_PRIORITIES[other.class]
+        self_class = Transformation::OP_PRIORITIES[self.class]
+        other_class = Transformation::OP_PRIORITIES[other.class]
+        if ((cmp = self_class <=> other_class) != 0); return cmp end
+        # comparing the template is not strictly necessary, but gives us a stable sort
+        self.template <=> other.template
       end
 
       def involved_shards(table_prefix, translations)
         []
+      end
+
+      def noop?
+        false
       end
     end
 
@@ -45,6 +63,7 @@ module Gizzard
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         involved_shards(table_prefix, translations).each { |sid| nameserver.mark_shard_busy(sid, BUSY) }
         nameserver.copy_shard(involved_shards(table_prefix, translations))
+        nil
       end
     end
 
@@ -64,6 +83,7 @@ module Gizzard
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
         nameserver.repair_shards(involved_shards(table_prefix, translations))
+        nil
       end
     end
 
@@ -87,6 +107,7 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.diff_shards(from_shard_id, to_shard_id)
+        nil
       end
     end
 
@@ -102,6 +123,12 @@ module Gizzard
 
       def inverse?(other)
         super && self.from.link_eql?(other.from) && self.to.link_eql?(other.to)
+      end
+
+      def inverse
+        inv_class = Transformation::OP_INVERSES[self.class]
+        return nil if inv_class.nil?
+        inv_class.new(@from, @to)
       end
 
       def eql?(other)
@@ -132,6 +159,8 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.add_link(from_shard_id, to_shard_id, to.weight)
+        # return inverse
+        TransformOperation.with(:remove_link, RemoveLinkRequest.new(from_shard_id, to_shard_id))
       end
     end
 
@@ -145,6 +174,8 @@ module Gizzard
         to_shard_id   = to.to_shard_id(table_prefix, translations)
 
         nameserver.remove_link(from_shard_id, to_shard_id)
+        # return inverse
+        TransformOperation.with(:add_link, AddLinkRequest.new(from_shard_id, to_shard_id, to.weight))
       end
     end
 
@@ -158,6 +189,12 @@ module Gizzard
 
       def inverse?(other)
         super && self.template.shard_eql?(other.template)
+      end
+
+      def inverse
+        inv_class = Transformation::OP_INVERSES[self.class]
+        return nil if inv_class.nil?
+        inv_class.new(@template, @wrapper_type)
       end
 
       def eql?(other)
@@ -191,7 +228,10 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        nameserver.create_shard(template.to_shard_info(table_prefix, translations))
+        shard_info = template.to_shard_info(table_prefix, translations)
+        nameserver.create_shard(shard_info)
+        # return inverse
+        TransformOperation.with(:delete_shard, shard_info.id)
       end
     end
 
@@ -201,7 +241,11 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        nameserver.delete_shard(template.to_shard_id(table_prefix, translations))
+        shard_id = template.to_shard_id(table_prefix, translations)
+        nameserver.delete_shard(shard_id)
+        # return inverse
+        shard_info = template.to_shard_info(table_prefix, translations)
+        TransformOperation.with(:create_shard, shard_info)
       end
     end
 
@@ -227,11 +271,14 @@ module Gizzard
         shard_id   = template.to_shard_id(table_prefix, translations)
         forwarding = Forwarding.new(table_id, base_id, shard_id)
         nameserver.set_forwarding(forwarding)
+        # return inverse
+        # NB: since forwarding changes are update-only, inverting a forwarding means
+        # restoring whatever we think we're overwriting now. VERY much assumes that
+        # there are no concurrent operations, which is terrifying yay!
+        TransformOperation.with(:set_forwarding, forwarding)
       end
     end
 
-
-    # XXX: A no-op, but needed for setup/teardown symmetry
 
     class RemoveForwarding < ShardOp
       def expand(copy_source, involved_in_copy, batch_finish)
@@ -239,10 +286,35 @@ module Gizzard
       end
 
       def apply(nameserver, table_id, base_id, table_prefix, translations)
-        # shard_id   = template.to_shard_id(table_prefix, translations)
-        # forwarding = Forwarding.new(table_id, base_id, shard_id)
+        # This is a no-op in gizzard deployments, because we do not support
+        # splitting/merging forwardings: thus, forwardings are always 'updated' via
+        # overwriting with AddForwarding: the op exists solely for setup/teardown
+        # symmetry
         # nameserver.remove_forwarding(forwarding)
+        nil
+      end
+
+      def noop?
+        true
       end
     end
+
+    # a no-op that indicates a position that rollback cannot move past
+    class Commit < ShardOp
+      def expand(copy_source, involved_in_copy, batch_finish)
+        { (involved_in_copy ? :cleanup : :prepare) => [self] }
+      end
+
+      def apply(nameserver, table_id, base_id, table_prefix, translations)
+        # the inverse of a commit is still a commit
+        TransformOperation.with(:commit, true)
+      end
+
+      def noop?
+        true
+      end
+    end
+    class CommitBegin < Commit; end
+    class CommitEnd < Commit; end
   end
 end

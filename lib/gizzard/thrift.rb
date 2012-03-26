@@ -121,6 +121,55 @@ module Gizzard
     end
   end
 
+  AddLinkRequest = T.make_struct(:AddLinkRequest,
+    T::Field.new(:up_id, struct(ShardId), 1),
+    T::Field.new(:down_id, struct(ShardId), 2),
+    T::Field.new(:weight, T::I32, 3)
+  )
+
+  RemoveLinkRequest = T.make_struct(:RemoveLinkRequest,
+    T::Field.new(:up_id, struct(ShardId), 1),
+    T::Field.new(:down_id, struct(ShardId), 2)
+  )
+
+  # a union: exactly one entry should be set
+  TransformOperation = T.make_struct(:TransformOperation,
+    T::Field.new(:create_shard, struct(ShardInfo), 1),
+    T::Field.new(:delete_shard, struct(ShardId), 2),
+    T::Field.new(:add_link, struct(AddLinkRequest), 3),
+    T::Field.new(:remove_link, struct(RemoveLinkRequest), 4),
+    T::Field.new(:set_forwarding, struct(Forwarding), 5),
+    T::Field.new(:remove_forwarding, struct(Forwarding), 6),
+    T::Field.new(:commit, T::BOOL, 7)
+  )
+
+  class TransformOperation
+    # build a TransformOperation for the given field and content
+    def TransformOperation.with(field_symbol, field_content)
+      tc = TransformOperation.new()
+      tc[field_symbol] = field_content
+      tc
+    end
+
+    def inspect
+      self.each_pair do |name, op|
+        return "#{name}(#{op})" if !op.nil?
+      end
+    end
+  end
+
+  # FIXME: rename command -> operation here and in the server
+  LogEntry = T.make_struct(:LogEntry,
+    T::Field.new(:id, T::I32, 1),
+    T::Field.new(:command, struct(TransformOperation), 2)
+  )
+
+  class LogEntry
+    def inspect
+      "(id:#{id})"
+    end
+  end
+
   class GizzmoService < T::ThriftService
     def initialize(host, port, log_path, framed, dry_run = false)
       super(host, port, framed)
@@ -197,6 +246,7 @@ module Gizzard
 
     thrift_method :dump_nameserver, list(struct(NameServerState)), field(:table_ids, list(i32), 1), :throws => exception(GizzardException)
 
+    thrift_method :batch_execute, void, field(:commands, list(struct(TransformOperation)), 1), :throws => exception(GizzardException)
 
     # Job Scheduler Management
 
@@ -222,6 +272,18 @@ module Gizzard
     thrift_method :list_remote_clusters, list(string), :throws => exception(GizzardException)
     thrift_method :list_remote_hosts, list(struct(Host)), :throws => exception(GizzardException)
     thrift_method :list_remote_hosts_in_cluster, list(struct(Host)), field(:cluster, string, 1), :throws => exception(GizzardException)
+
+
+    # Command log management
+    # (log entries are binary, but this client doesn't support labeling them as such)
+
+    # create or get a log, returning a binary id for that log
+    thrift_method :log_create, string, field(:log_name, string, 1)
+    thrift_method :log_get, string, field(:log_name, string, 1)
+    # given a log id, push/pop/peek binary data on that log
+    thrift_method :log_entry_push, void, field(:log_id, string, 1), field(:log_entry, struct(LogEntry), 2)
+    thrift_method :log_entry_peek, list(struct(LogEntry)), field(:log_id, string, 1), field(:count, i32, 2)
+    thrift_method :log_entry_pop, void, field(:log_id, string, 1), field(:log_entry_id, i32, 2)
   end
 
 

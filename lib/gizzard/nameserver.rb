@@ -93,10 +93,12 @@ module Gizzard
     alias dryrun? dryrun
 
     def initialize(*hosts)
+      # TODO: waaaaaat
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
       @retries = options[:retries] || DEFAULT_RETRIES
       @logfile = options[:log]     || "/tmp/gizzmo.log"
       @dryrun  = options[:dry_run] || false
+      @force   = options[:force]   || false
       @framed  = options[:framed]  || false
       @hosts   = hosts.flatten
     end
@@ -145,6 +147,10 @@ module Gizzard
       Manifest.new(self, table_ids)
     end
 
+    def command_log(name, create)
+      CommandLog.new(self, name, create)
+    end
+
     # confirm that all clients are connected to the same cluster
     def validate_clients_or_raise
       last_client_host = nil
@@ -191,10 +197,17 @@ module Gizzard
         failed_clients.each do |client, _, exception|
           puts "\t#{client.get_host} failed with: #{exception}"
         end
-        # TODO: propagate 'force' parameter here, and kill-if-force
+        if @force
+          puts "Cannot proceed past exceptions while force=true: exiting."
+          exit 1
+        end
         Gizzard::confirm!(false, "Proceed without these hosts?")
         # we're still alive: user wanted to proceed
         @all_clients.reject!(failed_clients.map{|client, _, _| client })
+      end
+      if @all_clients.size < 1
+        puts "No viable clients remain: exiting."
+        exit 1
       end
 
       # return only successful results
@@ -295,6 +308,37 @@ module Gizzard
 
         info = shard_infos[shard_id] or raise "shard info not found for: #{shard_id}"
         Shard.new(info, children, link_weight)
+      end
+    end
+
+    class CommandLog
+      attr_reader :name, :log_id
+      def initialize(nameserver, log_name, create)
+        @nameserver = nameserver
+        @name = log_name
+        @next_entry_id = 0
+        @log_id =
+          if create
+            nameserver.log_create(log_name)
+          else
+            nameserver.log_get(log_name)
+          end
+      end
+
+      # pushes a TransformOperation to the end of the log, returns a new log_entry_id
+      def push!(transform_operation)
+        entry = LogEntry.new((@next_entry_id += 1), transform_operation)
+        @nameserver.log_entry_push(@log_id, entry)
+      end
+
+      # returns the top 'count' LogEntries for the log
+      def peek(count)
+        @nameserver.log_entry_peek(@log_id, count)
+      end
+
+      # pops the given log_entry_id (which must be at the top of the log)
+      def pop!(log_entry_id)
+        @nameserver.log_entry_pop(@log_id, log_entry_id)
       end
     end
   end

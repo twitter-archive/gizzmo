@@ -17,7 +17,6 @@ module Gizzard
   end
 
   class Command
-
     attr_reader :buffer
 
     class << self
@@ -46,7 +45,8 @@ module Gizzard
         Nameserver.new(hosts, :retries => global_options.retry,
                               :log     => log,
                               :framed  => global_options.framed,
-                              :dry_run => global_options.dry)
+                              :dry_run => global_options.dry,
+                              :force   => global_options.force)
       end
 
       def make_job_injector(global_options, log)
@@ -839,11 +839,17 @@ module Gizzard
   class BaseTransformCommand < Command
     def run
       scheduler_options = command_options.scheduler_options || {}
-      force             = global_options.force
-      be_quiet          = force && command_options.quiet
+      @force             = global_options.force
+      @be_quiet          = @force && command_options.quiet
+      # TODO: remove Transformation's 'skip_copies' parameter
+      @skip_copies       = (scheduler_options[:skip_phases] || []).any? do |p|
+        Transformation::OP_PHASES_BY_NAME[p] == :copy
+      end
+      @batch_finish      = scheduler_options[:batch_finish] || false
+      @copy_wrapper      = scheduler_options[:copy_wrapper]
 
-      scheduler_options[:force] = force
-      scheduler_options[:quiet] = be_quiet
+      scheduler_options[:force] = @force
+      scheduler_options[:quiet] = @be_quiet
 
       # confirm that all app servers are relatively consistent
       manager.validate_clients_or_raise
@@ -858,7 +864,7 @@ module Gizzard
 
       base_name = get_base_name(transformations)
 
-      unless be_quiet
+      unless @be_quiet
         transformations.each do |transformation, trees|
           puts transformation.inspect
           puts "Applied to #{trees.length} shards"
@@ -881,10 +887,6 @@ module Gizzard
       help!("must have an even number of arguments") unless @argv.length % 2 == 0
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
-      copy_wrapper   = scheduler_options[:copy_wrapper]
-      skip_copies    = scheduler_options[:skip_copies] || false
-      batch_finish   = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       memoized_transforms = {}
@@ -899,7 +901,7 @@ module Gizzard
         end
         shard          = manifest.trees[forwarding]
 
-        transform_args = [shard.template, to_template, copy_wrapper, skip_copies, batch_finish]
+        transform_args = [shard.template, to_template, @copy_wrapper, @skip_copies, @batch_finish]
         transformation = memoized_transforms.fetch(transform_args) do |args|
           memoized_transforms[args] = Transformation.new(*args)
         end
@@ -919,16 +921,12 @@ module Gizzard
       require_tables
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
-      copy_wrapper      = scheduler_options[:copy_wrapper]
-      skip_copies       = scheduler_options[:skip_copies] || false
-      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       @argv.each_slice(2) do |(from_template_s, to_template_s)|
         from, to       = [from_template_s, to_template_s].map {|s| ShardTemplate.parse(s) }
-        transformation = Transformation.new(from, to, copy_wrapper, skip_copies, batch_finish)
+        transformation = Transformation.new(from, to, @copy_wrapper, @skip_copies, @batch_finish)
         forwardings    = Set.new(manifest.templates[from] || [])
         trees          = manifest.trees.reject {|(f, s)| !forwardings.include?(f) }
 
@@ -945,10 +943,7 @@ module Gizzard
       require_tables
       require_template_options
 
-      scheduler_options = command_options.scheduler_options || {}
       manifest          = manifest_for_write(*global_options.tables)
-      copy_wrapper      = scheduler_options[:copy_wrapper]
-      batch_finish      = scheduler_options[:batch_finish] || false
       transformations   = {}
 
       dest_templates_and_weights = {}
@@ -962,13 +957,14 @@ module Gizzard
 
       global_options.tables.inject({}) do |all, table|
         trees      = manifest.trees.reject {|(f, s)| f.table_id != table }
-        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
+        rebalancer = Rebalancer.new(trees, dest_templates_and_weights, @copy_wrapper, @batch_finish)
 
         all.update(rebalancer.transformations) {|t,a,b| a.merge b }
       end
     end
   end
 
+  # TODO: should extend BaseTransformCommand
   class AddPartitionCommand < Command
     def run
       require_tables
@@ -1089,7 +1085,6 @@ module Gizzard
   end
 
   class CreateTableCommand < Command
-
     DEFAULT_NUM_SHARDS   = 1024
     DEFAULT_BASE_NAME    = "shard"
 
@@ -1187,6 +1182,89 @@ module Gizzard
             end
           end
         end
+      end
+    end
+  end
+
+  class LogRollbackCommand < Command
+    def run
+      help!("must specify exactly one argument: a rollback-log name") if @argv.size != 1
+
+      rollback_log_name = @argv[0]
+      rl = manager.command_log(rollback_log_name, false)
+      unless rl
+        puts "The given rollback-log name could not be found on the server: '#{rollback_log_name}'"
+        puts
+        exit 1
+      end
+
+      # fetch a preview of the batch
+      batch, might_have_more_batches = fetch_and_truncate(rl, 32)
+      puts "Rolling back #{rl.name} will execute the following operations:"
+      if might_have_more_batches
+        head_id = batch.first.first
+        puts "(WARNING: Showing only the first #{batch.size} (of up to #{head_id} possible) operations!)"
+      end
+      batch.each do |_, operation|
+        puts "\t#{operation.inspect}"
+      end
+      if might_have_more_batches
+        puts "\t..."
+      end
+
+      # make it so
+      confirm!
+      rollback(rl)
+      manager.reload_config
+    end
+
+    private
+
+    # fetch a batch of LogEntries, and return a truncated list of (id, TransformOperation),
+    # exclusive of the first 'Commit' entry, and a boolean indicating whether there might be
+    # more batches
+    def fetch_and_truncate(rl, count)
+      batch = rl.peek(count)
+      operations = batch.map do |log_entry|
+        op = log_entry.command
+        unless op.kind_of? Gizzard::TransformOperation
+          puts "Invalid operation persisted in rollback-log! #{op}"
+          puts
+          exit 1
+        end
+        [log_entry.id, op]
+      end
+      # take the prefix up to the first 'commit' operation
+      truncated = operations.take_while do |id,operation|
+        operation[:commit].nil?
+      end
+      [truncated, count == truncated.size]
+    end
+
+    # takes a rollback log, and executes the inverse of its contents, up to the first
+    # instance of 'Op::Commit'
+    def rollback(rl)
+      batch_size = 128
+
+      batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
+      if batch.empty? && !might_have_more_batches
+        puts "Nothing to do."
+        return
+      end
+
+      puts "Rolling back #{rl.name}:"
+      while !batch.empty? || might_have_more_batches
+        if batch.empty?
+          batch, might_have_more_batches = fetch_and_truncate(rl, batch_size)
+          next
+        end
+        # TODO: update log execution to pop! batches of ids
+        batch.each do |id, op|
+          puts "#{op.inspect}"
+          manager.batch_execute([op])
+          rl.pop!(id)
+        end
+        batch = []
       end
     end
   end

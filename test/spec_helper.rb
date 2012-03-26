@@ -146,7 +146,7 @@ def gizzmo(cmd)
 end
 
 def nameserver
-  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s, :retries => 5)
+  @nameserver ||= Gizzard::Nameserver.new('localhost:' + MANAGER_PORT.to_s, :retries => 2, :force => true)
 end
 
 alias ns nameserver

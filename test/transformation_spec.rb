@@ -10,6 +10,8 @@ describe Gizzard::Transformation do
   def copy_shard(f, t);     Op::CopyShard.new(mk_template(f), mk_template(t)) end
   def set_forwarding(t);    Op::SetForwarding.new(mk_template(t)) end
   def remove_forwarding(t); Op::RemoveForwarding.new(mk_template(t)) end
+  def commit_begin(t);      Op::CommitBegin.new(mk_template(t)) end
+  def commit_end(t);        Op::CommitEnd.new(mk_template(t)) end
 
   def empty_ops
     Hash[[:prepare, :copy, :cleanup, :repair, :diff, :unblock_writes, :unblock_reads].map {|key| [key, []]}]
@@ -65,9 +67,11 @@ describe Gizzard::Transformation do
                       add_link('ReplicatingShard', 'BlockedShard') ],
         :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
         :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host3)'),
+                      commit_begin('ReplicatingShard'),
                       remove_link('ReplicatingShard', 'BlockedShard'),
                       remove_link('BlockedShard', 'SqlShard(host3)'),
-                      delete_shard('BlockedShard') ]
+                      delete_shard('BlockedShard'),
+                      commit_end('ReplicatingShard') ]
       })
     end
 
@@ -89,6 +93,7 @@ describe Gizzard::Transformation do
                         copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
           :cleanup => [ add_link('ReplicatingShard', 'SqlShard(host4)'),
                         add_link('ReplicatingShard', 'SqlShard(host3)'),
+                        commit_begin('ReplicatingShard'),
                         remove_link('ReplicatingShard', 'WriteOnlyShard'),
                         remove_link('ReplicatingShard', 'WriteOnlyShard'),
                         remove_link('WriteOnlyShard', 'SqlShard(host3)'),
@@ -98,7 +103,8 @@ describe Gizzard::Transformation do
                         delete_shard('SqlShard(host1)'),
                         delete_shard('SqlShard(host2)'),
                         delete_shard('WriteOnlyShard'),
-                        delete_shard('WriteOnlyShard') ]
+                        delete_shard('WriteOnlyShard'),
+                        commit_end('ReplicatingShard') ]
         })
       end
 
@@ -135,10 +141,12 @@ describe Gizzard::Transformation do
                         add_link('BlockedShard', 'SqlShard(host4)'),
                         add_link('BlockedShard', 'SqlShard(host3)'),
                         add_link('ReplicatingShard', 'BlockedShard') ],
-          :cleanup => [ remove_link('ReplicatingShard', 'SqlShard(host2)'),
+          :cleanup => [ commit_begin('ReplicatingShard'),
+                        remove_link('ReplicatingShard', 'SqlShard(host2)'),
                         remove_link('ReplicatingShard', 'SqlShard(host1)'),
                         delete_shard('SqlShard(host2)'),
-                        delete_shard('SqlShard(host1)') ],
+                        delete_shard('SqlShard(host1)'),
+                        commit_end('ReplicatingShard') ],
           :copy =>    [ copy_shard('SqlShard(host2)', 'SqlShard(host4)'),
                         copy_shard('SqlShard(host2)', 'SqlShard(host3)') ]
         })
@@ -181,6 +189,7 @@ describe Gizzard::Transformation do
                       copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
         :cleanup => [ add_link('WriteOnlyShard', 'SqlShard(host4)'),
                       add_link('ReplicatingShard', 'SqlShard(host3)'),
+                      commit_begin('ReplicatingShard'),
                       remove_link('ReplicatingShard', 'SqlShard(host1)'),
                       remove_link('BlockedShard', 'SqlShard(host3)'),
                       remove_link('ReplicatingShard', 'WriteOnlyShard'),
@@ -192,7 +201,8 @@ describe Gizzard::Transformation do
                       delete_shard('WriteOnlyShard'),
                       delete_shard('BlockedShard'),
                       delete_shard('SqlShard(host2)'),
-                      delete_shard('BlockedShard') ]
+                      delete_shard('BlockedShard'),
+                      commit_end('ReplicatingShard') ]
       })
     end
 
@@ -205,10 +215,12 @@ describe Gizzard::Transformation do
                       add_link('FailingOverShard', 'SqlShard(host2)'),
                       add_link('FailingOverShard', 'SqlShard(host1)'),
                       set_forwarding('FailingOverShard'),
+                      commit_begin('ReplicatingShard'),
                       remove_forwarding('ReplicatingShard'),
                       remove_link('ReplicatingShard', 'SqlShard(host1)'),
                       remove_link('ReplicatingShard', 'SqlShard(host2)'),
-                      delete_shard('ReplicatingShard') ]
+                      delete_shard('ReplicatingShard'),
+                      commit_end('ReplicatingShard') ]
       })
     end
 
@@ -220,7 +232,9 @@ describe Gizzard::Transformation do
         :prepare => [ create_shard('ReadOnlyShard'),
                       add_link('ReadOnlyShard', 'SqlShard(host1)'),
                       add_link('ReplicatingShard', 'ReadOnlyShard'),
-                      remove_link('ReplicatingShard', 'SqlShard(host1)') ]
+                      commit_begin('ReplicatingShard'),
+                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                      commit_end('ReplicatingShard') ]
       })
     end
 
@@ -253,13 +267,15 @@ describe Gizzard::Transformation do
 
       collapse(@trans.create_tree(@from_template) + @trans.destroy_tree(@from_template)).should == []
 
-      collapse(@trans.create_tree(@to_template) + @trans.destroy_tree(@from_template)).should ==
+      collapse(@trans.create_tree(@to_template) + @trans.destroy_tree(@from_template)).sort!.should ==
         [ Op::CreateShard.new(@host_3_template),
           Op::AddLink.new(@to_template, @host_3_template),
+          Op::CommitBegin.new(@to_template),
           Op::RemoveLink.new(@blocked_template, @host_1_template),
-          Op::DeleteShard.new(@host_1_template),
           Op::RemoveLink.new(@from_template, @blocked_template),
-          Op::DeleteShard.new(@blocked_template) ]
+          Op::DeleteShard.new(@host_1_template),
+          Op::DeleteShard.new(@blocked_template),
+          Op::CommitEnd.new(@to_template) ]
     end
   end
 
