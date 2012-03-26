@@ -317,14 +317,16 @@ class ThriftClient
         class_eval "def #{name}(#{arg_names}); _proxy(:#{name}#{args.size > 0 ? ', ' : ''}#{arg_names}); end"
       end
 
+      def connection
+        @connection ||= TCPSocket.new(@host, @port)
+      end
+
       def _proxy(method_name, *args)
         cls = self.class.ancestors.find { |cls| cls.respond_to?(:_arg_structs) and cls._arg_structs[method_name.to_sym] }
         arg_class, rv_class = cls._arg_structs[method_name.to_sym]
         arg_struct = arg_class.new(*args)
-        sock = TCPSocket.new(@host, @port)
-        sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
-        rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
-        sock.close
+        connection.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
+        rv = ThriftClient::Simple.read_response(connection, rv_class, @framed)
         rv[2]
       end
 
