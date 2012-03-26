@@ -85,7 +85,8 @@ module Gizzard
   class Nameserver
     DEFAULT_PORT    = 7920
     DEFAULT_RETRIES = 10
-    MAX_ATTEMPT_SECS = 10
+    MIN_ATTEMPT_SECS = 10
+    MAX_ATTEMPT_SECS = 30
     PARALLELISM     = 10
 
     attr_reader :hosts, :logfile, :dryrun, :framed
@@ -227,7 +228,7 @@ module Gizzard
       STDERR.puts "\nException: #{e.class}: #{e.description rescue "(no description)"}"
       STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0
       times -= 1
-      sleep_time = MAX_ATTEMPT_SECS / [times, 1].max
+      sleep_time = [MIN_ATTEMPT_SECS, MAX_ATTEMPT_SECS / [times, 1].max].max
       (times < 0) ? raise : (sleep(sleep_time); retry)
     end
 
