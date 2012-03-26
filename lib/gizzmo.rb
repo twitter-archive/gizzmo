@@ -277,10 +277,15 @@ subcommands = {
     opts.banner = "Usage: #{zero} info SHARD_ID [MORE SHARD_IDS...]"
     separators(opts, DOC_STRINGS["info"])
   end,
+
   'reload' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} reload"
+    opts.banner = "Usage: #{zero} reload [--fast]"
     separators(opts, DOC_STRINGS["reload"])
+    opts.on("--fast", "Reload only the entries that have been updated since the last reload.") do
+      subcommand_options.fast = true
+    end
   end,
+
   'drill' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} drill SIGNATURE"
     separators(opts, DOC_STRINGS["drill"])
