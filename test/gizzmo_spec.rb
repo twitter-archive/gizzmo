@@ -680,7 +680,7 @@ localhost/s_0_001_replicating' % logname)
 
       res = gizzmo('-f log-rollback "%s"' % logname)
       res.should match(fuzzily(<<-EOF))
-Rolling back #{logname} will reverse the following operations:
+Rolling back #{logname} will execute the following operations:
 Nothing to do.
       EOF
     end
@@ -694,42 +694,41 @@ localhost/s_0_001_replicating' % logname)
 
       # should be able to roll back everything that was executed
       gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
-Rolling back #{logname} will reverse the following operations:
-	delete_shard(WriteOnlyShard)
-	remove_link(ReplicatingShard -> WriteOnlyShard)
-	remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-	add_link(ReplicatingShard -> TestShard/127.0.0.1)
-	delete_shard(BlockedShard)
-	remove_link(BlockedShard -> TestShard/127.0.0.1)
-	remove_link(ReplicatingShard -> BlockedShard)
-	add_link(ReplicatingShard -> WriteOnlyShard)
-	add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-	create_shard(WriteOnlyShard)
-	copy_shard(TestShard/localhost -> TestShard/127.0.0.1)
-	add_link(BlockedShard -> TestShard/127.0.0.1)
-	add_link(ReplicatingShard -> BlockedShard)
-	create_shard(TestShard/127.0.0.1)
-	create_shard(BlockedShard)
+Rolling back #{logname} will execute the following operations:
+	create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_write_only, class_name="WriteOnlyShard", source_type="", destination_type="", busy=0>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only, weight=1>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001, weight=1>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001>)
+	create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_blocked, class_name="BlockedShard", source_type="", destination_type="", busy=0>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001, weight=1>)
+	add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked, weight=1>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001>)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_write_only">)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001>)
+	remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked>)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001">)
+	delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_blocked">)
 Rolling back #{logname}:
-create_shard(WriteOnlyShard)
-add_link(ReplicatingShard -> WriteOnlyShard)
-add_link(WriteOnlyShard -> TestShard/127.0.0.1)
-remove_link(ReplicatingShard -> TestShard/127.0.0.1)
-create_shard(BlockedShard)
-add_link(BlockedShard -> TestShard/127.0.0.1)
-add_link(ReplicatingShard -> BlockedShard)
-remove_link(ReplicatingShard -> WriteOnlyShard)
-remove_link(WriteOnlyShard -> TestShard/127.0.0.1)
-delete_shard(WriteOnlyShard)
-remove_link(BlockedShard -> TestShard/127.0.0.1)
-remove_link(ReplicatingShard -> BlockedShard)
-delete_shard(TestShard/127.0.0.1)
-delete_shard(BlockedShard)
+create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_write_only, class_name="WriteOnlyShard", source_type="", destination_type="", busy=0>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only, weight=1>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001, weight=1>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001>)
+create_shard(#<struct Struct::ST_ShardInfo id=127.0.0.1/s_0_0001_blocked, class_name="BlockedShard", source_type="", destination_type="", busy=0>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001, weight=1>)
+add_link(#<struct Struct::ST_AddLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked, weight=1>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_write_only>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_write_only, down_id=127.0.0.1/s_0_0001>)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_write_only">)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=127.0.0.1/s_0_0001_blocked, down_id=127.0.0.1/s_0_0001>)
+remove_link(#<struct Struct::ST_RemoveLinkRequest up_id=localhost/s_0_001_replicating, down_id=127.0.0.1/s_0_0001_blocked>)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001">)
+delete_shard(#<struct Struct::ST_ShardId hostname="127.0.0.1", table_prefix="s_0_0001_blocked">)
       EOF
 
       # then confirm that the log is now 'empty' (aka, entries all marked deleted)
       gizzmo('-f log-rollback "%s"' % logname).should match(fuzzily(<<-EOF))
-Rolling back #{logname} will reverse the following operations:
+Rolling back #{logname} will execute the following operations:
 Nothing to do.
       EOF
     end

@@ -150,6 +150,12 @@ module Gizzard
       tc[field_symbol] = field_content
       tc
     end
+
+    def inspect
+      self.each_pair do |name, op|
+        return "#{name}(#{op})" if !op.nil?
+      end
+    end
   end
 
   # FIXME: rename command -> operation here and in the server

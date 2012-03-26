@@ -17,7 +17,6 @@ module Gizzard
   end
 
   class Command
-
     attr_reader :buffer
 
     class << self
@@ -1233,7 +1232,7 @@ module Gizzard
       end
       # take the prefix up to the first 'commit' operation
       truncated = operations.take_while do |id,operation|
-        !(operation[:commit].nil?)
+        operation[:commit].nil?
       end
       [truncated, count == truncated.size]
     end

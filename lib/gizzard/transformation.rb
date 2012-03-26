@@ -253,7 +253,6 @@ module Gizzard
         # execute the operation, and log the inverse
         transform_operation =
           op.apply(nameserver, @table_id, @base_id, @table_prefix, @translations)
-        puts "pushing #{transform_operation}"
         rollback_log.push!(transform_operation) if rollback_log && transform_operation
       end
     end
