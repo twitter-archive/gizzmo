@@ -1,5 +1,31 @@
 require File.expand_path('../spec_helper', __FILE__)
 
+describe Gizzard do
+  describe "ShardId" do
+    it "parses correctly" do
+      parse_should("localhost", "edges_backward_134_134_readonly")
+      parse_should("localhost", "edges_backward_134_134_replicating")
+      parse_should("localhost", "edges_forward_134_134_readonly")
+      parse_should("localhost", "edges_forward_134_134_replicating")
+      parse_should("localhost", "edges_n134_134")
+      parse_should("localhost", "edges_n134_134_blocked")
+      parse_should("localhost", "edges_n134_134_replicating")
+      parse_should("localhost", "edges_134_134")
+      parse_should("localhost", "edges_134_134_backward_replicating")
+      parse_should("localhost", "edges_134_134_blocked")
+      parse_should("localhost", "edges_134_134_forward_replicating")
+      parse_should("localhost", "edges_134_134_replicating")
+      parse_should("localhost", "writeonly_edges_backward_134_134")
+      parse_should("localhost", "writeonly_edges_forward_134_134")
+    end
+
+    def parse_should(hostname, table_prefix)
+      Gizzard::ShardId.parse(hostname + "/" + table_prefix).should ==
+        Gizzard::ShardId.new(hostname, table_prefix)
+    end
+  end
+end
+
 describe Gizzard::Shard do
   describe "parse_enumeration" do
     it "parses correctly" do
