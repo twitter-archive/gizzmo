@@ -102,7 +102,7 @@ module Gizzard
       @transformations = {}
       @result.each do |bucket|
         bucket.set.each do |shard|
-          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper, @batch_finish)
+          trans = Transformation.new(shard.template, bucket.template, @copy_dest_wrapper, false, @batch_finish)
           forwardings_to_trees = (@transformations[trans] ||= {})
 
           forwardings_to_trees.update(shard.forwarding => shard.tree)
