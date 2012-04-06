@@ -153,9 +153,8 @@ describe Gizzard::Transformation do
       end
     end
 
-    it "rebalances a tree containing a write-only shard" do
+    describe "rebalances a tree containing a write-only shard" do
       to = mk_template 'ReplicatingShard -> (SqlShard(host3), WriteOnlyShard -> SqlShard(host4))'
-
       children = [
         Gizzard::Shard.new(info("host1", "tbl_001_a", "SqlShard"), [], 1),
         Gizzard::Shard.new(
@@ -169,41 +168,98 @@ describe Gizzard::Transformation do
       }
       dest_templates_and_weights = { to => 1 }
       copy_wrapper = "BlockedShard"
-      batch_finish = false
 
-      rebalancer = Gizzard::Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
-      rebalancer.transformations.size.should == 1
-      transformation = rebalancer.transformations.clone.shift[0]
-      transformation.operations.should == empty_ops.merge({
-        :prepare => [ create_shard('SqlShard(host4)'),
-                      create_shard('BlockedShard'),
-                      create_shard('BlockedShard'),
-                      create_shard('SqlShard(host3)'),
-                      create_shard('WriteOnlyShard'),
-                      add_link('ReplicatingShard', 'WriteOnlyShard'),
-                      add_link('WriteOnlyShard', 'BlockedShard'),
-                      add_link('BlockedShard', 'SqlShard(host4)'),
-                      add_link('BlockedShard', 'SqlShard(host3)'),
-                      add_link('ReplicatingShard', 'BlockedShard') ],
-        :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
-                      copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
-        :cleanup => [ add_link('WriteOnlyShard', 'SqlShard(host4)'),
-                      add_link('ReplicatingShard', 'SqlShard(host3)'),
-                      commit_begin('ReplicatingShard'),
-                      remove_link('ReplicatingShard', 'SqlShard(host1)'),
-                      remove_link('BlockedShard', 'SqlShard(host3)'),
-                      remove_link('ReplicatingShard', 'WriteOnlyShard'),
-                      remove_link('WriteOnlyShard', 'BlockedShard'),
-                      remove_link('BlockedShard', 'SqlShard(host4)'),
-                      remove_link('WriteOnlyShard', 'SqlShard(host2)'),
-                      remove_link('ReplicatingShard', 'BlockedShard'),
-                      delete_shard('SqlShard(host1)'),
-                      delete_shard('WriteOnlyShard'),
-                      delete_shard('BlockedShard'),
-                      delete_shard('SqlShard(host2)'),
-                      delete_shard('BlockedShard'),
-                      commit_end('ReplicatingShard') ]
-      })
+      it "without batch finish" do
+        batch_finish = false
+
+        rebalancer = Gizzard::Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
+        rebalancer.transformations.size.should == 1
+        transformation = rebalancer.transformations.clone.shift[0]
+        transformation.operations.should == empty_ops.merge({
+          :prepare => [ create_shard('SqlShard(host4)'),
+                        create_shard('BlockedShard'),
+                        create_shard('BlockedShard'),
+                        create_shard('SqlShard(host3)'),
+                        create_shard('WriteOnlyShard'),
+                        add_link('ReplicatingShard', 'WriteOnlyShard'),
+                        add_link('WriteOnlyShard', 'BlockedShard'),
+                        add_link('BlockedShard', 'SqlShard(host4)'),
+                        add_link('BlockedShard', 'SqlShard(host3)'),
+                        add_link('ReplicatingShard', 'BlockedShard') ],
+          :copy =>    [ copy_shard('SqlShard(host1)', 'SqlShard(host4)'),
+                        copy_shard('SqlShard(host1)', 'SqlShard(host3)') ],
+          :cleanup => [ add_link('WriteOnlyShard', 'SqlShard(host4)'),
+                        add_link('ReplicatingShard', 'SqlShard(host3)'),
+                        commit_begin('ReplicatingShard'),
+                        remove_link('ReplicatingShard', 'SqlShard(host1)'),
+                        remove_link('BlockedShard', 'SqlShard(host3)'),
+                        remove_link('ReplicatingShard', 'WriteOnlyShard'),
+                        remove_link('WriteOnlyShard', 'BlockedShard'),
+                        remove_link('BlockedShard', 'SqlShard(host4)'),
+                        remove_link('WriteOnlyShard', 'SqlShard(host2)'),
+                        remove_link('ReplicatingShard', 'BlockedShard'),
+                        delete_shard('SqlShard(host1)'),
+                        delete_shard('WriteOnlyShard'),
+                        delete_shard('BlockedShard'),
+                        delete_shard('SqlShard(host2)'),
+                        delete_shard('BlockedShard'),
+                        commit_end('ReplicatingShard') ]
+        })
+      end
+
+      it "with batch finish" do
+        batch_finish = true
+        rebalancer = Gizzard::Rebalancer.new(trees, dest_templates_and_weights, copy_wrapper, batch_finish)
+        rebalancer.transformations.size.should == 1
+        transformation = rebalancer.transformations.clone.shift[0]
+        transformation.operations.should == empty_ops.merge({
+          :prepare =>
+            [create_shard("BlockedShard"),
+            create_shard("SqlShard(host3)"),
+            create_shard("BlockedShard"),
+            create_shard("SqlShard(host4)"),
+            create_shard("WriteOnlyShard"),
+            add_link("ReplicatingShard", "BlockedShard"),
+            add_link("BlockedShard", "SqlShard(host3)"),
+            add_link("WriteOnlyShard", "BlockedShard"),
+            add_link("BlockedShard", "SqlShard(host4)"),
+            add_link("ReplicatingShard", "WriteOnlyShard")],
+          :copy =>
+            [copy_shard("SqlShard(host1)", "SqlShard(host3)"),
+            copy_shard("SqlShard(host1)", "SqlShard(host4)")],
+          :unblock_writes =>
+            [create_shard("WriteOnlyShard"),
+            create_shard("WriteOnlyShard"),
+            add_link("WriteOnlyShard", "SqlShard(host3)"),
+            add_link("ReplicatingShard", "WriteOnlyShard"),
+            add_link("WriteOnlyShard", "SqlShard(host4)"),
+            add_link("WriteOnlyShard", "WriteOnlyShard"),
+            remove_link("ReplicatingShard", "BlockedShard"),
+            remove_link("BlockedShard", "SqlShard(host3)"),
+            remove_link("WriteOnlyShard", "BlockedShard"),
+            remove_link("BlockedShard", "SqlShard(host4)"),
+            delete_shard("BlockedShard"),
+            delete_shard("BlockedShard")],
+          :unblock_reads =>
+            [add_link("ReplicatingShard", "SqlShard(host3)"),
+            add_link("WriteOnlyShard", "SqlShard(host4)"),
+            remove_link("WriteOnlyShard", "SqlShard(host3)"),
+            remove_link("ReplicatingShard", "WriteOnlyShard"),
+            remove_link("WriteOnlyShard", "SqlShard(host4)"),
+            remove_link("WriteOnlyShard", "WriteOnlyShard"),
+            delete_shard("WriteOnlyShard"),
+            delete_shard("WriteOnlyShard")],
+          :cleanup =>
+            [commit_begin("ReplicatingShard"),
+            remove_link("ReplicatingShard", "SqlShard(host1)"),
+            remove_link("WriteOnlyShard", "SqlShard(host2)"),
+            remove_link("ReplicatingShard", "WriteOnlyShard"),
+            delete_shard("SqlShard(host1)"),
+            delete_shard("SqlShard(host2)"),
+            delete_shard("WriteOnlyShard"),
+            commit_end("ReplicatingShard")]
+        })
+      end
     end
 
     it "migrates the top level shard" do
