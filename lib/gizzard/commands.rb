@@ -23,7 +23,7 @@ module Gizzard
       def run(command_name, global_options, argv, subcommand_options, log)
         command_class = Gizzard.const_get("#{classify(command_name)}Command")
 
-        @manager      ||= make_manager(global_options, log)
+        @manager      ||= make_manager(global_options, global_options.hosts, log)
         @job_injector ||= make_job_injector(global_options, log)
 
         command = command_class.new(@manager, @job_injector, global_options, argv, subcommand_options)
@@ -38,9 +38,10 @@ module Gizzard
         string.split(/\W+/).map{|s| s.capitalize }.join("")
       end
 
-      def make_manager(global_options, log)
-        raise "No hosts specified" unless global_options.hosts
-        hosts = global_options.hosts.map {|h| [h, global_options.port].join(":") }
+      # create a 'Nameserver' instance for the given set of hosts
+      def make_manager(global_options, host_list, log)
+        raise "No hosts specified" unless host_list
+        hosts = host_list.map {|h| [h, global_options.port].join(":") }
 
         Nameserver.new(hosts, :retries => global_options.retry,
                               :log     => log,
@@ -126,6 +127,15 @@ module Gizzard
       manifest = manager.manifest(*table_ids)
       manifest.validate_for_write_or_raise(ignore_busy, ignore_shard_types)
       manifest
+    end
+
+    # TODO: since this is transform specific, it should move into BaseTransformCommand
+    # once Add/Remove partition are subclasses (DS-84)
+    def make_copy_manager()
+      scheduler_options = command_options.scheduler_options || {}
+      scheduler_options[:copy_hosts] ?
+        make_manager(global_options, scheduler_options[:copy_hosts], log) :
+        @manager
     end
   end
 
@@ -847,6 +857,7 @@ module Gizzard
       end
       @batch_finish      = scheduler_options[:batch_finish] || false
       @copy_wrapper      = scheduler_options[:copy_wrapper]
+      @copy_manager      = make_copy_manager()
 
       scheduler_options[:force] = @force
       scheduler_options[:quiet] = @be_quiet
@@ -876,6 +887,7 @@ module Gizzard
       confirm!
 
       Gizzard.schedule! manager,
+                        @copy_manager,
                         base_name,
                         transformations,
                         scheduler_options
@@ -976,6 +988,7 @@ module Gizzard
       batch_finish      = scheduler_options[:batch_finish] || false
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
+      copy_manager      = make_copy_manager()
 
       scheduler_options[:quiet] = be_quiet
 
@@ -1021,6 +1034,7 @@ module Gizzard
       confirm!
 
       Gizzard.schedule! manager,
+                        copy_manager,
                         base_name,
                         transformations,
                         scheduler_options
@@ -1037,6 +1051,7 @@ module Gizzard
       batch_finish      = scheduler_options[:batch_finish] || false
       be_quiet          = global_options.force && command_options.quiet
       transformations   = {}
+      copy_manager      = make_copy_manager()
 
       scheduler_options[:quiet] = be_quiet
 
@@ -1078,6 +1093,7 @@ module Gizzard
       confirm!
 
       Gizzard.schedule! manager,
+                        copy_manager,
                         base_name,
                         transformations,
                         scheduler_options

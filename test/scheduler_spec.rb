@@ -7,7 +7,7 @@ describe Gizzard::Transformation::Scheduler do
     stub(@nameserver).dryrun? { false }
 
     @transformations = {}
-    @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, 't', @transformations)
+    @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, @nameserver, 't', @transformations)
   end
 
   describe "busy_shards" do
@@ -33,7 +33,7 @@ describe Gizzard::Transformation::Scheduler do
     it "returns a list of hosts over the threshold of copies per host" do
       shards = []
       stub(@nameserver).get_busy_shards { shards }
-      @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, 't', @transformations, :copies_per_host => 2)
+      @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, @nameserver, 't', @transformations, :copies_per_host => 2)
 
       @scheduler.busy_hosts.should == Set.new
 
@@ -49,7 +49,7 @@ describe Gizzard::Transformation::Scheduler do
     it "respects passed in extra hosts" do
       shards = []
       stub(@nameserver).get_busy_shards { shards }
-      @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, 't', @transformations, :copies_per_host => 2)
+      @scheduler = Gizzard::Transformation::Scheduler.new(@nameserver, @nameserver, 't', @transformations, :copies_per_host => 2)
 
       @scheduler.busy_hosts.should == Set.new
       @scheduler.busy_hosts(["127.0.0.1"]).should == Set.new
