@@ -17,9 +17,10 @@ module Gizzard
       :poll_interval   => 10,
     }.freeze
 
-    def initialize(nameserver, base_name, transformations, options = {})
+    def initialize(nameserver, copy_nameserver, base_name, transformations, options = {})
       options = DEFAULT_OPTIONS.merge(options)
       @nameserver         = nameserver
+      @copy_nameserver    = copy_nameserver
       @transformations    = transformations
       @max_copies         = options[:max_copies]
       @copies_per_host    = options[:copies_per_host]
@@ -101,7 +102,8 @@ module Gizzard
 
     def apply_job(job, phase)
       if !(@skip_phases.include? phase)
-        job.apply!(@nameserver, phase, @rollback_log)
+        ns = phase == :copy ? @copy_nameserver : @nameserver
+        job.apply!(ns, phase, @rollback_log)
       end
     end
 
