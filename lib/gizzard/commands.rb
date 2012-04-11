@@ -3,17 +3,23 @@ require "set"
 require "digest/md5"
 
 module Gizzard
-  def Gizzard::confirm!(force=false, message="Continue?")
+  CONFIRM_OPTIONS = Hash[
+    'y' => lambda { true },
+    'n' => lambda { puts "Exiting"; exit 1 }
+  ].freeze
+
+  # takes a map of 'character => lambda': if a character is defined, the result of
+  # executing the (no-arg) lambda is returned
+  def Gizzard::confirm!(force=false, message="Continue?", options=CONFIRM_OPTIONS, input=$stdin, output=$stdout)
     return if force
+    opt_char_string = options.keys.join('/')
     begin
-      print "#{message} (y/n) "; $stdout.flush
-      resp = $stdin.gets.chomp.downcase
-      puts ""
-    end while resp != 'y' && resp != 'n'
-    if resp == 'n'
-      puts "Exiting."
-      exit
-    end
+      output.print "#{message} (#{opt_char_string}) "
+      output.flush
+      resp = input.gets.chomp.downcase
+      output.puts ""
+    end while !options.has_key?(resp)
+    options[resp].call
   end
 
   class Command

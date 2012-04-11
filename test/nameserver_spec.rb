@@ -101,6 +101,45 @@ describe Gizzard::Nameserver do
     it "works..."
   end
 
+  describe "prune_hosts" do
+    class Client
+      def initialize(host)
+        @host = host
+      end
+
+      def get_host
+        @host
+      end
+    end
+
+    one = Client.new(1)
+    two = Client.new(2)
+    all = [one, two]
+    failed = [[one, "Result", "Exception"]]
+
+    it "ignores a failed client" do
+      prune("i\n", all, failed).should == [[two], [one]]
+    end
+
+    it "retries a failed client" do
+      prune("r\n", all, failed).should == [all, []]
+    end
+
+    it "fails when no more hosts" do
+      expect { prune("k\n", all, failed) }.should raise_error
+    end
+
+    it "fails when requested" do
+      expect { prune("k\n", all, failed) }.should raise_error
+    end
+
+    def prune(instr, all, failed)
+      input = StringIO.new(instr)
+      output = StringIO.new("")
+      Gizzard::Nameserver.prune_hosts(false, "prune", all, failed, input, output)
+    end
+  end
+
   describe "reload_config" do
     it "reloads config on every app server" do
       mock(@client).reload_config

@@ -16,6 +16,19 @@ describe "gizzmo (cli)" do
     @nameserver_db = nil
   end
 
+  describe "confirm!" do
+    it "differentiates between inputs" do
+      opt = Hash['y' => lambda {|| 'y' }]
+      output = sio()
+      Gizzard::confirm!(false, "Blah?", opt, sio("n\ny\n"), output).should == 'y'
+      output.string.should == "Blah? (y) \nBlah? (y) \n"
+    end
+
+    def sio(string="")
+      StringIO.new(string)
+    end
+  end
+
   describe "basic manipulation commands" do
     describe "create" do
       it "creates a single shard" do
