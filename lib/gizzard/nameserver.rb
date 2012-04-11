@@ -89,6 +89,45 @@ module Gizzard
     MAX_ATTEMPT_SECS = 30
     PARALLELISM     = 10
 
+    PRUNE_HOST_MSG =
+      "(r)etry on these hosts, (i)gnore these hosts for the remainder of the transform, (k)ill the process?"
+    PRUNE_HOST_OPTS = Hash[
+      'r' => lambda { true },
+      'i' => lambda { false },
+      'k' => lambda { raise Exception.new("Killing transform.") }
+    ].freeze
+
+    # given a list of all_clients, and a list of triples of (client, result, exception),
+    # ask the user how to handle the failed clients, and return a tuple of
+    # (all_clients, failed_clients_to_consider_successful). If the user does not want
+    # to proceed or there are no hosts to continue with, raises an exception.
+    def Nameserver.prune_hosts(force, operation_name, all_clients, failed_client_triples, input=$stdin, output=$stdout)
+      output.puts "#{failed_client_triples.size} of #{all_clients.size} clients " +
+        "failed to execute '#{operation_name}':"
+      failed_client_triples.each do |client, _, exception|
+        output.puts "\t#{client.get_host} failed with: #{exception}"
+      end
+      if force
+        raise Exception.new("Cannot proceed past exceptions while force=true: exiting.")
+      end
+      res = Gizzard::confirm!(false, PRUNE_HOST_MSG, PRUNE_HOST_OPTS, input, output)
+
+      # we're still alive: user wanted to proceed, either by retrying failed hosts,
+      # or by pruning them
+      if res
+        # continue with full host list
+        [all_clients,[]]
+      else
+        # return an updated list
+        without_clients = failed_client_triples.map{|client, _, _| client }
+        res_all_clients = all_clients - without_clients
+        if res_all_clients.empty?
+          raise Exception.new("No viable clients remain: exiting.")
+        end
+        [res_all_clients, without_clients]
+      end
+    end
+
     attr_reader :hosts, :logfile, :dryrun, :framed
     alias dryrun? dryrun
 
@@ -191,43 +230,46 @@ module Gizzard
     # executes the given block in parallel with a client for each server: in the face of failure,
     # may return less results than there are clients
     def on_all_servers(operation_name, &block)
-      # fork into many threads, and then join with exception handling
-      clients_and_threads = all_clients.map do |client|
-        [client, Thread.new { Thread.current[:result] = block.call(client) }]
-      end
-      clients_and_results_or_exceptions = clients_and_threads.map do |client, thread|
-        begin
-          thread.join
-          [client, thread[:result], nil]
-        rescue Exception => e
-          [client, nil, e]
+      remaining_clients = all_clients
+      successful_results = []
+      while true do
+        # fork into many threads, and then join with exception handling
+        clients_and_threads = remaining_clients.map do |client|
+          [client, Thread.new { Thread.current[:result] = block.call(client) }]
         end
-      end
+        clients_and_results_or_exceptions = clients_and_threads.map do |client, thread|
+          begin
+            thread.join
+            [client, thread[:result], nil]
+          rescue Exception => e
+            [client, nil, e]
+          end
+        end
 
-      successful_clients, failed_clients =
-        clients_and_results_or_exceptions.partition{|_, _, exception| exception.nil? }
-      if failed_clients.size > 0
-        # if there were failed clients, but the user would like to proceed anyway,
-        # mutate @all_clients to remove the failed clients
-        puts "#{failed_clients.size} of #{all_clients.size} clients failed to execute '#{operation_name}':"
-        failed_clients.each do |client, _, exception|
-          puts "\t#{client.get_host} failed with: #{exception}"
-        end
-        if @force
-          puts "Cannot proceed past exceptions while force=true: exiting."
-          exit 1
-        end
-        Gizzard::confirm!(false, "Proceed without these hosts?")
-        # we're still alive: user wanted to proceed
-        @all_clients.reject!(failed_clients.map{|client, _, _| client })
-      end
-      if @all_clients.size < 1
-        puts "No viable clients remain: exiting."
-        exit 1
-      end
+        successful_clients, failed_clients =
+          clients_and_results_or_exceptions.partition{|_, _, exception| exception.nil? }
+        # collect successful results and remove successful clients
+        remaining_clients =
+          remaining_clients - successful_clients.map{|c, _, _| c }
+        successful_results =
+          successful_results + successful_clients.map{|_, r, _| r }
 
-      # return only successful results
-      successful_clients.map{|_, result, _| result }
+        if failed_clients.size > 0
+          begin
+            # if there were failed clients, but the user would like to proceed anyway,
+            # mutate all_clients and remaining_clients
+            @all_clients, considered_successful_clients =
+              Nameserver.prune_hosts(@force, operation_name, all_clients, failed_clients)
+            remaining_clients =
+              remaining_clients - considered_successful_clients.map{|c, _, _| c }
+          rescue Exception => e
+            puts "Did not complete '#{operation_name}': " + e
+            exit 1
+          end
+        end
+
+        return successful_results if remaining_clients.empty?
+      end
     end
 
     def client

@@ -17,7 +17,7 @@ Jeweler::Tasks.new do |gem|
   gem.name = "gizzmo"
   gem.summary = %Q{Gizzmo is a command-line client for managing gizzard clusters.}
   gem.description = %Q{Gizzmo is a command-line client for managing gizzard clusters.}
-  gem.email = "kmaxwell@twitter.com"
+  gem.email = "stuhood@twitter.com"
   gem.homepage = "http://github.com/twitter/gizzmo"
   gem.authors = ["Kyle Maxwell"]
 end
