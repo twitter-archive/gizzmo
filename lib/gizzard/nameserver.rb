@@ -132,7 +132,6 @@ module Gizzard
     alias dryrun? dryrun
 
     def initialize(*hosts)
-      # TODO: waaaaaat
       options = hosts.last.is_a?(Hash) ? hosts.pop : {}
       @retries = options[:retries] || DEFAULT_RETRIES
       @logfile = options[:log]     || "/tmp/gizzmo.log"
