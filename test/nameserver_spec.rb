@@ -126,7 +126,7 @@ describe Gizzard::Nameserver do
     end
 
     it "fails when no more hosts" do
-      expect { prune("k\n", all, failed) }.should raise_error
+      expect { prune("i\n", [one], failed) }.should raise_error
     end
 
     it "fails when requested" do
