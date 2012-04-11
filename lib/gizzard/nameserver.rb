@@ -258,7 +258,7 @@ module Gizzard
           begin
             # if there were failed clients, but the user would like to proceed anyway,
             # mutate all_clients and remaining_clients
-            all_clients, considered_successful_clients =
+            @all_clients, considered_successful_clients =
               Nameserver.prune_hosts(@force, operation_name, all_clients, failed_clients)
             remaining_clients =
               remaining_clients - considered_successful_clients.map{|c, _, _| c }
