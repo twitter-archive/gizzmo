@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.16.0"
+  s.version = "0.17.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2012-04-11}
+  s.date = %q{2012-04-13}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{stuhood@twitter.com}
   s.executables = ["setup_shards", "gizzmo"]
