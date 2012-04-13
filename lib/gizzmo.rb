@@ -27,6 +27,8 @@ DOC_STRINGS = {
   "flush" => "Flush error queue for a given priority.",
   "forwardings" => "Get a list of all forwardings.",
   "hosts" => "List hosts used in shard names in the forwarding table and replicas.",
+  "hostweight-set" => "Sets read and write weights at a host level, which are multiplicative on shard weights.",
+  "hostweight-list" => "Lists host-level read and write weights. Hosts without entries default to 1.0 for all weights.",
   "info" => "Show id/class/busy for shards.",
   "inject" => "Inject jobs (as literal json) into the server. Jobs can be linefeed-terminated from stdin, or passed as arguments. Priority is server-defined, but typically lower numbers (like 1) are lower priority.",
   "links" => "List parent and child links for shards.",
@@ -229,6 +231,14 @@ subcommands = {
   'hosts' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} hosts"
     separators(opts, DOC_STRINGS["hosts"])
+  end,
+  'hostweight-set' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} hostweight-set HOSTNAME READ_WEIGHT_FLOAT WRITE_WEIGHT_FLOAT"
+    separators(opts, DOC_STRINGS["hostweight-set"])
+  end,
+  'hostweight-list' => OptionParser.new do |opts|
+    opts.banner = "Usage: #{zero} hostweight-list"
+    separators(opts, DOC_STRINGS["hostweight-list"])
   end,
   'tables' => OptionParser.new do |opts|
     opts.banner = "Usage: #{zero} tables"
