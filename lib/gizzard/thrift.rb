@@ -78,6 +78,22 @@ module Gizzard
     end
   end
 
+  HostWeightInfo = T.make_struct(:HostWeightInfo,
+    T::Field.new(:hostname, T::STRING, 1),
+    T::Field.new(:weight_write, T::DOUBLE, 2),
+    T::Field.new(:weight_read, T::DOUBLE, 3)
+  )
+
+  class HostWeightInfo
+    def inspect
+      "HostWeight(#{hostname} read=#{weight_read} write=#{weight_write})"
+    end
+
+    def to_unix
+      [hostname, weight_read, weight_write].join("\t")
+    end
+  end
+
   Forwarding = T.make_struct(:Forwarding,
     T::Field.new(:table_id, T::I32, 1),
     T::Field.new(:base_id, T::I64, 2),
@@ -98,7 +114,8 @@ module Gizzard
     T::Field.new(:shards, list(struct(ShardInfo)), 1),
     T::Field.new(:links, list(struct(LinkInfo)), 2),
     T::Field.new(:forwardings, list(struct(Forwarding)), 3),
-    T::Field.new(:table_id, T::I32, 4)
+    T::Field.new(:table_id, T::I32, 4),
+    T::Field.new(:host_weights, list(struct(HostWeightInfo)), 5)
   )
 
 
@@ -229,6 +246,9 @@ module Gizzard
     thrift_method :get_shard, struct(ShardInfo), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
     thrift_method :shards_for_hostname, list(struct(ShardInfo)), field(:hostname, string, 1), :throws => exception(GizzardException)
     thrift_method :get_busy_shards, list(struct(ShardInfo)), :throws => exception(GizzardException)
+
+    thrift_method :set_host_weight, void, field(:host_weight, struct(HostWeightInfo), 1), :throws => exception(GizzardException)
+    thrift_method :list_host_weights, list(struct(HostWeightInfo)), :throws => exception(GizzardException)
 
     thrift_method :list_upward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
     thrift_method :list_downward_links, list(struct(LinkInfo)), field(:id, struct(ShardId), 1), :throws => exception(GizzardException)
