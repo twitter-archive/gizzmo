@@ -49,7 +49,7 @@ To execute the tests:
 
 2. Pull in test server dependencies (once, or whenever you want to change the Gizzard version):
 
-        cd test/test_server ; sbt clean-lib update
+        cd test/test_server ; sbt clean clean-lib update
 
 3. Run rake (the default target is the test suite: all files ending in '_spec' in the test directory):
 

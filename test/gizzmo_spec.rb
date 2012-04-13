@@ -63,6 +63,16 @@ describe "gizzmo (cli)" do
       end
     end
 
+    describe "hostweight" do
+      it "sets and lists host weight" do
+        one_out = "localhost\t0.5\t1.0"
+        two_out = "remotehost\t0.3\t1.0"
+        gizzmo("hostweight-set localhost 0.5 1.0").should == "#{one_out}\n"
+        gizzmo("hostweight-set remotehost 0.3 1.0").should == "#{two_out}\n"
+        gizzmo("hostweight-list").split(/\n/).sort.should == [one_out, two_out].sort
+      end
+    end
+
     describe "wrap/unwrap" do
       before do
         ns.create_shard info("localhost", "t_0_000", "TestShard")

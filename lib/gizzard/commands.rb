@@ -280,6 +280,26 @@ module Gizzard
     end
   end
 
+  class HostweightSetCommand < Command
+    def run
+      hostname, weight_read, weight_write = argv
+      help! if argv.length != 3
+      weight_read = weight_read.to_f
+      weight_write = weight_write.to_f
+      hw = HostWeightInfo.new(hostname, weight_write, weight_read)
+      manager.set_host_weight(hw)
+      output hw.to_unix
+    end
+  end
+
+  class HostweightListCommand < Command
+    def run
+      manager.list_host_weights().each do |hw|
+        output hw.to_unix
+      end
+    end
+  end
+
   class AddlinkCommand < Command
     def run
       up_id, down_id, weight = argv
