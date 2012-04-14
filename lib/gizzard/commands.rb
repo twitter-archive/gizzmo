@@ -31,6 +31,7 @@ module Gizzard
 
         @manager      ||= make_manager(global_options, global_options.hosts, log)
         @job_injector ||= make_job_injector(global_options, log)
+        @log            = log
 
         command = command_class.new(@manager, @job_injector, global_options, argv, subcommand_options)
         command.run
@@ -70,6 +71,15 @@ module Gizzard
       @global_options  = global_options
       @argv            = argv
       @command_options = command_options
+    end
+
+    # TODO: since this is transform specific, it should move into BaseTransformCommand
+    # once Add/Remove partition are subclasses (DS-84)
+    def make_copy_manager()
+      scheduler_options = command_options.scheduler_options || {}
+      scheduler_options[:copy_hosts] ?
+        Command.make_manager(global_options, scheduler_options[:copy_hosts], @log) :
+        @manager
     end
 
     def help!(message = nil)
@@ -133,15 +143,6 @@ module Gizzard
       manifest = manager.manifest(*table_ids)
       manifest.validate_for_write_or_raise(ignore_busy, ignore_shard_types)
       manifest
-    end
-
-    # TODO: since this is transform specific, it should move into BaseTransformCommand
-    # once Add/Remove partition are subclasses (DS-84)
-    def make_copy_manager()
-      scheduler_options = command_options.scheduler_options || {}
-      scheduler_options[:copy_hosts] ?
-        make_manager(global_options, scheduler_options[:copy_hosts], log) :
-        @manager
     end
   end
 

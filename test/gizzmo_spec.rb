@@ -379,7 +379,7 @@ localhost/t_0_002_replicating	ReplicatingShard(1) -> (TestShard(localhost,1,Int,
       ns.set_forwarding forwarding(0, 1, id("localhost", "s_0_001_replicating"))
       ns.reload_config
 
-      gizzmo('-f transform-tree --no-progress --poll-interval=1 \
+      gizzmo('-f transform-tree --copy-hosts=127.0.0.1 --no-progress --poll-interval=1 \
 "ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1))" \
 localhost/s_0_001_replicating').should match(fuzzily(<<-EOF))
 ReplicatingShard(1) -> TestShard(localhost,1,Int,Int) => ReplicatingShard(1) -> (TestShard(localhost,1,Int,Int), TestShard(127.0.0.1,1)) :
