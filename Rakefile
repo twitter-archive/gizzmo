@@ -7,6 +7,7 @@ rescue LoadError
 end
 
 require 'rake'
+require 'rcov'
 require 'jeweler'
 require 'spec/rake/spectask'
 require 'rdoc/task'
@@ -29,6 +30,7 @@ Spec::Rake::SpecTask.new(:spec) do |t|
     t.spec_opts = ['--options', "\"#{spec_opts}\""]
   end
   t.spec_files = FileList['test/**/*_spec.rb']
+  t.rcov = true
 end
 
 Rake::RDocTask.new do |rdoc|
