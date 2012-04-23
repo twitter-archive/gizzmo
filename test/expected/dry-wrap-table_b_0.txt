@@ -1,5 +1,0 @@
-Skipped writing: create_shard(localhost/replicating_table_b_0)
-Skipped writing: add_link(localhost/replicating_table_b_0, localhost/table_b_0, 1)
-Skipped writing: add_link(localhost/table_repl_0, localhost/replicating_table_b_0, 1)
-Skipped writing: remove_link(localhost/table_repl_0, localhost/table_b_0)
-localhost/replicating_table_b_0
