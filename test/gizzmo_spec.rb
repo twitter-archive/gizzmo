@@ -78,20 +78,35 @@ describe "gizzmo (cli)" do
         ns.create_shard info("localhost", "t_0_000", "TestShard")
         ns.create_shard info("localhost", "t_0_000_replicating", "ReplicatingShard")
         ns.add_link id("localhost", "t_0_000_replicating"), id("localhost", "t_0_000"), 1
-
-        gizzmo "wrap BlockedShard localhost/t_0_000"
       end
 
-      it "wrap wraps a shard" do
-        nameserver_db[:shards].should == [info("localhost", "t_0_000", "TestShard"),
-                                          info("localhost", "t_0_000_blocked", "BlockedShard"),
-                                          info("localhost", "t_0_000_replicating", "ReplicatingShard")]
+      describe "wrap wraps a shard" do
+        it "with BlockedShard" do
+          gizzmo "wrap BlockedShard localhost/t_0_000"
+          nameserver_db[:shards].to_set.should == shards_with_wrapper("BlockedShard", "blocked")
+          nameserver_db[:links].to_set.should == links_with_wrapper("blocked")
+        end
 
-        nameserver_db[:links].should == [link(id("localhost", "t_0_000_blocked"), id("localhost", "t_0_000"), 1),
-                                         link(id("localhost", "t_0_000_replicating"), id("localhost", "t_0_000_blocked"), 1)]
+        it "with SlaveShard" do
+          gizzmo "wrap SlaveShard localhost/t_0_000"
+          nameserver_db[:shards].to_set.should == shards_with_wrapper("SlaveShard", "slave")
+          nameserver_db[:links].to_set.should == links_with_wrapper("slave")
+        end
+
+        def shards_with_wrapper(clazz, suffix)
+          [info("localhost", "t_0_000", "TestShard"),
+           info("localhost", "t_0_000_#{suffix}", clazz),
+           info("localhost", "t_0_000_replicating", "ReplicatingShard")].to_set
+        end
+
+        def links_with_wrapper(suffix)
+          [link(id("localhost", "t_0_000_#{suffix}"), id("localhost", "t_0_000"), 1),
+           link(id("localhost", "t_0_000_replicating"), id("localhost", "t_0_000_#{suffix}"), 1)].to_set
+        end
       end
 
       it "unwrap unwraps a shard" do
+        gizzmo "wrap BlockedShard localhost/t_0_000"
         gizzmo "unwrap localhost/t_0_000_blocked"
 
         nameserver_db[:shards].should == [info("localhost", "t_0_000", "TestShard"),
@@ -101,6 +116,7 @@ describe "gizzmo (cli)" do
       end
 
       it "unwrap doesn't unwrap a top level shard or a leaf" do
+        gizzmo "wrap BlockedShard localhost/t_0_000"
         gizzmo "unwrap localhost/t_0_000"
         gizzmo "unwrap localhost/t_0_000_replicating"
 
