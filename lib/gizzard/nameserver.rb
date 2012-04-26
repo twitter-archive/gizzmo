@@ -22,20 +22,22 @@ module Gizzard
       "ReadOnlyShard",
       "WriteOnlyShard",
       "BlockedShard",
+      "SlaveShard",
     ]
 
     REPLICATING_SHARD_TYPES = ["ReplicatingShard", "FailingOverShard"]
 
     TRANSITIONAL_SHARD_TYPES = ["BlockedShard"]
 
-    INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard"]
+    INVALID_COPY_TYPES = ["ReadOnlyShard", "BlackHoleShard", "BlockedShard", "WriteOnlyShard", "SlaveShard"]
 
     SHARD_SUFFIXES = {
       "FailingOverShard" => 'replicating',
       "ReplicatingShard" => 'replicating',
       "ReadOnlyShard" => 'read_only',
       "WriteOnlyShard" => 'write_only',
-      "BlockedShard" => 'blocked'
+      "BlockedShard" => 'blocked',
+      "SlaveShard" => 'slave',
     }
 
     SHARD_TAGS = {
@@ -43,7 +45,8 @@ module Gizzard
       "ReadOnlyShard" => 'read_only',
       "WriteOnlyShard" => 'write_only',
       "BlockedShard" => 'blocked',
-      "BlackHoleShard" => 'blackhole'
+      "BlackHoleShard" => 'blackhole',
+      "SlaveShard" => 'slave',
     }
 
     def id; info.id end
