@@ -88,8 +88,8 @@ module Gizzard
   class Nameserver
     DEFAULT_PORT    = 7920
 
-    DEFAULT_RETRIES = 100
-    MAX_BACKOFF_SECS = 30
+    DEFAULT_RETRIES = 50
+    MAX_BACKOFF_SECS = 60
     PARALLELISM     = 10
 
     PRUNE_HOST_MSG =
