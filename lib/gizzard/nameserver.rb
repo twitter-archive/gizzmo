@@ -169,7 +169,7 @@ module Gizzard
     end
 
     def diff_shards(*shards)
-      with_retry { random_client.diff_shards(*shards) }
+      with_retry(MAX_BACKOFF_SECS/2) { random_client.diff_shards(*shards) }
     end
 
     def respond_to?(method)
