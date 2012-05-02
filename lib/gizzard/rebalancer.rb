@@ -48,7 +48,7 @@ module Gizzard
 
       @result = dest_templates_and_weights.map do |template, weight|
         weight_fraction = weight / total_weight.to_f
-        approx_shards   = total_shards * weight_fraction
+        approx_shards   = (total_shards * weight_fraction).round
 
         Bucket.new template, approx_shards, Set.new
       end
