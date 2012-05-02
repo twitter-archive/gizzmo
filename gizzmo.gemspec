@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gizzmo}
-  s.version = "0.17.1"
+  s.version = "0.17.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Kyle Maxwell"]
-  s.date = %q{2012-04-14}
+  s.date = %q{2012-05-02}
   s.description = %q{Gizzmo is a command-line client for managing gizzard clusters.}
   s.email = %q{stuhood@twitter.com}
   s.executables = ["setup_shards", "gizzmo"]
@@ -40,24 +40,6 @@ Gem::Specification.new do |s|
     "lib/gizzmo.rb",
     "lib/vendor/thrift_client/simple.rb",
     "test/config.yaml",
-    "test/expected/blocked-transform-shard.txt",
-    "test/expected/busy-transform-shard.txt",
-    "test/expected/deep.txt",
-    "test/expected/dry-wrap-table_b_0.txt",
-    "test/expected/empty-file.txt",
-    "test/expected/find-only-sql-shard-type.txt",
-    "test/expected/forwardings.txt",
-    "test/expected/help-info.txt",
-    "test/expected/info.txt",
-    "test/expected/links-for-replicating_table_b_0.txt",
-    "test/expected/links-for-table_b_0.txt",
-    "test/expected/links-for-table_repl_0.txt",
-    "test/expected/original-find.txt",
-    "test/expected/subtree-info.txt",
-    "test/expected/subtree.txt",
-    "test/expected/unwrapped-replicating_table_b_0.txt",
-    "test/expected/unwrapped-table_b_0.txt",
-    "test/expected/wrap-table_b_0.txt",
     "test/gizzmo_spec.rb",
     "test/helper.rb",
     "test/nameserver_spec.rb",
@@ -65,7 +47,6 @@ Gem::Specification.new do |s|
     "test/shard_template_spec.rb",
     "test/spec.opts",
     "test/spec_helper.rb",
-    "test/test.sh",
     "test/test_server/.gitignore",
     "test/test_server/project/build.properties",
     "test/test_server/project/build/Project.scala",
@@ -86,12 +67,14 @@ Gem::Specification.new do |s|
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
       s.add_runtime_dependency(%q<jeweler>, [">= 0"])
+      s.add_runtime_dependency(%q<rcov>, ["~> 1.0.0"])
       s.add_runtime_dependency(%q<mysql>, [">= 0"])
       s.add_runtime_dependency(%q<rspec>, ["~> 1.3.2"])
       s.add_runtime_dependency(%q<rr>, [">= 0"])
       s.add_runtime_dependency(%q<diff-lcs>, [">= 0"])
     else
       s.add_dependency(%q<jeweler>, [">= 0"])
+      s.add_dependency(%q<rcov>, ["~> 1.0.0"])
       s.add_dependency(%q<mysql>, [">= 0"])
       s.add_dependency(%q<rspec>, ["~> 1.3.2"])
       s.add_dependency(%q<rr>, [">= 0"])
@@ -99,6 +82,7 @@ Gem::Specification.new do |s|
     end
   else
     s.add_dependency(%q<jeweler>, [">= 0"])
+    s.add_dependency(%q<rcov>, ["~> 1.0.0"])
     s.add_dependency(%q<mysql>, [">= 0"])
     s.add_dependency(%q<rspec>, ["~> 1.3.2"])
     s.add_dependency(%q<rr>, [">= 0"])
