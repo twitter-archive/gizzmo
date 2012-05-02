@@ -178,8 +178,9 @@ module Gizzard
 
     def method_missing(method, *args, &block)
       if client.respond_to?(method)
-        # operations without specialized backoff use a backoff of 1
-        with_retry(1) { random_client.send(method, *args, &block) }
+        # operations without specialized backoff use a backoff which assumes cheap, easily
+        # retryable operations: if this isn't the case, methods should specialize as above
+        with_retry(0.1) { random_client.send(method, *args, &block) }
       else
         super
       end
