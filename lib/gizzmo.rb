@@ -489,7 +489,7 @@ subcommands = {
     end
   end,
   'log-rollback' => OptionParser.new do |opts|
-    opts.banner = "Usage: #{zero} --rollback-log=LOG_NAME log-rollback"
+    opts.banner = "Usage: #{zero} log-rollback LOG_NAME"
     separators(opts, DOC_STRINGS["log-rollback"])
   end,
 }
