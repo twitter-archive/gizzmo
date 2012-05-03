@@ -17,6 +17,8 @@ describe Gizzard do
       parse_should("localhost", "edges_134_134_replicating")
       parse_should("localhost", "writeonly_edges_backward_134_134")
       parse_should("localhost", "writeonly_edges_forward_134_134")
+      parse_should("localhost", "status_1833_replicating")
+      parse_should("localhost", "status_1833")
     end
 
     def parse_should(hostname, table_prefix)
