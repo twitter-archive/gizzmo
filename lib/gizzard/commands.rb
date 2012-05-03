@@ -324,9 +324,12 @@ module Gizzard
   end
 
   class UnwrapCommand < Command
+    BATCH_SIZE = 1000
     def run
       shard_ids = argv
       help! "No shards specified" if shard_ids.empty?
+
+      batch = []
       shard_ids.each do |shard_id_string|
         shard_id = ShardId.parse(shard_id_string)
 
@@ -340,15 +343,25 @@ module Gizzard
 
         upward_links.each do |uplink|
           downward_links.each do |downlink|
-            manager.add_link(uplink.up_id, downlink.down_id, uplink.weight)
             new_link = LinkInfo.new(uplink.up_id, downlink.down_id, uplink.weight)
-            manager.remove_link(uplink.up_id, uplink.down_id)
-            manager.remove_link(downlink.up_id, downlink.down_id)
+            batch << TransformOperation.with(:add_link,
+              AddLinkRequest.new(uplink.up_id, downlink.down_id, uplink.weight))
+            batch << TransformOperation.with(:remove_link,
+              RemoveLinkRequest.new(uplink.up_id, uplink.down_id))
+            batch << TransformOperation.with(:remove_link,
+              RemoveLinkRequest.new(downlink.up_id, downlink.down_id))
             output new_link.to_unix
           end
         end
-        manager.delete_shard shard_id
+        batch << TransformOperation.with(:delete_shard, shard_id)
+
+        if batch.size > BATCH_SIZE
+          manager.batch_execute(batch)
+          batch = []
+        end
       end
+
+      manager.batch_execute(batch) unless batch.size == 0
     end
   end
 
@@ -423,6 +436,7 @@ module Gizzard
   end
 
   class WrapCommand < Command
+    BATCH_SIZE = 1000
     def self.derive_wrapper_shard_id(shard_info, wrapping_class_name)
       suffix = "_" + wrapping_class_name.split(".").last.downcase.gsub("shard", "")
       ShardId.new("localhost", shard_info.id.table_prefix + suffix)
@@ -431,21 +445,33 @@ module Gizzard
     def run
       class_name, *shard_ids = @argv
       help! "No shards specified" if shard_ids.empty?
+
+      batch = []
       shard_ids.each do |shard_id_string|
         shard_id   = ShardId.parse(shard_id_string)
         shard_info = manager.get_shard(shard_id)
-        manager.create_shard(ShardInfo.new(wrapper_id = self.class.derive_wrapper_shard_id(shard_info, class_name), class_name, "", "", 0))
+        batch << TransformOperation.with(:create_shard,
+          ShardInfo.new(wrapper_id = self.class.derive_wrapper_shard_id(shard_info, class_name), class_name, "", "", 0))
 
         existing_links = manager.list_upward_links(shard_id)
         unless existing_links.include?(LinkInfo.new(wrapper_id, shard_id, 1))
-          manager.add_link(wrapper_id, shard_id, 1)
+          batch << TransformOperation.with(:add_link,
+            AddLinkRequest.new(wrapper_id, shard_id, 1))
           existing_links.each do |link_info|
-            manager.add_link(link_info.up_id, wrapper_id, link_info.weight)
-            manager.remove_link(link_info.up_id, link_info.down_id)
+            batch << TransformOperation.with(:add_link,
+              AddLinkRequest.new(link_info.up_id, wrapper_id, link_info.weight))
+            batch << TransformOperation.with(:remove_link,
+              RemoveLinkRequest.new(link_info.up_id, link_info.down_id))
           end
+        end
+        if batch.size > BATCH_SIZE
+          manager.batch_execute(batch)
+          batch = []
         end
         output wrapper_id.to_unix
       end
+
+      manager.batch_execute(batch) unless batch.size == 0
     end
   end
 
