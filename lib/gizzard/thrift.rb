@@ -32,10 +32,10 @@ module Gizzard
     alias_method :to_unix, :inspect
 
     def self.parse(string)
-      if groups = string.match(/(.*)\/(.*\d+_\d{3,}.*)/)
+      if groups = string.match(/(.*)\/(.*_\d{3,}.*)/)
         new(*groups.values_at(1, 2))
       else
-        raise "Invalid shard id '#{string}': shard ids are composed of '<table-prefix>_<table-id>_<three-or-more-digit-id>[_<optional-suffix>]'"
+        raise "Invalid shard id '#{string}': shard ids are composed of '<table-prefix>_<three-or-more-digit-id>[_<optional-suffix>]'"
       end
     end
   end

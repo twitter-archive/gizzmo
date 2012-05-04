@@ -1268,7 +1268,7 @@ module Gizzard
       end
 
       # fetch a preview of the batch
-      batch, might_have_more_batches = fetch_and_truncate(rl, 32)
+      batch, might_have_more_batches = fetch_and_truncate(rl, 1024)
       puts "Rolling back #{rl.name} will execute the following operations:"
       if might_have_more_batches
         head_id = batch.first.first
