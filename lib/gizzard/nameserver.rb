@@ -303,7 +303,7 @@ module Gizzard
       times ||= @retries
       yield
     rescue Exception => e
-      STDERR.puts "\nException for #{opname}: #{e.class}: #{e.description rescue "(no description)"}"
+      STDERR.puts "\nException for #{opname}: #{e.to_s}: #{e.description rescue "(no description)"}"
       STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0
       times -= 1
       sleep_time = [min_backoff_secs, MAX_BACKOFF_SECS / [times, 1].max].max

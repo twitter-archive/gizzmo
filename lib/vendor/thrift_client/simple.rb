@@ -321,11 +321,18 @@ class ThriftClient
         cls = self.class.ancestors.find { |cls| cls.respond_to?(:_arg_structs) and cls._arg_structs[method_name.to_sym] }
         arg_class, rv_class = cls._arg_structs[method_name.to_sym]
         arg_struct = arg_class.new(*args)
-        sock = TCPSocket.new(@host, @port)
-        sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
-        rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
-        sock.close
-        rv[2]
+        @sock ||= TCPSocket.new(@host, @port)
+        begin
+          packed = ThriftClient::Simple.pack_request(method_name, arg_struct, @framed)
+          wrote = @sock.write(packed)
+          rv = ThriftClient::Simple.read_response(@sock, rv_class, @framed)
+          rv[2]
+        rescue Exception => e
+          # attempt to close the socket and nil it, then re-raise the original exception
+          begin; @sock.close; rescue; end
+          @sock = nil
+          raise e
+        end
       end
 
       # convenience. robey is lazy.
