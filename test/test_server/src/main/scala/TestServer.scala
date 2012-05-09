@@ -80,6 +80,7 @@ package object config {
         nameServerReplicas = testNameServerReplicas(name)
         jobInjector.port   = iPort
         manager.port       = mPort
+        manager.threadPool.minThreads = 10
 
         val server             = new TestTHsHaServer { val name = "TestGizzardService"; val port = sPort }
         val databaseConnection = new TestDBConnection { val database = "gizzard_test_" + name }
