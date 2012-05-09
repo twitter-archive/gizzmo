@@ -209,6 +209,7 @@ module Gizzard
         puts "Skipped writing: #{printable(method_name, args)}"
       else
         @log.puts printable(method_name, args, true)
+        @log.flush
         super(method_name, *args)
       end
     end
