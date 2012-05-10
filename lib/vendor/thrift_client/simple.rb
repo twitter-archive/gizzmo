@@ -29,6 +29,41 @@ class ThriftClient
       I32 => 4,
     }
 
+    # a hash of persistent connections that should be torn down by the exit handler:
+    # connections are reused for the lifetime of the process, or until their first
+    # failed rpc
+    SOCKETS = Hash.new
+    previous_sig = trap("EXIT") do
+      SOCKETS.each do |sock|
+        begin
+          sock.close
+        rescue
+        end
+      end
+    end
+    if !previous_sig.nil?
+      raise Exception.new("Cannot override EXIT system handler: #{previous_sig}.")
+    end
+
+    # establish or reuse a persistent connection for the given host
+    def self.sock(host, port)
+      if SOCKETS.key? host
+        SOCKETS[host]
+      else
+        sock = TCPSocket.new(host, port)
+        SOCKETS[host] = sock
+      end
+    end
+
+    # attempt to close and clear the connection for the given host
+    def self.sock_close(host)
+      if SOCKETS.key? host
+        sock = SOCKETS[host]
+        begin; sock.close; rescue; end
+        SOCKETS.delete(host)
+      end
+    end
+
     module ComplexType
       module Extends
         def type_id=(n)
@@ -321,11 +356,16 @@ class ThriftClient
         cls = self.class.ancestors.find { |cls| cls.respond_to?(:_arg_structs) and cls._arg_structs[method_name.to_sym] }
         arg_class, rv_class = cls._arg_structs[method_name.to_sym]
         arg_struct = arg_class.new(*args)
-        sock = TCPSocket.new(@host, @port)
-        sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
-        rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
-        sock.close
-        rv[2]
+        begin
+          sock = ThriftClient::Simple.sock(@host, @port)
+          packed = ThriftClient::Simple.pack_request(method_name, arg_struct, @framed)
+          wrote = sock.write(packed)
+          rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
+          rv[2]
+        rescue Exception => e
+          ThriftClient::Simple.sock_close(@host)
+          raise e
+        end
       end
 
       # convenience. robey is lazy.
