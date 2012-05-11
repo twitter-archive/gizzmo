@@ -41,9 +41,6 @@ class ThriftClient
         end
       end
     end
-    if !previous_sig.nil?
-      raise Exception.new("Cannot override EXIT system handler: #{previous_sig}.")
-    end
 
     # establish or reuse a persistent connection for the given host
     def self.sock(host, port)
