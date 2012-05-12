@@ -145,33 +145,33 @@ module Gizzard
     end
 
     def get_shards(ids)
-      ids.map {|id| with_retry("get_shards", 1) { random_client.get_shard(id) } }
+      ids.map {|id| with_retry(1) { random_client.get_shard(id) } }
     end
 
     def reload_updated_forwardings
       opname = "reload_updated_forwardings"
       on_all_servers opname do |c|
-        with_retry(opname, MAX_BACKOFF_SECS/4) { c.reload_updated_forwardings }
+        with_retry(MAX_BACKOFF_SECS/4) { c.reload_updated_forwardings }
       end
     end
 
     def reload_config
       opname = "reload_config"
       on_all_servers opname do |c|
-        with_retry(opname, MAX_BACKOFF_SECS/4) { c.reload_config }
+        with_retry(MAX_BACKOFF_SECS/4) { c.reload_config }
       end
     end
 
     def copy_shard(*shards)
-      with_retry("copy_shard", MAX_BACKOFF_SECS/2) { random_client.copy_shard(*shards) }
+      with_retry(MAX_BACKOFF_SECS/2) { random_client.copy_shard(*shards) }
     end
 
     def repair_shards(*shards)
-      with_retry("repair_shards", MAX_BACKOFF_SECS/2) { random_client.repair_shard(*shards) }
+      with_retry(MAX_BACKOFF_SECS/2) { random_client.repair_shard(*shards) }
     end
 
     def diff_shards(*shards)
-      with_retry("diff_shards", MAX_BACKOFF_SECS/2) { random_client.diff_shards(*shards) }
+      with_retry(MAX_BACKOFF_SECS/2) { random_client.diff_shards(*shards) }
     end
 
     def respond_to?(method)
@@ -182,7 +182,7 @@ module Gizzard
       if client.respond_to?(method)
         # operations without specialized backoff use a backoff which assumes cheap, easily
         # retryable operations: if this isn't the case, methods should specialize as above
-        with_retry(method, 0.1) { random_client.send(method, *args, &block) }
+        with_retry(0.1) { random_client.send(method, *args, &block) }
       else
         super
       end
@@ -299,14 +299,13 @@ module Gizzard
 
     private
 
-    def with_retry(opname, min_backoff_secs)
+    def with_retry(min_backoff_secs)
       times ||= @retries
       yield
     rescue SystemExit => e
-      STDERR.puts "\nExiting immediately for #{e.to_s}"
+      STDERR.puts "Exiting immediately for #{e.to_s}"
       raise
     rescue Exception => e
-      STDERR.puts "\nException for #{opname}: #{e.to_s}: #{e.description rescue "(no description)"}"
       STDERR.puts "Retrying #{times} more time#{'s' if times > 1}..." if times > 0
       times -= 1
       sleep_time = [min_backoff_secs, MAX_BACKOFF_SECS / [times, 1].max].max
