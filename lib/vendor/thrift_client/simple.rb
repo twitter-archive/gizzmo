@@ -34,7 +34,7 @@ class ThriftClient
     # failed rpc
     SOCKETS = Hash.new
     previous_sig = trap("EXIT") do
-      SOCKETS.each do |sock|
+      SOCKETS.each do |host,sock|
         begin
           sock.close
         rescue
@@ -44,12 +44,10 @@ class ThriftClient
 
     # establish or reuse a persistent connection for the given host
     def self.sock(host, port)
-      if SOCKETS.key? host
-        SOCKETS[host]
-      else
-        sock = TCPSocket.new(host, port)
-        SOCKETS[host] = sock
+      if !SOCKETS.key?(host)
+        SOCKETS[host] = TCPSocket.new(host, port)
       end
+      SOCKETS[host]
     end
 
     # attempt to close and clear the connection for the given host
@@ -355,11 +353,11 @@ class ThriftClient
         arg_struct = arg_class.new(*args)
         begin
           sock = ThriftClient::Simple.sock(@host, @port)
-          packed = ThriftClient::Simple.pack_request(method_name, arg_struct, @framed)
-          wrote = sock.write(packed)
+          sock.write(ThriftClient::Simple.pack_request(method_name, arg_struct, @framed))
           rv = ThriftClient::Simple.read_response(sock, rv_class, @framed)
           rv[2]
         rescue Exception => e
+          STDERR.puts "\nException for #{method_name} on #{@host}: #{e.to_s}: #{e.description rescue "(no description)"}"
           ThriftClient::Simple.sock_close(@host)
           raise e
         end

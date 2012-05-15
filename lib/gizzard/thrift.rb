@@ -299,12 +299,12 @@ module Gizzard
     # (log entries are binary, but this client doesn't support labeling them as such)
 
     # create or get a log, returning a binary id for that log
-    thrift_method :log_create, string, field(:log_name, string, 1)
-    thrift_method :log_get, string, field(:log_name, string, 1)
+    thrift_method :log_create, string, field(:log_name, string, 1), :throws => exception(GizzardException)
+    thrift_method :log_get, string, field(:log_name, string, 1), :throws => exception(GizzardException)
     # given a log id, push/pop/peek binary data on that log
-    thrift_method :log_entry_push, void, field(:log_id, string, 1), field(:log_entry, struct(LogEntry), 2)
-    thrift_method :log_entry_peek, list(struct(LogEntry)), field(:log_id, string, 1), field(:count, i32, 2)
-    thrift_method :log_entry_pop, void, field(:log_id, string, 1), field(:log_entry_id, i32, 2)
+    thrift_method :log_entry_push, void, field(:log_id, string, 1), field(:log_entry, struct(LogEntry), 2), :throws => exception(GizzardException)
+    thrift_method :log_entry_peek, list(struct(LogEntry)), field(:log_id, string, 1), field(:count, i32, 2), :throws => exception(GizzardException)
+    thrift_method :log_entry_pop, void, field(:log_id, string, 1), field(:log_entry_id, i32, 2), :throws => exception(GizzardException)
   end
 
 
