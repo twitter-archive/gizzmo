@@ -187,6 +187,7 @@ module Gizzard
     def end_settling_jobs(jobs)
       return if jobs.none? { |job| job.required?(:unblock_reads) }
 
+      nameserver.reload_updated_forwardings
       log "SETTLING:"
       jobs.each do |j|
         log "  #{j.inspect}"
