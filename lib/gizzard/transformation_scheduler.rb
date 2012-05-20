@@ -194,8 +194,13 @@ module Gizzard
       end
       Gizzard::confirm!(@force, "Finished copies: destination shards are now receiving writes, but " +
                         "not reads. Wait until queues are drained, and then enter 'y' to proceed.")
+      unblocked_count = 0
       jobs.each do |j|
         apply_job(j, :unblock_reads)
+        unblocked_count += 1
+        if unblocked_count > max_copies
+          nameserver.reload_updated_forwardings
+        end
       end
       nameserver.reload_updated_forwardings
       Gizzard::confirm!(@force, "Destination shards are now receiving reads and writes. Wait until " +
