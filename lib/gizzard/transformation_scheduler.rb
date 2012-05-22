@@ -198,7 +198,7 @@ module Gizzard
       jobs.each do |j|
         apply_job(j, :unblock_reads)
         unblocked_count += 1
-        if unblocked_count > max_copies
+        if unblocked_count % max_copies == 0
           nameserver.reload_updated_forwardings
         end
       end
