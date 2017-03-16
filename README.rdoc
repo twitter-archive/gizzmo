@@ -1,3 +1,7 @@
+= STATUS
+
+Twitter is no longer maintaining this project or responding to issues or PRs.
+
 = gizzmo
 
 Gizzmo is a command-line client for managing gizzard clusters.
